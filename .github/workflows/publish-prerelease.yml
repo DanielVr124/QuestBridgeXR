@@ -29,7 +29,7 @@ jobs:
       - name: Verify downloadable files exist
         shell: bash
         run: |
-          find dist -type f -maxdepth 4 -print
+          find dist -maxdepth 4 -type f -print
           if ! find dist -type f \\( -name '*.zip' -o -name '*.apk' \\) -print -quit | grep -q .; then
             echo "No ZIP or APK build outputs were downloaded." >&2
             exit 1
