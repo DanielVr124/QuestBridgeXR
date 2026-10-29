@@ -1484,6 +1484,16 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         // Twin metal uprights attach through a centered VESA-style mounting plate.
         drawBox(pv.data(),x,monitorY-monitorH*.5f+.055f,monitorZ-.047f,.25f,.13f,.028f,trimDark);
         drawBox(pv.data(),x,monitorY-monitorH*.5f+.055f,monitorZ-.031f,.19f,.075f,.008f,silver);
+        // Rear service spine, ventilation slots, and a small illuminated model mark make
+        // the monitor feel finished when seen from the side or while walking around it.
+        const float rearSpineY=monitorY+monitorH*.12f;
+        drawBox(pv.data(),x,rearSpineY,monitorZ+.057f,.25f,.29f,.024f,trimDark);
+        drawBox(pv.data(),x,rearSpineY+.115f,monitorZ+.043f,.105f,.006f,.005f,accentBlue);
+        for(int vent=0;vent<5;++vent) {
+            const float ventY=rearSpineY+.065f-static_cast<float>(vent)*.027f;
+            drawBox(pv.data(),x,ventY,monitorZ+.043f,.105f,.007f,.005f,rgb(.24f,.29f,.38f));
+        }
+        drawBox(pv.data(),x,rearSpineY-.105f,monitorZ+.043f,.045f,.018f,.005f,silver);
         const float legOffset=monitorW*.205f;
         for(int side=-1;side<=1;side+=2) {
             const float legX=x+side*legOffset;
