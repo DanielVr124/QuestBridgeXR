@@ -1082,9 +1082,9 @@ void RoomRenderer::toggleSitting(const XrPosef& headPose) {
     moveZ_=nearest->z-headPose.position.z;
     worldOffsetX_ = 0.0f;
     worldOffsetZ_ = 0.0f;
-    yawPivotX_ = headPose.position.x;
+    yawPivotX_ = headPose.position.x + moveX_;
     yawPivotY_ = headPose.position.y;
-    yawPivotZ_ = headPose.position.z;
+    yawPivotZ_ = headPose.position.z + moveZ_;
     yawPivotInitialized_ = true;
     virtualYaw_=nearest->yaw-headYaw(headPose);
     sitting_=true;
