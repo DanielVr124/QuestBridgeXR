@@ -8,7 +8,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from questbridge_studio import QuestBridgeStudio
-from qbx_config import ROOM_ENVIRONMENTS
+from qbx_config import ROOM_ENVIRONMENT_LABELS
 
 class StudioUiTests(unittest.TestCase):
     @classmethod
@@ -49,7 +49,9 @@ class StudioUiTests(unittest.TestCase):
             for child in widget.winfo_children():
                 visit(child)
         visit(self.app)
-        self.assertTrue(any(set(ROOM_ENVIRONMENTS).issubset(set(values)) for values in combo_values))
+        expected_labels = set(ROOM_ENVIRONMENT_LABELS.values())
+        self.assertEqual(len(expected_labels), 208)
+        self.assertTrue(any(expected_labels.issubset(set(values)) for values in combo_values))
 
     def test_each_config_setting_has_a_widget(self):
         self.assertEqual(len(self.app.vars), 75)
