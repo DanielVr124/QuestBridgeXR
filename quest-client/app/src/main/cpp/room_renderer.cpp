@@ -17,7 +17,8 @@
 
 namespace {
 constexpr float kPi = 3.14159265358979323846f;
-constexpr std::array<const char*, 28> kEnvironmentNames = {
+constexpr std::array<const char*, 88> kEnvironmentNames = {
+
     "blossom",
     "night_city",
     "golden_city",
@@ -46,7 +47,102 @@ constexpr std::array<const char*, 28> kEnvironmentNames = {
     "lavender_fields",
     "firefly_swamp",
     "polar_station",
+    "neon_downtown",
+    "skyline_penthouse",
+    "harbor_city",
+    "rainy_metropolis",
+    "old_town_evening",
+    "rooftop_sunset",
+    "future_megacity",
+    "night_market",
+    "redwood_forest",
+    "bamboo_grove",
+    "misty_woodland",
+    "wildflower_meadow",
+    "jungle_canopy",
+    "waterfall_glen",
+    "apple_orchard",
+    "mossy_forest",
+    "coral_reef",
+    "turquoise_lagoon",
+    "moonlit_ocean",
+    "stormy_coast",
+    "ice_fjord",
+    "river_valley",
+    "seaside_village",
+    "bioluminescent_bay",
+    "alpine_sunrise",
+    "winter_pines",
+    "glacier_valley",
+    "highland_lake",
+    "mountain_village",
+    "snow_cabin",
+    "aurora_ridge",
+    "polar_twilight",
+    "mars_frontier",
+    "starship_bridge",
+    "binary_stars",
+    "alien_planet",
+    "crystal_planet",
+    "floating_islands",
+    "fantasy_castle",
+    "moon_garden",
+    "desert_oasis",
+    "red_canyon",
+    "golden_badlands",
+    "volcanic_ash",
+    "lava_cavern",
+    "salt_flats",
+    "misty_moor",
+    "thunderhead",
+    "spring_garden",
+    "summer_meadow",
+    "autumn_orchard",
+    "winter_village",
+    "lantern_festival",
+    "sakura_festival",
+    "lavender_twilight",
+    "golden_hour_hills",
+    "dreamscape",
+    "vaporwave_dream",
+    "synthwave_highway",
+    "crystal_forest",
 };
+
+
+struct EnvironmentPalette {
+    std::array<float, 3> skyTop;
+    std::array<float, 3> skyHorizon;
+    std::array<float, 3> ground;
+    float horizon;
+};
+
+EnvironmentPalette extraEnvironmentPalette(int extraIndex) {
+    EnvironmentPalette p{};
+    switch (extraIndex / 8) {
+    case 0: p.skyTop={10,13,39}; p.skyHorizon={70,69,136}; p.ground={8,18,39}; p.horizon=0.82f; break;
+    case 1: p.skyTop={20,58,49}; p.skyHorizon={105,162,119}; p.ground={18,58,41}; p.horizon=0.70f; break;
+    case 2: p.skyTop={8,54,76}; p.skyHorizon={75,175,190}; p.ground={5,75,95}; p.horizon=0.68f; break;
+    case 3: p.skyTop={33,76,112}; p.skyHorizon={164,200,222}; p.ground={69,112,139}; p.horizon=0.65f; break;
+    case 4: p.skyTop={13,10,49}; p.skyHorizon={78,56,132}; p.ground={22,18,64}; p.horizon=0.84f; break;
+    case 5: p.skyTop={66,31,25}; p.skyHorizon={210,119,66}; p.ground={124,72,43}; p.horizon=0.69f; break;
+    case 6: p.skyTop={73,68,119}; p.skyHorizon={205,157,166}; p.ground={101,93,120}; p.horizon=0.66f; break;
+    default: p.skyTop={19,12,62}; p.skyHorizon={151,73,158}; p.ground={20,26,78}; p.horizon=0.81f; break;
+    }
+    const float variant = static_cast<float>(extraIndex % 8);
+    const float shift = (variant - 3.5f) * 3.5f;
+    p.skyTop[0] = std::clamp(p.skyTop[0] + shift, 0.0f, 255.0f);
+    p.skyTop[1] = std::clamp(p.skyTop[1] + (static_cast<int>(variant) % 3 - 1) * 7.0f, 0.0f, 255.0f);
+    p.skyTop[2] = std::clamp(p.skyTop[2] - shift * 0.35f, 0.0f, 255.0f);
+    p.skyHorizon[0] = std::clamp(p.skyHorizon[0] + shift * 1.5f, 0.0f, 255.0f);
+    p.skyHorizon[1] = std::clamp(p.skyHorizon[1] + (static_cast<int>(variant) % 4 - 1) * 5.0f, 0.0f, 255.0f);
+    p.skyHorizon[2] = std::clamp(p.skyHorizon[2] - shift * 0.5f, 0.0f, 255.0f);
+    p.ground[0] = std::clamp(p.ground[0] + shift * 0.8f, 0.0f, 255.0f);
+    p.ground[1] = std::clamp(p.ground[1] + (static_cast<int>(variant) % 3 - 1) * 5.0f, 0.0f, 255.0f);
+    p.ground[2] = std::clamp(p.ground[2] - shift * 0.25f, 0.0f, 255.0f);
+    p.horizon = std::clamp(p.horizon + (static_cast<int>(variant) % 5 - 2) * 0.008f, 0.58f, 0.92f);
+    return p;
+}
 
 int environmentIndex(const std::string& name) {
     for (size_t i = 0; i < kEnvironmentNames.size(); ++i) {
@@ -215,17 +311,40 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
     case 27: skyTop={8,35,60}; skyHorizon={139,188,207}; ground={103,130,150}; break;                    // polar station
     default: break;
     }
+    if (sceneIndex >= 28 && sceneIndex < static_cast<int>(kEnvironmentNames.size())) {
+        const auto palette = extraEnvironmentPalette(sceneIndex - 28);
+        skyTop = palette.skyTop;
+        skyHorizon = palette.skyHorizon;
+        ground = palette.ground;
+        horizon = palette.horizon;
+    }
 
-    const bool city = sceneIndex == 4 || sceneIndex == 17 || sceneIndex == 18;
+    const bool city = sceneIndex == 4 || sceneIndex == 17 || sceneIndex == 18 ||
+                      (sceneIndex >= 28 && sceneIndex <= 35);
     const bool water = sceneIndex == 5 || sceneIndex == 9 || sceneIndex == 13 ||
-                       sceneIndex == 15 || sceneIndex == 20;
+                       sceneIndex == 15 || sceneIndex == 20 ||
+                       (sceneIndex >= 44 && sceneIndex <= 51) || sceneIndex == 68;
     const bool forest = sceneIndex == 7 || sceneIndex == 14 || sceneIndex == 15 ||
-                        sceneIndex == 19 || sceneIndex == 21 || sceneIndex == 26;
+                        sceneIndex == 19 || sceneIndex == 21 || sceneIndex == 26 ||
+                        (sceneIndex >= 36 && sceneIndex <= 38) ||
+                        (sceneIndex >= 40 && sceneIndex <= 43) ||
+                        sceneIndex == 67 || sceneIndex == 76 || sceneIndex == 78 ||
+                        sceneIndex == 81 || sceneIndex == 87;
     const bool mountain = sceneIndex == 6 || sceneIndex == 9 || sceneIndex == 11 ||
-                          sceneIndex == 20 || sceneIndex == 21 || sceneIndex == 22 || sceneIndex == 27;
+                          sceneIndex == 20 || sceneIndex == 21 || sceneIndex == 22 || sceneIndex == 27 ||
+                          (sceneIndex >= 52 && sceneIndex <= 60) ||
+                          (sceneIndex >= 69 && sceneIndex <= 70) ||
+                          (sceneIndex >= 73 && sceneIndex <= 75);
+    const bool extraNight = sceneIndex == 28 || sceneIndex == 30 || sceneIndex == 31 ||
+                            sceneIndex == 34 || sceneIndex == 35 || sceneIndex == 46 ||
+                            sceneIndex == 51 || sceneIndex == 58 || sceneIndex == 59 ||
+                            (sceneIndex >= 61 && sceneIndex <= 67) || sceneIndex == 71 ||
+                            sceneIndex == 72 || sceneIndex == 75 || sceneIndex == 79 ||
+                            sceneIndex == 80 || sceneIndex == 81 || sceneIndex == 82 ||
+                            (sceneIndex >= 84 && sceneIndex <= 87);
     const bool night = sceneIndex == 3 || sceneIndex == 4 || sceneIndex == 10 ||
                        sceneIndex == 11 || sceneIndex == 18 || sceneIndex == 19 ||
-                       sceneIndex == 23 || sceneIndex == 24 || sceneIndex == 26 || sceneIndex == 27;
+                       sceneIndex == 23 || sceneIndex == 24 || sceneIndex == 26 || sceneIndex == 27 || extraNight;
 
     float sunX = 0.72f, sunY = 0.37f, sunRadius = 0.075f;
     std::array<float, 3> sunColor{255, 227, 177};
@@ -278,9 +397,18 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                 const float star = 95.0f + static_cast<float>((noise >> 9) & 0x7fU);
                 r += star * 0.78f; g += star * 0.86f; b += star;
             }
+            if ((sceneIndex == 58 || sceneIndex == 59) && v < horizon) {
+                const float center = 0.39f + 0.065f * std::sin(u * 7.0f + 0.6f)
+                                   + 0.021f * std::sin(u * 23.0f);
+                const float ribbon = std::exp(-std::pow((v - center) / 0.075f, 2.0f));
+                const float wave = 0.45f + 0.55f * (0.5f + 0.5f * std::sin(u * 19.0f + v * 31.0f));
+                r += (sceneIndex == 58 ? 13.0f : 23.0f) * ribbon * wave;
+                g += (sceneIndex == 58 ? 126.0f : 73.0f) * ribbon * wave;
+                b += (sceneIndex == 58 ? 98.0f : 151.0f) * ribbon * wave;
+            }
             if ((sceneIndex == 5 || sceneIndex == 6 || sceneIndex == 8 || sceneIndex == 10 ||
                  sceneIndex == 11 || sceneIndex == 19 || sceneIndex == 20 ||
-                 sceneIndex == 25 || sceneIndex == 27) && v < horizon) {
+                 sceneIndex == 25 || sceneIndex == 27 || (sceneIndex >= 28 && !night)) && v < horizon) {
                 const float dx = (u - sunX) * 1.6f;
                 const float dy = v - sunY;
                 if (dx * dx + dy * dy < sunRadius * sunRadius) {
@@ -306,7 +434,8 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                 if (v > ridgeFront && v < 0.86f) {
                     r = ground[0] * 0.95f; g = ground[1] * 0.90f; b = ground[2] * 0.86f;
                 }
-                if ((sceneIndex == 6 || sceneIndex == 20 || sceneIndex == 27) &&
+                if ((sceneIndex == 6 || sceneIndex == 20 || sceneIndex == 27 ||
+                     (sceneIndex >= 52 && sceneIndex <= 59)) &&
                     v > ridgeBack && v < ridgeBack + 0.035f) {
                     r = 231.0f; g = 244.0f; b = 250.0f;
                 }
@@ -328,7 +457,7 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                 const float wave = std::sin(v * 176.0f + u * 38.0f)
                                  + 0.45f * std::sin(v * 93.0f - u * 19.0f);
                 const float shimmer = wave > 1.05f ? 22.0f : wave > 0.65f ? 9.0f : 0.0f;
-                r = ground[0] + shimmer * (sceneIndex == 5 ? 1.0f : 0.3f);
+                r = ground[0] + shimmer * ((sceneIndex == 5 || sceneIndex == 44 || sceneIndex == 45 || sceneIndex == 50) ? 1.0f : 0.3f);
                 g = ground[1] + shimmer * 0.9f;
                 b = ground[2] + shimmer;
                 if (sceneIndex == 5 && v > 0.87f) {
@@ -340,7 +469,7 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                         r = 32.0f; g = 94.0f; b = 61.0f;
                     }
                 }
-                if (sceneIndex == 13) {
+                if (sceneIndex == 13 || sceneIndex == 44 || sceneIndex == 51) {
                     const float bubbleU = static_cast<float>((noise >> 8) % 1000U) / 1000.0f;
                     if ((x % 67 < 3) && std::fabs(u - bubbleU) < 0.012f) { r = 93.0f; g = 219.0f; b = 237.0f; }
                     if (std::fabs(std::sin(u * 21.0f + v * 6.0f)) < 0.035f && v > 0.40f) {
@@ -355,13 +484,13 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                 const float treeTop = 0.55f + repeating * (sceneIndex == 15 ? 0.20f : 0.14f)
                                     + 0.025f * std::sin(u * 37.0f);
                 if (v > treeTop && v < 0.92f) {
-                    if (sceneIndex == 14) { r = 113.0f + 38.0f * repeating; g = 45.0f + 27.0f * repeating; b = 25.0f; }
-                    else if (sceneIndex == 15) { r = 8.0f; g = 56.0f + 22.0f * repeating; b = 38.0f; }
-                    else if (sceneIndex == 26) { r = 3.0f; g = 35.0f + 15.0f * repeating; b = 31.0f; }
-                    else if (sceneIndex == 21) { r = 15.0f; g = 67.0f + 35.0f * repeating; b = 49.0f; }
+                    if (sceneIndex == 14 || sceneIndex == 78) { r = 113.0f + 38.0f * repeating; g = 45.0f + 27.0f * repeating; b = 25.0f; }
+                    else if (sceneIndex == 15 || sceneIndex == 40) { r = 8.0f; g = 56.0f + 22.0f * repeating; b = 38.0f; }
+                    else if (sceneIndex == 26 || sceneIndex == 43) { r = 3.0f; g = 35.0f + 15.0f * repeating; b = 31.0f; }
+                    else if (sceneIndex == 21 || sceneIndex == 36) { r = 15.0f + 30.0f * repeating; g = 49.0f + 35.0f * repeating; b = 35.0f; }
                     else { r = 6.0f; g = 40.0f + 25.0f * repeating; b = 36.0f; }
                 }
-                if (sceneIndex == 19 && v > 0.52f && v < 0.74f &&
+                if ((sceneIndex == 19 || sceneIndex == 81) && v > 0.52f && v < 0.74f &&
                     (std::fabs(std::sin(u * 21.0f + v * 10.0f)) < 0.13f) &&
                     noise % 5U == 0U) {
                     r = 255.0f; g = 177.0f; b = 222.0f;
@@ -372,22 +501,22 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
             }
 
             // Dune curves, ash fields, lava seams and alien wasteland contours.
-            if (sceneIndex == 8 || sceneIndex == 22) {
+            if (sceneIndex == 8 || sceneIndex == 22 || sceneIndex == 69 || sceneIndex == 70) {
                 const float dune = 0.57f + 0.10f * std::sin(u * 8.0f + 0.4f)
                                  + 0.045f * std::sin(u * 21.0f);
                 if (v > dune) {
-                    if (sceneIndex == 8) { r = 218.0f + 17.0f * std::sin(u * 4.0f); g = 139.0f; b = 67.0f; }
+                    if (sceneIndex == 8 || sceneIndex == 69 || sceneIndex == 70) { r = (sceneIndex == 69 ? 176.0f : 218.0f) + 17.0f * std::sin(u * 4.0f); g = sceneIndex == 70 ? 112.0f : 139.0f; b = sceneIndex == 69 ? 59.0f : 67.0f; }
                     else { r = 63.0f; g = 48.0f; b = 42.0f; }
                 }
             }
-            if (sceneIndex == 12) {
+            if (sceneIndex == 12 || sceneIndex == 71 || sceneIndex == 72) {
                 const float volcanoPeak = 0.43f + std::fabs(u - 0.50f) * 0.78f;
                 if (v > volcanoPeak) {
-                    r = 31.0f; g = 20.0f; b = 25.0f;
-                    const float crack = std::fabs(std::fmod(u * 17.0f + std::sin(v * 15.0f) * 0.18f, 1.0f) - 0.5f);
-                    if (v > 0.72f && crack < 0.022f) { r = 255.0f; g = 71.0f; b = 18.0f; }
+                    r = sceneIndex == 71 ? 53.0f : 31.0f; g = 20.0f; b = 25.0f;
+                    const float crack = std::fabs(std::fmod(u * (sceneIndex == 72 ? 31.0f : 17.0f) + std::sin(v * 15.0f) * 0.18f, 1.0f) - 0.5f);
+                    if (v > 0.72f && crack < 0.022f) { r = 255.0f; g = sceneIndex == 71 ? 34.0f : 71.0f; b = 18.0f; }
                 }
-                if (v > 0.43f && v < 0.55f && std::fabs(u - 0.50f) < 0.045f) {
+                if ((sceneIndex == 12 || sceneIndex == 71) && v > 0.43f && v < 0.55f && std::fabs(u - 0.50f) < 0.045f) {
                     r = 255.0f; g = 103.0f; b = 30.0f;
                 }
             }
@@ -401,7 +530,7 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                     r = colors[stripe][0]; g = colors[stripe][1]; b = colors[stripe][2];
                 }
             }
-            if (sceneIndex == 24) {
+            if (sceneIndex == 24 || sceneIndex == 64 || sceneIndex == 87) {
                 const float topSpike = 0.12f + 0.16f * std::fabs(std::sin(u * 23.0f));
                 const float bottomSpike = 0.83f - 0.16f * std::fabs(std::sin(u * 17.0f + 0.7f));
                 if (v < topSpike || v > bottomSpike) {
@@ -412,7 +541,7 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                     r += 24.0f * crystalGlow; g += 8.0f * crystalGlow; b += 40.0f * crystalGlow;
                 }
             }
-            if (sceneIndex == 25 && v > 0.63f) {
+            if ((sceneIndex == 25 || sceneIndex == 82) && v > 0.63f) {
                 const int row = static_cast<int>((v - 0.63f) * 220.0f);
                 const int plant = static_cast<int>(u * 160.0f) % 5;
                 r = plant % 2 == 0 ? 115.0f : 157.0f;
@@ -442,6 +571,30 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                 }
                 if (sceneIndex == 18 && v < 0.82f && (x % 37) < 2 &&
                     (noise % 5U == 0U)) { r = 51.0f; g = 91.0f; b = 137.0f; }
+            }
+
+            if ((sceneIndex == 80 || sceneIndex == 81) && v < 0.72f && noise % 130U < 3U) {
+                if (sceneIndex == 80) { r += 142.0f; g += 84.0f; b += 28.0f; }
+                else { r += 132.0f; g += 70.0f; b += 121.0f; }
+            }
+            if ((sceneIndex == 85 || sceneIndex == 86) && v > horizon) {
+                const float depth = (v - horizon) / (1.0f - horizon);
+                const bool horizontalGrid = std::fabs(std::fmod(depth * 19.0f, 1.0f) - 0.5f) < 0.035f;
+                const bool verticalGrid = std::fabs(std::fmod(u * 30.0f + depth * 8.0f, 1.0f) - 0.5f) < 0.025f;
+                if (horizontalGrid || verticalGrid) { r += 70.0f; g += 15.0f; b += 120.0f; }
+            }
+            if (sceneIndex == 62 && v < horizon) {
+                for (int starIndex = 0; starIndex < 2; ++starIndex) {
+                    const float sx = starIndex == 0 ? 0.31f : 0.70f;
+                    const float sy = starIndex == 0 ? 0.34f : 0.39f;
+                    const float radius = starIndex == 0 ? 0.052f : 0.035f;
+                    const float dx = (u - sx) * 1.6f;
+                    if (dx * dx + (v - sy) * (v - sy) < radius * radius) {
+                        r = starIndex == 0 ? 255.0f : 129.0f;
+                        g = starIndex == 0 ? 226.0f : 191.0f;
+                        b = starIndex == 0 ? 171.0f : 255.0f;
+                    }
+                }
             }
 
             // Aurora/city/lunar nights retain stars above their horizon.
@@ -695,6 +848,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     case 12: case 22:
         wall=rgb(.22f,.10f,.09f); floor=rgb(.12f,.06f,.065f); wood=rgb(.22f,.12f,.085f); sofa=rgb(.28f,.13f,.11f); break;
     default: break;
+    }
+    if (activeEnvironmentIndex_ >= 28) {
+        switch ((activeEnvironmentIndex_ - 28) / 8) {
+        case 0: wall=rgb(.10f,.12f,.22f); floor=rgb(.07f,.08f,.15f); wood=rgb(.10f,.11f,.22f); sofa=rgb(.18f,.11f,.30f); break;
+        case 1: wall=rgb(.10f,.20f,.15f); floor=rgb(.06f,.13f,.09f); wood=rgb(.13f,.21f,.13f); sofa=rgb(.14f,.30f,.19f); break;
+        case 2: wall=rgb(.06f,.19f,.24f); floor=rgb(.03f,.11f,.16f); wood=rgb(.08f,.19f,.23f); sofa=rgb(.08f,.29f,.34f); break;
+        case 3: wall=rgb(.12f,.20f,.29f); floor=rgb(.09f,.15f,.22f); wood=rgb(.16f,.25f,.31f); sofa=rgb(.21f,.34f,.43f); break;
+        case 4: wall=rgb(.08f,.07f,.20f); floor=rgb(.035f,.03f,.11f); wood=rgb(.12f,.07f,.25f); sofa=rgb(.19f,.11f,.34f); break;
+        case 5: wall=rgb(.25f,.13f,.10f); floor=rgb(.14f,.07f,.055f); wood=rgb(.24f,.12f,.07f); sofa=rgb(.35f,.16f,.11f); break;
+        case 6: wall=rgb(.24f,.18f,.25f); floor=rgb(.16f,.12f,.21f); wood=rgb(.28f,.19f,.22f); sofa=rgb(.42f,.24f,.34f); break;
+        default: wall=rgb(.11f,.08f,.25f); floor=rgb(.045f,.04f,.15f); wood=rgb(.15f,.09f,.28f); sofa=rgb(.23f,.12f,.37f); break;
+        }
     }
     glUseProgram(program_);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDisable(GL_CULL_FACE);
     glUniform1i(locTexture_,0);
