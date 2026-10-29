@@ -84,6 +84,8 @@ private:
     std::array<GLuint, 208> environmentTextures_{};
     int activeEnvironmentIndex_ = 0;
     GLuint videoFallbackTexture_ = 0;
+    GLuint textVao_ = 0;
+    GLuint textVbo_ = 0;
     bool initialized_ = false;
     float moveX_ = 0.0f;
     float moveZ_ = 0.0f;
