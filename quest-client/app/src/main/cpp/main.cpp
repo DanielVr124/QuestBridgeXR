@@ -1,12 +1,13 @@
 #define XR_USE_PLATFORM_ANDROID
 #define XR_USE_GRAPHICS_API_OPENGL_ES
+#include <jni.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <android/log.h>
 #include <android_native_app_glue.h>
 #include <android/native_window.h>
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
 #include <GLES3/gl3.h>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -569,7 +570,7 @@ public:
         while (!exiting && app_ && !app_->destroyRequested) {
             int events = 0;
             android_poll_source* source = nullptr;
-            while (ALooper_pollAll(sessionRunning_ ? 0 : 100, nullptr, &events,
+            while (ALooper_pollOnce(sessionRunning_ ? 0 : 100, nullptr, &events,
                                    reinterpret_cast<void**>(&source)) >= 0) {
                 if (source) source->process(app_, source);
                 if (app_->destroyRequested) { exiting = true; break; }
@@ -1190,7 +1191,7 @@ void android_main(android_app* app) {
     while (!app->window && !app->destroyRequested) {
         int events = 0;
         android_poll_source* source = nullptr;
-        ALooper_pollAll(100, nullptr, &events, reinterpret_cast<void**>(&source));
+        ALooper_pollOnce(100, nullptr, &events, reinterpret_cast<void**>(&source));
         if (source) source->process(app, source);
     }
     if (app->destroyRequested) return;
