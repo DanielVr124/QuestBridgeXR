@@ -1071,8 +1071,12 @@ private:
                     const float shade = eye == 0 ? 0.035f : 0.055f;
                     glClearColor(shade, shade, shade + 0.025f, 1.0f);
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                    XrPosef headCenterPose = views_[0].pose;
+                    headCenterPose.position.x = (views_[0].pose.position.x + views_[1].pose.position.x) * 0.5f;
+                    headCenterPose.position.y = (views_[0].pose.position.y + views_[1].pose.position.y) * 0.5f;
+                    headCenterPose.position.z = (views_[0].pose.position.z + views_[1].pose.position.z) * 0.5f;
                     room_.renderEye(static_cast<int>(eye), static_cast<int>(sc.width), static_cast<int>(sc.height),
-                                    views_[eye], desktopTexture, video_.hasFrame());
+                                    views_[eye], headCenterPose, desktopTexture, video_.hasFrame());
                     glBindFramebuffer(GL_FRAMEBUFFER, 0);
                     XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
                     if (XR_FAILED(xrReleaseSwapchainImage(sc.handle, &releaseInfo))) {
