@@ -1051,6 +1051,11 @@ private:
     }
 
     void renderFrame() {
+        ++renderFrameCount_;
+        if (renderFrameCount_ % 300 == 1) {
+            LOGI("OpenXR render loop active; frame=%llu sessionState=%d",
+                 static_cast<unsigned long long>(renderFrameCount_), static_cast<int>(sessionState_));
+        }
         XrFrameWaitInfo waitInfo{XR_TYPE_FRAME_WAIT_INFO};
         XrFrameState frameState{XR_TYPE_FRAME_STATE};
         if (!xrOk(xrWaitFrame(session_, &waitInfo, &frameState), "xrWaitFrame")) { usleep(10000); return; }
@@ -1075,13 +1080,17 @@ private:
                     auto& sc = swapchains_[eye];
                     uint32_t imageIndex = 0;
                     XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-                    if (XR_FAILED(xrAcquireSwapchainImage(sc.handle, &acquireInfo, &imageIndex))) {
+                    const XrResult acquireResult = xrAcquireSwapchainImage(sc.handle, &acquireInfo, &imageIndex);
+                    if (XR_FAILED(acquireResult)) {
+                        LOGE("xrAcquireSwapchainImage failed for eye %u: %d", eye, static_cast<int>(acquireResult));
                         allEyesRendered = false;
                         break;
                     }
                     XrSwapchainImageWaitInfo waitSwapInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
                     waitSwapInfo.timeout = XR_INFINITE_DURATION;
-                    if (XR_FAILED(xrWaitSwapchainImage(sc.handle, &waitSwapInfo))) {
+                    const XrResult waitImageResult = xrWaitSwapchainImage(sc.handle, &waitSwapInfo);
+                    if (XR_FAILED(waitImageResult)) {
+                        LOGE("xrWaitSwapchainImage failed for eye %u: %d", eye, static_cast<int>(waitImageResult));
                         XrSwapchainImageReleaseInfo rel{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
                         xrReleaseSwapchainImage(sc.handle, &rel);
                         allEyesRendered = false;
@@ -1106,7 +1115,9 @@ private:
                                     views_[eye], desktopTexture, video_.hasFrame());
                     glBindFramebuffer(GL_FRAMEBUFFER, 0);
                     XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-                    if (XR_FAILED(xrReleaseSwapchainImage(sc.handle, &releaseInfo))) {
+                    const XrResult releaseResult = xrReleaseSwapchainImage(sc.handle, &releaseInfo);
+                    if (XR_FAILED(releaseResult)) {
+                        LOGE("xrReleaseSwapchainImage failed for eye %u: %d", eye, static_cast<int>(releaseResult));
                         allEyesRendered = false;
                         break;
                     }
@@ -1121,7 +1132,8 @@ private:
                 }
                 layerReady = allEyesRendered;
             } else {
-                LOGW("xrLocateViews failed or returned an unexpected number of views");
+                LOGE("xrLocateViews failed or returned unexpected view count (result=%d count=%u expected=%zu)",
+                     static_cast<int>(located), viewCount, views_.size());
                 sendTracking(frameState.predictedDisplayTime);
             }
         } else {
@@ -1141,7 +1153,12 @@ private:
             endInfo.layerCount = 1;
             endInfo.layers = layers;
         }
-        xrEndFrame(session_, &endInfo);
+        const XrResult endResult = xrEndFrame(session_, &endInfo);
+        if (XR_FAILED(endResult)) {
+            LOGE("xrEndFrame failed: %d (layerReady=%s)", static_cast<int>(endResult), layerReady ? "yes" : "no");
+        } else if (!layerReady && renderFrameCount_ % 60 == 1) {
+            LOGW("OpenXR frame submitted without projection layer; runtime may keep showing its loading indicator");
+        }
     }
 
     void shutdown() {
@@ -1201,6 +1218,7 @@ private:
     XrSessionState sessionState_ = XR_SESSION_STATE_UNKNOWN;
     bool sessionRunning_ = false;
     bool shutdown_ = false;
+    uint64_t renderFrameCount_ = 0;
     XrActionSet actionSet_ = XR_NULL_HANDLE;
     std::array<HandActions, 2> hands_{};
     std::vector<EyeSwapchain> swapchains_;
