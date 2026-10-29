@@ -69,7 +69,8 @@ private:
     void drawMonitors(const float* projectionView, const float* projection, float floorY,
                       GLuint videoTexture, bool hasVideo, bool followView);
 
-    RoomSettings settings_{};\n    AmbientAudio ambience_{};
+    RoomSettings settings_{};
+    AmbientAudio ambience_{};
     GLuint program_ = 0;
     GLuint vignetteProgram_ = 0;
     GLuint vao_ = 0;
