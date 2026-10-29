@@ -50,6 +50,8 @@ With the default room controls enabled:
 - **Left thumbstick:** walk around the room.
 - **Right thumbstick:** turn; snap-turn is enabled by default.
 - **Click the right thumbstick (R3):** cycle to the next environment. There are 208 scenes, so this currently advances one at a time and wraps around at the end.
+- **Press B on the right controller:** open or close the monitor's QuestBridge Control Center. The menu replaces the live PC image while open and reveals it again when closed.
+- **Point the right controller at the monitor:** use the blue laser and squeeze the right trigger to select menu tabs and actions. The menu includes Home, Environments, Display Output, Comfort, and Help.
 - **Click the left thumbstick (L3):** cycle the desktop display between the monitor, TV, and both.
 - **Press X on the left controller:** toggle the seated-height mode. Moving with the left thumbstick automatically stands you back up.
 
