@@ -973,13 +973,12 @@ private:
         previousLeftStickClick_ = leftStickClick;
         previousRightStickClick_ = rightStickClick;
         previousLeftPrimary_ = leftPrimary;
-        const float moveX = applyDeadzone(std::clamp(config_.invertThumbstickX ? -move.x : move.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
-        const float moveY = applyDeadzone(std::clamp(config_.invertThumbstickY ? -move.y : move.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
+        float moveX = applyDeadzone(std::clamp(config_.invertThumbstickX ? -move.x : move.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
+        float moveY = applyDeadzone(std::clamp(config_.invertThumbstickY ? -move.y : move.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
         const float turnX = applyDeadzone(std::clamp(turn.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
         // Walking can be disabled independently; turning must remain available in either mode.
-        room_.updateLocomotion(config_.roomMovementEnabled ? moveX : 0.0f,
-                               config_.roomMovementEnabled ? moveY : 0.0f,
-                               turnX, dt, headPose);
+        if (!config_.roomMovementEnabled) { moveX = 0.0f; moveY = 0.0f; }
+        room_.updateLocomotion(moveX, moveY, turnX, dt, headPose);
 
         if (!config_.controllersEnabled) return;
         for (int handIndex = 0; handIndex < 2; ++handIndex) {
