@@ -1254,18 +1254,15 @@ void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monito
 }
 
 XrPosef RoomRenderer::transformViewPose(const XrPosef& viewPose, const XrVector3f& headCenter) const {
-    // Artificial yaw belongs on the virtual tracking rig, not on the room mesh.
-    // Render and submit the same transformed pose so OpenXR's late reprojection
-    // agrees with the camera that produced the pixels.
-    const XrQuaternionf yawQ{0.0f, std::sin(virtualYaw_ * 0.5f), 0.0f, std::cos(virtualYaw_ * 0.5f)};
+    // Preserve the real OpenXR head orientation and eye poses. Artificial turning
+    // is applied to the virtual room geometry, never to the submitted compositor
+    // pose; this avoids the runtime reprojecting a view that was rendered with a
+    // different camera orientation (the source of the black-screen regression).
     XrPosef rendered = viewPose;
-    rendered.orientation = quatMul(yawQ, viewPose.orientation);
-    const Mat4 yaw = rotateY(virtualYaw_);
-    const float dx = viewPose.position.x - headCenter.x;
-    const float dz = viewPose.position.z - headCenter.z;
-    rendered.position.x = headCenter.x + yaw[0] * dx + yaw[8] * dz + moveX_;
+    rendered.position.x = viewPose.position.x + moveX_;
     rendered.position.y = viewPose.position.y - (sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f);
-    rendered.position.z = headCenter.z + yaw[2] * dx + yaw[10] * dz + moveZ_;
+    rendered.position.z = viewPose.position.z + moveZ_;
+    (void)headCenter;
     return rendered;
 }
 
@@ -1280,9 +1277,14 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
     Mat4 projection=makeProjection(view.fov);
     Mat4 camera=makeView(renderedPose);
-    // World geometry stays fixed; virtual yaw is applied to the camera pose
-    // above and that exact pose is submitted to the compositor.
-    Mat4 pv=mul(projection,camera);
+    // Rotate the virtual room around one shared head-center pivot. Both eyes
+    // use the same pivot, while OpenXR receives the real tracked eye orientation.
+    const float pivotX = headCenter.x + moveX_;
+    const float pivotY = headCenter.y - (sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f);
+    const float pivotZ = headCenter.z + moveZ_;
+    const Mat4 roomTurn = mul(translation(pivotX, pivotY, pivotZ),
+        mul(rotateY(-virtualYaw_), translation(-pivotX, -pivotY, -pivotZ)));
+    Mat4 pv = mul(projection, mul(camera, roomTurn));
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
     std::array<float,4> floor = rgb(.09f,.12f,.18f);
@@ -1513,13 +1515,11 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     for(int hand=0;hand<2;++hand) {
         if(!controllerPoseValid_[hand]) continue;
         XrPosef controller=controllerPoses_[hand];
-        const XrQuaternionf yawQ{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
-        controller.orientation=quatMul(yawQ,controller.orientation);
-        const Mat4 yaw=rotateY(virtualYaw_);
-        const float dx=controller.position.x-headCenter.x, dz=controller.position.z-headCenter.z;
-        controller.position.x=headCenter.x+yaw[0]*dx+yaw[8]*dz+moveX_;
-        controller.position.y-=sitting_?std::clamp(settings_.sittingHeadDropM,.10f,.75f):0.0f;
-        controller.position.z=headCenter.z+yaw[2]*dx+yaw[10]*dz+moveZ_;
+        // Controller poses stay physically tracked; only locomotion and sitting
+        // offsets are applied. Artificial room yaw must not rotate the hands.
+        controller.position.x += moveX_;
+        controller.position.y -= sitting_ ? std::clamp(settings_.sittingHeadDropM,.10f,.75f) : 0.0f;
+        controller.position.z += moveZ_;
         drawControllerModel(pv.data(),controller,hand==0,controllerTriggers_[hand],controllerGrips_[hand]);
     }
     if(settings_.comfortVignette && vignetteProgram_){
