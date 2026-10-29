@@ -29,7 +29,7 @@ class ProjectPathTests(unittest.TestCase):
             exe.touch()
             with patch.object(qbx_paths.sys, 'frozen', True, create=True), \
                  patch.object(qbx_paths.sys, 'executable', str(exe)):
-                self.assertEqual(qbx_paths.project_root('ignored.py'), root)
+                self.assertEqual(qbx_paths.project_root('ignored.py'), root.resolve())
 
 if __name__ == '__main__':
     unittest.main()
