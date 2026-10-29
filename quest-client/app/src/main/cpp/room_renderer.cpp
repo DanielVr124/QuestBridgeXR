@@ -1254,15 +1254,19 @@ void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monito
 }
 
 XrPosef RoomRenderer::transformViewPose(const XrPosef& viewPose, const XrVector3f& headCenter) const {
-    // Preserve the real OpenXR head orientation and eye poses. Artificial turning
-    // is applied to the virtual room geometry, never to the submitted compositor
-    // pose; this avoids the runtime reprojecting a view that was rendered with a
-    // different camera orientation (the source of the black-screen regression).
+    // Apply virtual yaw to the complete eye pose, not just its orientation. The
+    // transformed pose is used both to render and in XrCompositionLayerProjectionView,
+    // so the compositor and app agree exactly about the camera for each eye.
+    const float yaw = virtualYaw_;
+    const float c = std::cos(yaw), s = std::sin(yaw);
+    const float dx = viewPose.position.x - headCenter.x;
+    const float dz = viewPose.position.z - headCenter.z;
     XrPosef rendered = viewPose;
-    rendered.position.x = viewPose.position.x + moveX_;
+    rendered.position.x = headCenter.x + c * dx + s * dz + moveX_;
     rendered.position.y = viewPose.position.y - (sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f);
-    rendered.position.z = viewPose.position.z + moveZ_;
-    (void)headCenter;
+    rendered.position.z = headCenter.z - s * dx + c * dz + moveZ_;
+    const XrQuaternionf yawQ{0.0f, std::sin(yaw * 0.5f), 0.0f, std::cos(yaw * 0.5f)};
+    rendered.orientation = quatMul(yawQ, viewPose.orientation);
     return rendered;
 }
 
@@ -1277,14 +1281,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
     Mat4 projection=makeProjection(view.fov);
     Mat4 camera=makeView(renderedPose);
-    // Rotate the virtual room around one shared head-center pivot. Both eyes
-    // use the same pivot, while OpenXR receives the real tracked eye orientation.
-    const float pivotX = headCenter.x + moveX_;
-    const float pivotY = headCenter.y - (sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f);
-    const float pivotZ = headCenter.z + moveZ_;
-    const Mat4 roomTurn = mul(translation(pivotX, pivotY, pivotZ),
-        mul(rotateY(-virtualYaw_), translation(-pivotX, -pivotY, -pivotZ)));
-    Mat4 pv = mul(projection, mul(camera, roomTurn));
+    // The camera pose already contains virtual yaw; keep world geometry stationary.
+    // This avoids a second world-space turn and keeps both eyes in one consistent rig.
+    Mat4 pv = mul(projection, camera);
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
     std::array<float,4> floor = rgb(.09f,.12f,.18f);
@@ -1511,15 +1510,19 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         : (activeEnvironmentIndex_ == 16 || activeEnvironmentIndex_ == 19 || activeEnvironmentIndex_ == 25) ? rgb(1.0f,.53f,.82f)
         : rgb(1.0f,.63f,.30f);
     drawBox(pv.data(),-halfW+0.32f,floorY+2.02f,-1.7f,0.42f,0.28f,0.42f,lampGlow);
-    // Both tracked controller replicas follow the same artificial-turn rig as the HMD.
+    // Transform controllers through the same virtual rig as the head, so their
+    // positions and orientations stay attached to the user's tracked hands.
     for(int hand=0;hand<2;++hand) {
         if(!controllerPoseValid_[hand]) continue;
         XrPosef controller=controllerPoses_[hand];
-        // Controller poses stay physically tracked; only locomotion and sitting
-        // offsets are applied. Artificial room yaw must not rotate the hands.
-        controller.position.x += moveX_;
-        controller.position.y -= sitting_ ? std::clamp(settings_.sittingHeadDropM,.10f,.75f) : 0.0f;
-        controller.position.z += moveZ_;
+        const float yaw=virtualYaw_, c=std::cos(yaw), s=std::sin(yaw);
+        const float dx=controller.position.x-headCenter.x;
+        const float dz=controller.position.z-headCenter.z;
+        controller.position.x=headCenter.x+c*dx+s*dz+moveX_;
+        controller.position.y-=sitting_ ? std::clamp(settings_.sittingHeadDropM,.10f,.75f) : 0.0f;
+        controller.position.z=headCenter.z-s*dx+c*dz+moveZ_;
+        const XrQuaternionf yawQ{0.0f,std::sin(yaw*.5f),0.0f,std::cos(yaw*.5f)};
+        controller.orientation=quatMul(yawQ,controller.orientation);
         drawControllerModel(pv.data(),controller,hand==0,controllerTriggers_[hand],controllerGrips_[hand]);
     }
     if(settings_.comfortVignette && vignetteProgram_){
