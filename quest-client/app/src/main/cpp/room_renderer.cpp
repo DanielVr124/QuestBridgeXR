@@ -566,7 +566,7 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
             }
             if ((sceneIndex == 5 || sceneIndex == 6 || sceneIndex == 8 || sceneIndex == 10 ||
                  sceneIndex == 11 || sceneIndex == 19 || sceneIndex == 20 ||
-                 sceneIndex == 25 || sceneIndex == 27 || (sceneIndex >= 28 && !night)) && v < horizon) {
+                 sceneIndex == 25 || sceneIndex == 27 || (sceneIndex >= 28 && !night && addedPack != 1 && addedPack != 12)) && v < horizon) {
                 const float dx = (u - sunX) * 1.6f;
                 const float dy = v - sunY;
                 if (dx * dx + dy * dy < sunRadius * sunRadius) {
@@ -825,7 +825,7 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
             // Pastel hills, rainbow reflections, and cotton-candy bands.
             if (addedPack == 10 && v > horizon) {
                 const int stripe = (static_cast<int>(u * 19.0f) + static_cast<int>(v * 9.0f)) % 6;
-                const float hues[6][3] = {{249,153,195},{255,207,154},{255,241,167},{158,231,208},{156,195,255},{202,165,245}};
+                static constexpr float hues[6][3] = {{249,153,195},{255,207,154},{255,241,167},{158,231,208},{156,195,255},{202,165,245}};
                 if (sceneIndex != 171 || stripe < 4) {
                     r = hues[stripe][0] * 0.64f + ground[0] * 0.36f;
                     g = hues[stripe][1] * 0.64f + ground[1] * 0.36f;
