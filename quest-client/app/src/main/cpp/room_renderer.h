@@ -33,6 +33,8 @@ public:
     void setSettings(const RoomSettings& settings);
     void updateLocomotion(float leftX, float leftY, float rightX, float dt,
                           const XrPosef& headPose);
+    // Keep the OpenXR compositor pose synchronized with the exact virtual camera pose.
+    XrPosef compositionPose(const XrPosef& trackedPose) const;
     void cycleScreenDestination();
     void cycleEnvironment();
     void toggleSitting(const XrPosef& headPose);
