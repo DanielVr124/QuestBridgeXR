@@ -1052,9 +1052,15 @@ void RoomRenderer::toggleSitting(const XrPosef& headPose) {
     if(!nearest){LOGI("Move close to the desk chair or couch before sitting");return;}
 
     // Rebase the virtual room so the current tracked head position sits at the seat anchor.
-    // Real headset tracking remains untouched; this only positions the virtual avatar/camera.
+    // Real headset tracking remains untouched; this only positions the virtual world.
     moveX_=nearest->x-headPose.position.x;
     moveZ_=nearest->z-headPose.position.z;
+    worldOffsetX_ = 0.0f;
+    worldOffsetZ_ = 0.0f;
+    yawPivotX_ = headPose.position.x;
+    yawPivotY_ = headPose.position.y;
+    yawPivotZ_ = headPose.position.z;
+    yawPivotInitialized_ = true;
     virtualYaw_=nearest->yaw-headYaw(headPose);
     sitting_=true;
     LOGI("Sat on the virtual %s",nearest->name);
@@ -1101,6 +1107,12 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floor
 
 void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
     if(dt<0.0f||dt>0.1f)dt=0.0f;
+    if (!yawPivotInitialized_) {
+        yawPivotX_ = headPose.position.x;
+        yawPivotY_ = headPose.position.y;
+        yawPivotZ_ = headPose.position.z;
+        yawPivotInitialized_ = true;
+    }
     // Pushing the left stick stands up automatically; the virtual seat is not a locked animation state.
     if(sitting_ && (std::fabs(leftX)>0.22f || std::fabs(leftY)>0.22f)) sitting_=false;
     const float yaw=headYaw(headPose)+virtualYaw_;
@@ -1126,34 +1138,54 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     const bool hitsCouch=settings_.showCouch && overlaps(moveX_,moveZ_,couchX,couchZ,.65f,1.20f);
     if (hitsDesk || hitsChair || hitsCouch) { moveX_ = oldMoveX; moveZ_ = oldMoveZ; }
     snapCooldown_=std::max(0.0f,snapCooldown_-dt);
-    if(settings_.smoothTurn){virtualYaw_+=std::clamp(rightStickX,-1.0f,1.0f)*std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;}
-    else {
+    if(settings_.smoothTurn){
+        const bool turning = std::fabs(rightStickX) > 0.18f;
+        if (turning && !previousSmoothTurning_) rebaseYawPivot(headPose);
+        virtualYaw_+=std::clamp(rightStickX,-1.0f,1.0f)*std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;
+        previousSmoothTurning_ = turning;
+        previousTurnRight_ = false;
+        previousTurnLeft_ = false;
+    } else {
+        previousSmoothTurning_ = false;
         const bool right=rightStickX>0.7f,left=rightStickX < -0.7f;
-        if(snapCooldown_<=0.0f && right && !previousTurnRight_){virtualYaw_-=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
-        else if(snapCooldown_<=0.0f && left && !previousTurnLeft_){virtualYaw_+=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
+        if(snapCooldown_<=0.0f && right && !previousTurnRight_){
+            rebaseYawPivot(headPose);
+            virtualYaw_-=settings_.snapTurnDegrees*kPi/180.0f;
+            snapCooldown_=0.24f;
+        } else if(snapCooldown_<=0.0f && left && !previousTurnLeft_){
+            rebaseYawPivot(headPose);
+            virtualYaw_+=settings_.snapTurnDegrees*kPi/180.0f;
+            snapCooldown_=0.24f;
+        }
         previousTurnRight_=right;previousTurnLeft_=left;
     }
 }
 
 
-XrPosef RoomRenderer::compositionPose(const XrPosef& trackedPose) const {
-    // This pose must match makeView() exactly. If the OpenXR compositor is given the
-    // raw physical pose while the app renders with virtual turning/movement, its
-    // late reprojection applies a second, inconsistent camera transform. That mismatch
-    // is visible as increasing distortion while turning.
-    XrPosef pose = trackedPose;
-    const XrQuaternionf yawQ{0.0f, std::sin(virtualYaw_ * 0.5f), 0.0f,
-                            std::cos(virtualYaw_ * 0.5f)};
-    pose.orientation = quatMul(yawQ, trackedPose.orientation);
-    pose.position.x += moveX_;
-    pose.position.z += moveZ_;
-    if (sitting_) {
-        pose.position.y -= std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f);
+void RoomRenderer::rebaseYawPivot(const XrPosef& headPose) {
+    if (!yawPivotInitialized_) {
+        yawPivotX_ = headPose.position.x;
+        yawPivotY_ = headPose.position.y;
+        yawPivotZ_ = headPose.position.z;
+        yawPivotInitialized_ = true;
+        return;
     }
-    return pose;
+    // Preserve the virtual head position when changing the yaw pivot.
+    const float dx = headPose.position.x - yawPivotX_;
+    const float dz = headPose.position.z - yawPivotZ_;
+    const float c = std::cos(virtualYaw_);
+    const float s = std::sin(virtualYaw_);
+    const float mappedX = yawPivotX_ + c * dx + s * dz;
+    const float mappedZ = yawPivotZ_ - s * dx + c * dz;
+    worldOffsetX_ += mappedX - headPose.position.x;
+    worldOffsetZ_ += mappedZ - headPose.position.z;
+    yawPivotX_ = headPose.position.x;
+    yawPivotY_ = headPose.position.y;
+    yawPivotZ_ = headPose.position.z;
 }
 
-void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,GLuint videoTexture,bool hasVideo) {
+void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,
+                             const XrPosef& headCenterPose,GLuint videoTexture,bool hasVideo) {
     if(!initialized_)return;
     float halfW=3.0f,halfD=3.8f;
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
@@ -1161,7 +1193,15 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
     Mat4 projection=makeProjection(view.fov);
     const float sittingDrop = sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f;
-    Mat4 camera=makeView(view.pose,moveX_,moveZ_,virtualYaw_,sittingDrop);
+    // Keep the actual per-eye OpenXR pose untouched. Virtual yaw and locomotion are
+    // represented as a shared transform of the virtual world, not a fake compositor pose.
+    const Mat4 physicalView = makeView(view.pose, 0.0f, 0.0f, 0.0f, 0.0f);
+    const Mat4 inverseVirtualWorld = mul(
+        translation(yawPivotX_, yawPivotY_, yawPivotZ_),
+        mul(rotateY(-virtualYaw_),
+            mul(translation(-yawPivotX_, -yawPivotY_, -yawPivotZ_),
+                translation(-(moveX_ + worldOffsetX_), sittingDrop, -(moveZ_ + worldOffsetZ_)))));
+    Mat4 camera = mul(physicalView, inverseVirtualWorld);
     Mat4 pv=mul(projection,camera);
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
