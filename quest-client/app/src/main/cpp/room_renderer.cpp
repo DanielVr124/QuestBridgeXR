@@ -17,7 +17,7 @@
 
 namespace {
 constexpr float kPi = 3.14159265358979323846f;
-constexpr std::array<const char*, 208> kEnvironmentNames = {
+constexpr std::array<const char*, 328> kEnvironmentNames = {
 
 
     "blossom",
@@ -227,7 +227,127 @@ constexpr std::array<const char*, 208> kEnvironmentNames = {
     "celestial_garden",
     "ancient_sky_ruins",
     "midnight_blossom_grove",
-    "aurora_lagoon",
+    "aurora_lagoon",    "liminal_supermarket",
+    "liminal_airport_terminal",
+    "liminal_departures_hall",
+    "liminal_hotel_lobby",
+    "liminal_convention_center",
+    "liminal_food_court",
+    "liminal_office_floor",
+    "liminal_subway_platform",
+    "liminal_train_station",
+    "liminal_bus_terminal",
+    "liminal_parking_garage",
+    "liminal_hospital_wing",
+    "liminal_library_after_hours",
+    "liminal_indoor_playground",
+    "liminal_movie_theater",
+    "liminal_arcade_after_hours",
+    "liminal_escalator_hall",
+    "liminal_stairwell",
+    "liminal_underground_corridor",
+    "liminal_fountain_mall",
+    "backrooms_level_zero",
+    "backrooms_yellow_maze",
+    "backrooms_service_corridors",
+    "backrooms_damp_basement",
+    "backrooms_warehouse_rows",
+    "backrooms_cubicle_labyrinth",
+    "backrooms_vacant_hotel",
+    "backrooms_loading_dock",
+    "backrooms_carpeted_stairs",
+    "backrooms_yellow_reception",
+    "backrooms_pipe_network",
+    "backrooms_flooded_annex",
+    "backrooms_painted_columns",
+    "backrooms_red_exit_hall",
+    "backrooms_blue_utility_rooms",
+    "backrooms_endless_office",
+    "backrooms_concrete_maze",
+    "backrooms_archive_storage",
+    "backrooms_broken_elevator",
+    "backrooms_infinite_corridors",
+    "dreamcore_telephone_field",
+    "dreamcore_wrong_house",
+    "dreamcore_silent_carnival",
+    "dreamcore_floating_classroom",
+    "dreamcore_empty_station",
+    "dreamcore_moonlit_road",
+    "dreamcore_oversized_bedroom",
+    "dreamcore_giant_doorfield",
+    "dreamcore_distant_playground",
+    "dreamcore_checkerboard_plaza",
+    "dreamcore_pink_corridor",
+    "dreamcore_lost_arcade",
+    "dreamcore_sunset_void",
+    "dreamcore_infinite_bathroom",
+    "dreamcore_hallway_eyes",
+    "dreamcore_orphaned_elevator",
+    "weirdcore_static_garden",
+    "weirdcore_wrong_turn",
+    "weirdcore_telephone_tower",
+    "weirdcore_mirror_classroom",
+    "poolrooms_sunlit_atrium",
+    "poolrooms_deep_end",
+    "poolrooms_tiled_tunnels",
+    "poolrooms_violet_depths",
+    "poolrooms_empty_locker_room",
+    "poolrooms_circular_pools",
+    "poolrooms_waterfall_chamber",
+    "poolrooms_neon_tiles",
+    "poolrooms_submerged_corridor",
+    "poolrooms_endless_lap_pool",
+    "poolrooms_black_water",
+    "poolrooms_sky_ceiling",
+    "poolrooms_diving_board",
+    "poolrooms_blue_maze",
+    "poolrooms_echo_gallery",
+    "threshold_hotel_lobby",
+    "threshold_hotel_guest_wing",
+    "threshold_room_001",
+    "threshold_room_099",
+    "threshold_room_404",
+    "threshold_hall_of_doors",
+    "threshold_rusted_elevator",
+    "threshold_banquet_hall",
+    "threshold_library_wing",
+    "threshold_red_carpet_corridor",
+    "threshold_blackout_hall",
+    "threshold_brass_key_gallery",
+    "threshold_clockwork_lobby",
+    "threshold_service_tunnels",
+    "threshold_maintenance_room",
+    "threshold_forgotten_infirmary",
+    "threshold_grand_staircase",
+    "threshold_windowless_guestroom",
+    "threshold_security_office",
+    "threshold_attic_of_keys",
+    "threshold_bellhop_hall",
+    "threshold_locked_archive",
+    "threshold_doorway_maze",
+    "threshold_emergency_lighting",
+    "threshold_last_elevator",
+    "empty_meadow_at_dusk",
+    "endless_courtyard",
+    "fogged_glass_corridor",
+    "abandoned_waterpark",
+    "empty_wedding_hall",
+    "closed_department_store",
+    "old_hotel_pool",
+    "school_gym_after_hours",
+    "unlit_recreation_center",
+    "rainy_parking_roof",
+    "office_after_midnight",
+    "empty_gallery_museum",
+    "hospital_waiting_room",
+    "elevator_to_nowhere",
+    "corridor_of_identical_doors",
+    "endless_rooftop",
+    "underground_cafeteria",
+    "glassy_white_hall",
+    "liminal_sky_bridge",
+    "sunset_tunnel",
+
 };
 
 
@@ -289,6 +409,52 @@ int environmentIndex(const std::string& name) {
     }
     return 0;
 }
+
+bool containsToken(const std::string& text, const char* token) {
+    return text.find(token) != std::string::npos;
+}
+
+bool isInteriorSceneName(const std::string& name) {
+    constexpr const char* tokens[] = {
+        "backrooms","liminal","poolrooms","threshold","hallway","corridor","hotel",
+        "school","mall","office","airport","station","subway","hospital","warehouse",
+        "stairwell","elevator","tunnel","basement","infirmary","library","supermarket",
+        "terminal","cafeteria","gym","gallery","museum","parking","theater","arcade",
+        "waterpark","food_court","convention","escalator","departures","loading_dock",
+        "archive","service","guest","maintenance","door","underground","recreation",
+        "playground","attic","reception","infinite_bathroom","wrong_house"
+    };
+    for (const char* token : tokens) if (containsToken(name, token)) return true;
+    return false;
+}
+
+bool hasWorldDoorOpening(int sceneIndex, int boundaryIndex, int segmentIndex, bool vertical) {
+    // Stable scene-specific opening positions prevent maze layouts from feeling identical.
+    const int seed = sceneIndex * 13 + boundaryIndex * 7 + segmentIndex * 3 + (vertical ? 5 : 11);
+    return segmentIndex == ((boundaryIndex + sceneIndex / 3 + (vertical ? 1 : 2)) % 5) ||
+           seed % 7 == 0;
+}
+
+bool collidesWithInteriorGrid(int sceneIndex, float x, float z) {
+    auto blocked = [&](float along, int boundary, int segment, bool vertical) {
+        const float mid = -16.0f + static_cast<float>(segment) * 8.0f;
+        if (std::fabs(along - mid) > 4.08f) return false;
+        if (hasWorldDoorOpening(sceneIndex, boundary, segment, vertical) &&
+            std::fabs(along - mid) < 1.28f) return false;
+        return true;
+    };
+    for (int boundary = 0; boundary < 5; ++boundary) {
+        const float wall = -20.0f + static_cast<float>(boundary) * 10.0f;
+        if (std::fabs(x - wall) < 0.34f) {
+            for (int seg = 0; seg < 5; ++seg) if (blocked(z, boundary, seg, true)) return true;
+        }
+        if (std::fabs(z - wall) < 0.34f) {
+            for (int seg = 0; seg < 5; ++seg) if (blocked(x, boundary, seg, false)) return true;
+        }
+    }
+    return std::fabs(x) > 27.5f || std::fabs(z) > 27.5f;
+}
+
 const char* kVertexShader = R"GLSL(#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
@@ -918,7 +1084,9 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,4,4,0,GL_RGB,GL_UNSIGNED_BYTE,idlePixels);glBindTexture(GL_TEXTURE_2D,0);
-    initialized_=true; chooseEnvironment(); LOGI("cozy room renderer initialized"); return true;
+    initialized_=true; chooseEnvironment(); LOGI("cozy room renderer initialized"); if (!ambience_.initialize(settings_.ambienceEnabled)) LOGW("Native ambience audio could not start");
+    chooseEnvironment();
+    return true;
 }
 
 void RoomRenderer::createGeometry() {
@@ -957,7 +1125,7 @@ void RoomRenderer::createGeometry() {
     glBindVertexArray(0);
 }
 
-void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; chooseEnvironment(); }
+void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; ambience_.setEnabled(settings_.ambienceEnabled); chooseEnvironment(); }
 void RoomRenderer::chooseEnvironment() {
     const int previousIndex = activeEnvironmentIndex_;
     const int selectedIndex = environmentIndex(settings_.environment);
@@ -968,6 +1136,7 @@ void RoomRenderer::chooseEnvironment() {
         environmentTextures_[previousIndex] = 0;
     }
     activeEnvironmentIndex_ = selectedIndex;
+    ambience_.setEnvironment(settings_.environment);
     if (activeEnvironmentIndex_ >= 3 && initialized_ && !environmentTextures_[activeEnvironmentIndex_]) {
         environmentTextures_[activeEnvironmentIndex_] = createProceduralEnvironment(activeEnvironmentIndex_);
         if (!environmentTextures_[activeEnvironmentIndex_]) {
@@ -1056,37 +1225,247 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floor
 }
 
 void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
-    if(dt<0.0f||dt>0.1f)dt=0.0f;
-    // Pushing the left stick stands up automatically; the virtual seat is not a locked animation state.
-    if(sitting_ && (std::fabs(leftX)>0.22f || std::fabs(leftY)>0.22f)) sitting_=false;
-    const float yaw=headYaw(headPose)+virtualYaw_;
-    const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
-    // Left stick uses head-relative direction; reverse sign because forward is -Z in OpenXR.
-    const float forwardX=std::sin(yaw), forwardZ=-std::cos(yaw);
-    const float rightX=std::cos(yaw), rightZ=std::sin(yaw);
-    const float oldMoveX = moveX_, oldMoveZ = moveZ_;
-    moveX_+=(rightX*leftX+forwardX*leftY)*speed*dt;
-    moveZ_+=(rightZ*leftX+forwardZ*leftY)*speed*dt;
-    float halfW=3.0f,halfD=3.8f;
-    if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
-    moveX_=std::clamp(moveX_,-halfW+0.55f,halfW-0.55f);
-    moveZ_=std::clamp(moveZ_,-halfD+0.55f,halfD-0.55f);
-    auto overlaps = [](float x, float z, float cx, float cz, float rx, float rz) {
-        return std::fabs(x-cx) < rx && std::fabs(z-cz) < rz;
-    };
-    // Simple non-physics collision boxes keep joystick movement from passing through furniture.
-    const float couchX = -halfW + 1.25f, couchZ = -halfD + 0.80f;
-    const bool hitsDesk = overlaps(moveX_, moveZ_, 0.0f, -1.75f, 1.72f, 0.68f);
-    const bool hitsChair = settings_.showChair && overlaps(moveX_, moveZ_, 0.85f, 1.6f, 0.55f, 0.54f);
-    const bool hitsCouch = settings_.showCouch && overlaps(moveX_, moveZ_, couchX, couchZ, 1.18f, 0.65f);
-    if (hitsDesk || hitsChair || hitsCouch) { moveX_ = oldMoveX; moveZ_ = oldMoveZ; }
-    snapCooldown_=std::max(0.0f,snapCooldown_-dt);
-    if(settings_.smoothTurn){virtualYaw_+=std::clamp(rightStickX,-1.0f,1.0f)*std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;}
-    else {
-        const bool right=rightStickX>0.7f,left=rightStickX < -0.7f;
-        if(snapCooldown_<=0.0f && right && !previousTurnRight_){virtualYaw_-=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
-        else if(snapCooldown_<=0.0f && left && !previousTurnLeft_){virtualYaw_+=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
-        previousTurnRight_=right;previousTurnLeft_=left;
+    // Bound unusually long frames so a hitch cannot fling the player through a wall.
+    dt = std::clamp(dt, 0.0f, 0.05f);
+    if (sitting_ && (std::fabs(leftX) > 0.22f || std::fabs(leftY) > 0.22f)) sitting_ = false;
+
+    const float yaw = headYaw(headPose) + virtualYaw_;
+    const float speed = std::clamp(settings_.movementSpeed, 0.1f, 4.0f);
+    const float forwardX = std::sin(yaw), forwardZ = -std::cos(yaw);
+    const float rightX = std::cos(yaw), rightZ = std::sin(yaw);
+    float inputLen = std::sqrt(leftX * leftX + leftY * leftY);
+    if (inputLen > 1.0f) { leftX /= inputLen; leftY /= inputLen; inputLen = 1.0f; }
+    const float targetVX = (rightX * leftX + forwardX * leftY) * speed * inputLen;
+    const float targetVZ = (rightZ * leftX + forwardZ * leftY) * speed * inputLen;
+    // Exponential response feels controlled at low stick deflection but starts and stops smoothly.
+    const float response = 1.0f - std::exp(-11.5f * dt);
+    velocityX_ += (targetVX - velocityX_) * response;
+    velocityZ_ += (targetVZ - velocityZ_) * response;
+
+    if (settings_.mode == "explore") {
+        const float candidateX = std::clamp(moveX_ + velocityX_ * dt, -27.4f, 27.4f);
+        const float candidateZ = std::clamp(moveZ_ + velocityZ_ * dt, -27.4f, 27.4f);
+        const std::string& scene = kEnvironmentNames[activeEnvironmentIndex_];
+        const bool interior = isInteriorSceneName(scene);
+        if (!interior || !collidesWithInteriorGrid(activeEnvironmentIndex_, candidateX, moveZ_))
+            moveX_ = candidateX;
+        else velocityX_ = 0.0f;
+        if (!interior || !collidesWithInteriorGrid(activeEnvironmentIndex_, moveX_, candidateZ))
+            moveZ_ = candidateZ;
+        else velocityZ_ = 0.0f;
+    } else {
+        float halfW = 3.0f, halfD = 3.8f;
+        if (settings_.roomSize == "large") { halfW = 6.0f; halfD = 7.5f; }
+        else if (settings_.roomSize == "medium") { halfW = 4.2f; halfD = 5.4f; }
+        const auto overlaps = [](float x, float z, float cx, float cz, float rx, float rz) {
+            return std::fabs(x - cx) < rx && std::fabs(z - cz) < rz;
+        };
+        const float couchX = -halfW + 1.25f, couchZ = -halfD + 0.80f;
+        auto blocked = [&](float x, float z) {
+            return overlaps(x, z, 0.0f, -1.75f, 1.72f, 0.68f) ||
+                   (settings_.showChair && overlaps(x, z, 0.85f, 1.6f, 0.55f, 0.54f)) ||
+                   (settings_.showCouch && overlaps(x, z, couchX, couchZ, 1.18f, 0.65f));
+        };
+        const float candidateX = std::clamp(moveX_ + velocityX_ * dt, -halfW + 0.55f, halfW - 0.55f);
+        const float candidateZ = std::clamp(moveZ_ + velocityZ_ * dt, -halfD + 0.55f, halfD - 0.55f);
+        if (!blocked(candidateX, moveZ_)) moveX_ = candidateX; else velocityX_ = 0.0f;
+        if (!blocked(moveX_, candidateZ)) moveZ_ = candidateZ; else velocityZ_ = 0.0f;
+    }
+
+    snapCooldown_ = std::max(0.0f, snapCooldown_ - dt);
+    if (settings_.smoothTurn) {
+        virtualYaw_ += std::clamp(rightStickX, -1.0f, 1.0f) *
+                       std::clamp(settings_.turnSpeed, 0.2f, 3.5f) * dt;
+    } else {
+        const bool right = rightStickX > 0.7f, left = rightStickX < -0.7f;
+        if (snapCooldown_ <= 0.0f && right && !previousTurnRight_) {
+            virtualYaw_ -= settings_.snapTurnDegrees * kPi / 180.0f; snapCooldown_ = 0.24f;
+        } else if (snapCooldown_ <= 0.0f && left && !previousTurnLeft_) {
+            virtualYaw_ += settings_.snapTurnDegrees * kPi / 180.0f; snapCooldown_ = 0.24f;
+        }
+        previousTurnRight_ = right;
+        previousTurnLeft_ = left;
+    }
+}
+
+void RoomRenderer::drawMonitors(const float* pv, const float* projection, float floorY,
+                                GLuint videoTexture, bool hasVideo, bool followView) {
+    if (!settings_.monitorsVisible) return;
+    const int count = std::clamp(settings_.monitorCount, 1, 3);
+    const float monitorW = count == 1 ? 1.28f : count == 2 ? 0.90f : 0.72f;
+    const float monitorH = monitorW * 9.0f / 16.0f;
+    const float centerY = followView ? 0.03f : floorY + 1.35f;
+    const float deskZ = followView ? -1.55f : -1.75f;
+    const float deskTopY = floorY + 0.83f;
+    const float standHeight = std::max(0.08f, centerY - monitorH * 0.5f - deskTopY);
+    const float gap = 0.08f;
+    const bool streamOn = settings_.screenDestination == "monitor" || settings_.screenDestination == "both";
+    const GLuint tex = (streamOn && hasVideo) ? videoTexture : videoFallbackTexture_;
+    const float* transform = followView ? projection : pv;
+    for (int i = 0; i < count; ++i) {
+        const float x = (i - (count - 1) * 0.5f) * (monitorW + gap);
+        const float z = followView ? deskZ : deskZ;
+        drawBox(transform, x, centerY, z - 0.045f, monitorW + 0.055f, monitorH + 0.055f, 0.08f, rgb(.035f,.045f,.075f));
+        drawPlane(transform, x, centerY, z + 0.002f, monitorW, monitorH, tex, rgb(1,1,1));
+        if (!followView) drawBox(pv, x, deskTopY + standHeight * 0.5f, z, 0.05f, standHeight, 0.08f, rgb(.23f,.19f,.17f));
+    }
+}
+
+void RoomRenderer::toggleMonitors() {
+    if (!settings_.roomControlsEnabled) return;
+    settings_.monitorsVisible = !settings_.monitorsVisible;
+    LOGI("Virtual monitors %s", settings_.monitorsVisible ? "shown" : "hidden");
+}
+
+void RoomRenderer::toggleWorldMode() {
+    if (!settings_.roomControlsEnabled) return;
+    settings_.mode = settings_.mode == "explore" ? "workspace" : "explore";
+    moveX_ = moveZ_ = velocityX_ = velocityZ_ = virtualYaw_ = 0.0f;
+    sitting_ = false;
+    LOGI("Virtual world mode changed to %s", settings_.mode.c_str());
+}
+
+void RoomRenderer::renderExploreWorld(const float* pv, const float* projection, float floorY,
+                                      GLuint videoTexture, bool hasVideo) {
+    const int scene = activeEnvironmentIndex_;
+    const std::string& name = kEnvironmentNames[scene];
+    const bool interior = isInteriorSceneName(name);
+    EnvironmentPalette palette = extraEnvironmentPalette(std::max(0, scene - 28));
+    auto channel = [](float value) { return std::clamp(value / 255.0f, 0.0f, 1.0f); };
+    std::array<float,4> sky = rgb(channel(palette.skyHorizon[0]),channel(palette.skyHorizon[1]),channel(palette.skyHorizon[2]));
+    std::array<float,4> ground = rgb(channel(palette.ground[0]),channel(palette.ground[1]),channel(palette.ground[2]));
+    std::array<float,4> wall = rgb(.67f,.62f,.39f);
+    std::array<float,4> accent = rgb(.91f,.73f,.34f);
+    std::array<float,4> ceiling = rgb(.80f,.77f,.59f);
+    if (containsToken(name,"backrooms")) {
+        wall=rgb(.66f,.61f,.38f); ground=rgb(.38f,.30f,.21f); ceiling=rgb(.76f,.70f,.49f); accent=rgb(.82f,.68f,.28f);
+    } else if (containsToken(name,"poolrooms") || containsToken(name,"underwater") || containsToken(name,"water")) {
+        wall=rgb(.33f,.79f,.77f); ground=rgb(.19f,.48f,.52f); ceiling=rgb(.52f,.88f,.82f); accent=rgb(.26f,.94f,.92f);
+    } else if (containsToken(name,"threshold") || containsToken(name,"door") || containsToken(name,"hotel") || containsToken(name,"elevator")) {
+        wall=rgb(.24f,.095f,.105f); ground=rgb(.10f,.065f,.08f); ceiling=rgb(.19f,.14f,.15f); accent=rgb(.86f,.49f,.20f);
+    } else if (containsToken(name,"liminal") || containsToken(name,"corridor") || containsToken(name,"hallway")) {
+        wall=rgb(.66f,.69f,.68f); ground=rgb(.36f,.39f,.38f); ceiling=rgb(.76f,.77f,.72f); accent=rgb(.78f,.80f,.67f);
+    } else if (containsToken(name,"dreamcore") || containsToken(name,"weirdcore")) {
+        ground=rgb(.29f,.19f,.43f); sky=rgb(.48f,.35f,.76f); accent=rgb(.98f,.58f,.83f);
+    } else if (containsToken(name,"space") || containsToken(name,"planet") || containsToken(name,"nebula") || containsToken(name,"moon") || containsToken(name,"cosmic") || containsToken(name,"star")) {
+        ground=rgb(.035f,.035f,.10f); sky=rgb(.05f,.035f,.16f); accent=rgb(.28f,.47f,1.0f);
+    } else if (containsToken(name,"forest") || containsToken(name,"meadow") || containsToken(name,"garden") || containsToken(name,"grove") || containsToken(name,"woodland")) {
+        ground=rgb(.10f,.26f,.17f); accent=rgb(.30f,.64f,.38f);
+    }
+    glUseProgram(program_);
+    glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDisable(GL_CULL_FACE);
+    glUniform1i(locTexture_,0);
+    // The outer sky cube and continuous floor make the world surround the player in every direction.
+    drawBox(pv,0,floorY+24.0f,0,84.0f,50.0f,84.0f,interior?ceiling:sky);
+    drawBox(pv,0,floorY-0.16f,0,72.0f,0.32f,72.0f,ground);
+
+    if (interior) {
+        drawBox(pv,0,floorY+5.65f,0,56.0f,0.22f,56.0f,ceiling);
+        drawBox(pv,-28.0f,floorY+2.75f,0,0.3f,5.5f,56.0f,wall);
+        drawBox(pv,28.0f,floorY+2.75f,0,0.3f,5.5f,56.0f,wall);
+        drawBox(pv,0,floorY+2.75f,-28.0f,56.0f,5.5f,0.3f,wall);
+        drawBox(pv,0,floorY+2.75f,28.0f,56.0f,5.5f,0.3f,wall);
+        // Reusable room modules: the small gaps align with the walkable door openings used by collision.
+        for (int boundary=0; boundary<5; ++boundary) {
+            const float axis=-20.0f+static_cast<float>(boundary)*10.0f;
+            for (int segment=0; segment<5; ++segment) {
+                const float mid=-16.0f+static_cast<float>(segment)*8.0f;
+                if (!hasWorldDoorOpening(scene,boundary,segment,true))
+                    drawBox(pv,axis,floorY+2.75f,mid,0.18f,5.5f,7.95f,wall);
+                if (!hasWorldDoorOpening(scene,boundary,segment,false))
+                    drawBox(pv,mid,floorY+2.75f,axis,7.95f,5.5f,0.18f,wall);
+            }
+        }
+        // Lightweight ceiling fixtures help the endless halls read at a glance.
+        for (int i=0;i<9;++i) {
+            const float p=-24.0f+static_cast<float>(i)*6.0f;
+            drawBox(pv,p,floorY+5.50f,-23.4f,1.35f,0.055f,0.20f,accent);
+        }
+        if (containsToken(name,"threshold") || containsToken(name,"door") || containsToken(name,"hotel")) {
+            // Repeated original door panels and frames suggest a haunted hotel, without copying branded assets.
+            for (int i=0;i<5;++i) {
+                const float z=-19.0f+i*8.0f;
+                const float x=(i%2==0)?-8.0f:8.0f;
+                drawBox(pv,x,floorY+1.35f,z,1.38f,2.7f,0.10f,rgb(.12f,.065f,.075f));
+                drawBox(pv,x-0.78f,floorY+1.38f,z,0.10f,2.82f,0.18f,accent);
+                drawBox(pv,x+0.78f,floorY+1.38f,z,0.10f,2.82f,0.18f,accent);
+                drawBox(pv,x,floorY+2.80f,z,1.62f,0.10f,0.18f,accent);
+            }
+        }
+        if (containsToken(name,"poolrooms") || containsToken(name,"water")) {
+            for(int x=-4;x<=4;++x) for(int z=-4;z<=4;++z) {
+                if ((x+z)%2==0) drawBox(pv,x*3.2f,floorY+0.015f,z*3.2f,2.95f,0.018f,2.95f,rgb(.23f,.63f,.68f));
+            }
+            for(int p=-2;p<=2;++p) {
+                drawBox(pv,p*7.0f,floorY+2.5f,-14.0f,0.65f,5.0f,0.65f,rgb(.38f,.83f,.80f));
+                drawBox(pv,p*7.0f,floorY+2.5f,14.0f,0.65f,5.0f,0.65f,rgb(.38f,.83f,.80f));
+            }
+        }
+        if (containsToken(name,"backrooms")) {
+            for(int side=-1;side<=1;side+=2) {
+                drawBox(pv,side*1.8f,floorY+5.25f,-1.9f,0.10f,0.10f,46.0f,rgb(.45f,.42f,.29f));
+            }
+        }
+    } else {
+        const bool forest = containsToken(name,"forest") || containsToken(name,"woodland") || containsToken(name,"grove");
+        const bool city = containsToken(name,"city") || containsToken(name,"tokyo") || containsToken(name,"urban") || containsToken(name,"skyline") || containsToken(name,"metropolis");
+        const bool cosmic = containsToken(name,"space") || containsToken(name,"planet") || containsToken(name,"nebula") || containsToken(name,"moon") || containsToken(name,"cosmic") || containsToken(name,"star");
+        if (forest) {
+            for(int row=0;row<4;++row) for(int col=0;col<5;++col) {
+                const float x=-19.0f+col*9.0f+(row%2?2.8f:0.0f);
+                const float z=-20.0f+row*11.0f;
+                if(std::fabs(x)<5.0f && std::fabs(z)<5.0f) continue;
+                drawBox(pv,x,floorY+2.0f,z,0.42f,4.0f,0.42f,rgb(.22f,.15f,.10f));
+                drawBox(pv,x,floorY+4.2f,z,2.5f,2.4f,2.5f,accent);
+            }
+        } else if (city) {
+            for(int row=0;row<3;++row) for(int col=0;col<6;++col) {
+                const float side=(col%2==0)?-1.0f:1.0f;
+                const float x=side*(7.0f+(col/2)*5.5f);
+                const float z=-18.0f+row*14.0f;
+                const float height=5.0f+static_cast<float>((row*7+col*3)%8);
+                drawBox(pv,x,floorY+height*0.5f,z,3.0f,height,3.6f,rgb(.12f,.13f,.20f));
+                for(int w=0;w<3;++w) drawBox(pv,x+(w-1)*0.65f,floorY+1.0f+height*0.55f,z+1.84f,0.20f,0.25f,0.045f,accent);
+            }
+        } else if (cosmic || containsToken(name,"dreamcore") || containsToken(name,"weirdcore")) {
+            for(int i=0;i<9;++i) {
+                const float x=-20.0f+(i%3)*20.0f;
+                const float z=-18.0f+(i/3)*18.0f;
+                const float y=floorY+4.0f+static_cast<float>((i*7)%9);
+                drawBox(pv,x,y,z,2.4f,2.4f,2.4f,accent,0.25f*i);
+                if (i%2==0) {
+                    drawBox(pv,x,y+1.9f,z,0.18f,4.0f,0.18f,accent,0.25f*i);
+                    drawBox(pv,x,y+3.9f,z,2.8f,0.18f,0.18f,accent,0.25f*i);
+                }
+            }
+        } else {
+            // Distant terrain and monumental landmarks make generic worlds feel walkable rather than like a skybox.
+            for(int i=0;i<12;++i) {
+                const float x=-27.0f+i*4.8f;
+                const float z=-24.0f+static_cast<float>((i*7)%11)*3.1f;
+                const float height=2.0f+static_cast<float>((i*5)%7);
+                drawBox(pv,x,floorY+height*0.5f,z,3.1f,height,3.0f,accent);
+            }
+            if (containsToken(name,"ocean") || containsToken(name,"lagoon") || containsToken(name,"beach") || containsToken(name,"water")) {
+                for(int i=0;i<8;++i) drawBox(pv,-22.0f+i*6.0f,floorY+0.05f,-10.0f,5.5f,0.03f,12.0f,rgb(.08f,.36f,.48f));
+            }
+        }
+        // Large, deliberately simple wayfinding monoliths give open worlds an exploration landmark.
+        drawBox(pv,0,floorY+2.5f,-15.0f,0.36f,5.0f,0.36f,accent);
+        drawBox(pv,0,floorY+5.0f,-15.0f,2.2f,0.22f,0.22f,accent);
+    }
+
+    // A shared PC workstation is an anchor in every world; screens are world-locked or head-following.
+    const float deskZ=-2.40f;
+    drawBox(pv,0,floorY+0.78f,deskZ,3.10f,0.10f,0.82f,rgb(.20f,.16f,.18f));
+    drawBox(pv,-1.25f,floorY+0.37f,deskZ,0.10f,0.74f,0.75f,rgb(.20f,.16f,.18f));
+    drawBox(pv,1.25f,floorY+0.37f,deskZ,0.10f,0.74f,0.75f,rgb(.20f,.16f,.18f));
+    drawMonitors(pv,projection,floorY,videoTexture,hasVideo,settings_.monitorBehavior!="world");
+    if (settings_.showTv) {
+        const bool tvStream=(settings_.screenDestination=="tv"||settings_.screenDestination=="both");
+        const GLuint tvTex=(tvStream&&hasVideo)?videoTexture:environmentTextures_[activeEnvironmentIndex_];
+        drawBox(pv,2.7f,floorY+2.0f,-4.05f,2.25f,1.36f,0.09f,rgb(.03f,.035f,.05f));
+        drawPlane(pv,2.7f,floorY+2.0f,-3.995f,2.10f,1.20f,tvTex,rgb(1,1,1));
     }
 }
 
@@ -1100,6 +1479,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float sittingDrop = sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f;
     Mat4 camera=makeView(view.pose,moveX_,moveZ_,virtualYaw_,sittingDrop);
     Mat4 pv=mul(projection,camera);
+
+    if (settings_.mode == "explore") {
+        renderExploreWorld(pv.data(), projection.data(), floorY, videoTexture, hasVideo);
+        if (settings_.comfortVignette && vignetteProgram_) {
+            glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+            glUseProgram(vignetteProgram_); glBindVertexArray(planeTexture_);
+            glDrawArrays(GL_TRIANGLES,0,6); glBindVertexArray(0);
+            glUseProgram(0); glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
+        }
+        glBindTexture(GL_TEXTURE_2D,0); glBindVertexArray(0); glUseProgram(0); glDisable(GL_DEPTH_TEST);
+        return;
+    }
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
     std::array<float,4> floor = rgb(.09f,.12f,.18f);
@@ -1166,21 +1557,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(),0,floorY+0.78f,deskZ,3.25f,0.10f,0.82f,wood);
     drawBox(pv.data(),-1.38f,floorY+0.37f,deskZ,0.10f,0.75f,0.72f,wood);
     drawBox(pv.data(),1.38f,floorY+0.37f,deskZ,0.10f,0.75f,0.72f,wood);
-    const int monitorCount=std::clamp(settings_.monitorCount,1,3);
-    const float monitorW=monitorCount==1?1.28f:monitorCount==2?0.90f:0.72f;
-    const float monitorH=monitorW*9.0f/16.0f;
-    const float monitorCenterY=floorY+1.35f;
-    const float deskTopY=floorY+0.83f;
-    const float standHeight=std::max(0.08f,monitorCenterY-monitorH*0.5f-deskTopY);
-    const float gap=0.08f;
-    for(int i=0;i<monitorCount;++i){
-        const float x=(i-(monitorCount-1)*0.5f)*(monitorW+gap);
-        const bool streamOn=(settings_.screenDestination=="monitor"||settings_.screenDestination=="both");
-        GLuint tex=(streamOn&&hasVideo)?videoTexture:videoFallbackTexture_;
-        drawBox(pv.data(),x,monitorCenterY,deskZ-0.05f,monitorW+0.05f,monitorH+0.05f,0.08f,rgb(.05f,.06f,.09f));
-        drawPlane(pv.data(),x,monitorCenterY,deskZ+0.001f,monitorW,monitorH,tex,rgb(1,1,1));
-        drawBox(pv.data(),x,deskTopY+standHeight*0.5f,deskZ,0.05f,standHeight,0.08f,wood);
-    }
+    drawMonitors(pv.data(), projection.data(), floorY, videoTexture, hasVideo, false);
     // Optional wall-mounted television on the right wall; source can be switched between monitor and TV or mirrored.
     if(settings_.showTv){
         const bool tvStream=(settings_.screenDestination=="tv"||settings_.screenDestination=="both");
@@ -1224,7 +1601,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 }
 
 void RoomRenderer::release() {
-    if(!initialized_&&!program_&&!vao_)return;
+    if(!initialized_&&!program_&&!vao_) { ambience_.shutdown(); return; }
+    ambience_.shutdown();
     if(program_)glDeleteProgram(program_);if(vignetteProgram_)glDeleteProgram(vignetteProgram_);if(vao_)glDeleteVertexArrays(1,&vao_);if(vbo_)glDeleteBuffers(1,&vbo_);
     if(planeTexture_)glDeleteVertexArrays(1,&planeTexture_);if(cubeTexture_)glDeleteBuffers(1,&cubeTexture_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
