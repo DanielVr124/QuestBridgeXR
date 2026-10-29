@@ -8,7 +8,7 @@
 #include <openxr/openxr.h>
 
 struct RoomSettings {
-    std::string environment = "blossom";       // 88 scenes; see Studio Virtual Room settings
+    std::string environment = "blossom";       // 208 scenes; see Studio Virtual Room settings
     std::string roomSize = "medium";           // small | medium | large
     std::string screenDestination = "monitor"; // monitor | tv | both
     int monitorCount = 1;                       // 1..3, replicated stream
@@ -70,7 +70,7 @@ private:
     GLint locUvScale_ = -1;
     GLuint cubeTexture_ = 0;
     GLuint planeTexture_ = 0;
-    std::array<GLuint, 88> environmentTextures_{};
+    std::array<GLuint, 208> environmentTextures_{};
     int activeEnvironmentIndex_ = 0;
     GLuint videoFallbackTexture_ = 0;
     bool initialized_ = false;
