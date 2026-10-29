@@ -1135,6 +1135,24 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     }
 }
 
+
+XrPosef RoomRenderer::compositionPose(const XrPosef& trackedPose) const {
+    // This pose must match makeView() exactly. If the OpenXR compositor is given the
+    // raw physical pose while the app renders with virtual turning/movement, its
+    // late reprojection applies a second, inconsistent camera transform. That mismatch
+    // is visible as increasing distortion while turning.
+    XrPosef pose = trackedPose;
+    const XrQuaternionf yawQ{0.0f, std::sin(virtualYaw_ * 0.5f), 0.0f,
+                            std::cos(virtualYaw_ * 0.5f)};
+    pose.orientation = quatMul(yawQ, trackedPose.orientation);
+    pose.position.x += moveX_;
+    pose.position.z += moveZ_;
+    if (sitting_) {
+        pose.position.y -= std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f);
+    }
+    return pose;
+}
+
 void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,GLuint videoTexture,bool hasVideo) {
     if(!initialized_)return;
     float halfW=3.0f,halfD=3.8f;
