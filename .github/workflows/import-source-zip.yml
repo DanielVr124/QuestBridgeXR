@@ -4,8 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'QuestBridgeXR-v0.8.1-verified-source.zip'
-      - 'QuestBridgeXR-v0.8.1-source.zip'
+      - '.qbx-import-trigger'
   workflow_dispatch:
 
 permissions:
@@ -28,7 +27,7 @@ jobs:
             if [ -f "$candidate" ]; then archive="$candidate"; break; fi
           done
           if [ -z "$archive" ]; then
-            echo "Upload QuestBridgeXR-v0.8.1-verified-source.zip (or QuestBridgeXR-v0.8.1-source.zip) to the repository root first."
+            echo "Source ZIP not found in repository root."
             exit 1
           fi
           python3 - "$archive" <<'PY'
@@ -40,16 +39,18 @@ jobs:
                   raise SystemExit(f"Corrupt ZIP member: {bad}")
               names = z.namelist()
               if not any(n.startswith("QuestBridgeXR/.github/workflows/build-release.yml") for n in names):
-                  raise SystemExit("Archive is missing QuestBridgeXR/.github/workflows/build-release.yml")
+                  raise SystemExit("Archive is missing the expected build workflow file.")
               if not any(n.startswith("QuestBridgeXR/runtime/src/qbx_runtime.cpp") for n in names):
-                  raise SystemExit("Archive is missing the native runtime source")
+                  raise SystemExit("Archive is missing the native runtime source.")
               z.extractall("/tmp/qbx-extract")
           PY
           if [ ! -d /tmp/qbx-extract/QuestBridgeXR ]; then
             echo "Expected top-level QuestBridgeXR/ directory not found in archive."
             exit 1
           fi
-          rsync -a --exclude='.git/' /tmp/qbx-extract/QuestBridgeXR/ ./
+          # GitHub's automatic token cannot push changes to workflow files.
+          # Keep the workflow files created through the repository API untouched.
+          rsync -a --exclude='.git/' --exclude='.github/workflows/' /tmp/qbx-extract/QuestBridgeXR/ ./
           rm -f "$archive"
           test -s .github/workflows/build-release.yml
           test -s runtime/src/qbx_runtime.cpp
