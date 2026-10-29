@@ -49,10 +49,8 @@ With the default room controls enabled:
 
 - **Left thumbstick:** walk around the room.
 - **Right thumbstick:** turn; snap-turn is enabled by default.
-- **Click the right thumbstick (R3):** cycle to the next environment. There are 208 scenes, so this currently advances one at a time and wraps around at the end.
 - **Press the three-lines Menu button on the left controller:** open or close the monitor's QuestBridge Control Center. Some Quest runtimes reserve this button for the system menu; right B remains a compatibility fallback. The menu replaces the live PC image while open and reveals it again when closed.
-- **Point the right controller at the monitor:** a continuous blue laser follows the controller's aim pose; squeeze the right trigger to select menu tabs and actions. The menu includes Home, Environments, Display Output, Comfort, and Help.
-- **Click the left thumbstick (L3):** cycle the desktop display between the monitor, TV, and both.
+- **Point the right controller at the monitor:** a continuous blue laser follows the controller's aim pose; squeeze the right trigger to select menu tabs and actions. The menu includes Home, Environments, Display Output, Comfort, and Help. Thumbstick clicks no longer trigger environment or display shortcuts, so they won't interrupt movement or turning.
 - **Press X on the left controller:** toggle the seated-height mode. Moving with the left thumbstick automatically stands you back up.
 
 If a control does not respond, check that `room_controls_enabled=true`, `room_movement_enabled=true`, and `sitting_toggle_enabled=true` are present in the active `config.ini`. Controller input forwarding and room navigation use the same OpenXR actions.
