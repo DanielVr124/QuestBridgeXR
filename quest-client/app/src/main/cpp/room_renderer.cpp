@@ -1452,6 +1452,13 @@ void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monito
                  0.0f,centerY-h*.432f,.27f,subdued);
 }
 
+XrPosef RoomRenderer::transformViewPose(const XrPosef& viewPose, const XrVector3f& headCenter) const {
+    // Preserve the headset's real OpenXR pose for compositor consistency. Virtual
+    // locomotion and yaw are applied to the room geometry, not the eye pose.
+    (void)headCenter;
+    return viewPose;
+}
+
 void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,
                              const XrVector3f& headCenter,XrPosef& renderedPose,
                              GLuint videoTexture,bool hasVideo) {
