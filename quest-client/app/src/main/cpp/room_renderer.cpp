@@ -1161,6 +1161,31 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             sidePanelWidth,ceilingY-floorY,0.10f,wall);
     drawBox(pv.data(),0,ceilingY-1.05f,frontZ+0.02f,1.4f,2.1f,0.10f,wall);
     drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,std::min(halfW*1.35f,settings_.roomSize=="small"?3.4f:6.2f),activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f);
+
+    // QuestBridge ambience pass: layered architectural details in a restrained blue/violet palette.
+    // Geometry is deliberately low-cost and uses the existing box shader (no extra draw pipeline).
+    const auto accentBlue = rgb(.20f,.62f,1.0f);
+    const auto accentViolet = rgb(.49f,.30f,1.0f);
+    const auto trimDark = rgb(.055f,.075f,.13f);
+    const float trimY = floorY + 3.72f;
+    // Floating ceiling coves and slim light bars create a premium studio silhouette.
+    drawBox(pv.data(),0,trimY,0,halfW*1.62f,.035f,.045f,trimDark);
+    drawBox(pv.data(),0,trimY-.035f,0,halfW*1.48f,.018f,.028f,accentViolet);
+    drawBox(pv.data(),-halfW+.12f,trimY-.08f,0,.035f,.035f,halfD*1.65f,accentBlue);
+    drawBox(pv.data(), halfW-.12f,trimY-.08f,0,.035f,.035f,halfD*1.65f,accentViolet);
+    // Back-wall acoustic panels frame the outside view without competing with it.
+    const float panelY = floorY + 2.48f;
+    const float panelZ = backZ + .16f;
+    for (int side : {-1, 1}) {
+        const float panelX = side * std::min(halfW*.72f, 2.65f);
+        drawBox(pv.data(),panelX,panelY,panelZ,.36f,1.02f,.055f,trimDark);
+        drawBox(pv.data(),panelX,panelY,panelZ+.035f,.025f,.83f,.018f,side<0?accentBlue:accentViolet);
+        drawBox(pv.data(),panelX+side*.11f,panelY,panelZ+.035f,.018f,.64f,.018f,rgb(.12f,.17f,.28f));
+    }
+    // A subtle floating console rail visually ties the screens and room together.
+    drawBox(pv.data(),0,floorY+1.02f,deskZ+.48f,3.0f,.025f,.025f,accentBlue);
+    drawBox(pv.data(),0,floorY+1.055f,deskZ+.48f,2.45f,.012f,.018f,accentViolet);
+
     // Desk and monitor mount.
     const float deskZ=-1.75f;
     drawBox(pv.data(),0,floorY+0.78f,deskZ,3.25f,0.10f,0.82f,wood);
