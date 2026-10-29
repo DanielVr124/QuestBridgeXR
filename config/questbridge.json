@@ -63,6 +63,10 @@
   },
   "room": {
     "environment": "blossom",
+    "mode": "explore",
+    "monitor_behavior": "world",
+    "monitors_visible": true,
+    "ambience_enabled": true,
     "room_size": "medium",
     "screen_destination": "monitor",
     "monitor_count": 1,
