@@ -39,7 +39,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: prerelease-build-${{ github.event.workflow_run.id }}
-          name: QuestBridgeXR Pre-release #${{ github.event.workflow_run.run_number }}
+          target_commitish: ${{ github.event.workflow_run.head_sha }}
+          name: "QuestBridgeXR Pre-release #${{ github.event.workflow_run.run_number }}"
           prerelease: true
           make_latest: false
           generate_release_notes: true
