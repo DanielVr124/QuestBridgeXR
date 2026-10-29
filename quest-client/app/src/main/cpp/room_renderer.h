@@ -37,6 +37,8 @@ public:
     void cycleEnvironment();
     void toggleSitting(const XrPosef& headPose);
     void toggleMenu();
+    bool menuVisible() const { return menuVisible_; }
+    void handleMenuInput(float vertical, bool selectPressed);
     bool sitting() const { return sitting_; }
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
                    GLuint videoTexture, bool hasVideo);
@@ -54,6 +56,8 @@ private:
     void drawBox(const float* projectionView, float x, float y, float z,
                  float sx, float sy, float sz, const std::array<float, 4>& color,
                  float yaw = 0.0f);
+    void drawText(const float* projectionView, const char* text, float x, float y, float z,
+                  float pixelSize, const std::array<float, 4>& color);
     void drawSphere(const float* projectionView, float x, float y, float z,
                     float sx, float sy, float sz, const std::array<float, 4>& color);
     void drawPlane(const float* projectionView, float x, float y, float z,
@@ -96,4 +100,6 @@ private:
     bool previousSmoothTurning_ = false;
     bool sitting_ = false;
     bool menuVisible_ = false;
+    int menuSelection_ = 0;
+    bool previousMenuNavigation_ = false;
 };
