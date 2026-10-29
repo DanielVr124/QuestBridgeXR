@@ -1095,12 +1095,13 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     if (blocked(moveX_, oldMoveZ)) moveX_ = oldMoveX;
     if (blocked(moveX_, moveZ_)) moveZ_ = oldMoveZ;
     snapCooldown_=std::max(0.0f,snapCooldown_-dt);
-    if(settings_.smoothTurn){virtualYaw_+=std::clamp(rightStickX,-1.0f,1.0f)*std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;}
+    // OpenXR's positive yaw convention makes the world rotate opposite to the
+    // user's intended stick direction. Negate stick input so right means right.
+    if(settings_.smoothTurn){virtualYaw_-=std::clamp(rightStickX,-1.0f,1.0f)*std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;}
     else {
         const bool right=rightStickX>0.7f,left=rightStickX < -0.7f;
-        // Keep snap-turn direction consistent with smooth turning and locomotion yaw.
-        if(snapCooldown_<=0.0f && right && !previousTurnRight_){virtualYaw_+=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
-        else if(snapCooldown_<=0.0f && left && !previousTurnLeft_){virtualYaw_-=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
+        if(snapCooldown_<=0.0f && right && !previousTurnRight_){virtualYaw_-=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
+        else if(snapCooldown_<=0.0f && left && !previousTurnLeft_){virtualYaw_+=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
         previousTurnRight_=right;previousTurnLeft_=left;
     }
 }
@@ -1280,15 +1281,22 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     Mat4 projection=makeProjection(view.fov);
     Mat4 camera=makeView(view.pose);
     const float sittingDrop = sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f;
-    // Apply virtual movement/turning to the world, not the tracked eye pose.
-    // Rotating the room opposite the stick turn keeps the player at the pivot and
-    // leaves OpenXR's real stereo views available for compositor reprojection.
+    // The virtual player position includes both physical tracking and accumulated
+    // joystick locomotion. Rotate the room around that moving pivot, not around the
+    // reference-space origin; otherwise turning near a wall orbits the player.
+    const float pivotX = headCenter.x + moveX_;
+    const float pivotY = headCenter.y;
+    const float pivotZ = headCenter.z + moveZ_;
     const Mat4 worldTransform = mul(
         translation(-moveX_, sittingDrop, -moveZ_),
-        mul(translation(headCenter.x, headCenter.y, headCenter.z),
+        mul(translation(pivotX, pivotY, pivotZ),
             mul(rotateY(-virtualYaw_),
-                translation(-headCenter.x, -headCenter.y, -headCenter.z))));
+                translation(-pivotX, -pivotY, -pivotZ))));
     Mat4 pv = mul(mul(projection, camera), worldTransform);
+    // Tracked controller poses are already in the viewer's tracking space. They
+    // must not inherit the virtual room translation/rotation or they'll appear
+    // stuck as the player moves. Render them directly through the tracked camera.
+    const Mat4 trackedPv = mul(projection, camera);
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
     std::array<float,4> floor = rgb(.09f,.12f,.18f);
@@ -1517,7 +1525,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // avoiding a second controller-only yaw that caused orientation disagreement.
     for(int hand=0;hand<2;++hand) {
         if(!controllerPoseValid_[hand]) continue;
-        drawControllerModel(pv.data(),controllerPoses_[hand],hand==0,
+        drawControllerModel(trackedPv.data(),controllerPoses_[hand],hand==0,
                             controllerTriggers_[hand],controllerGrips_[hand]);
     }
     if(settings_.comfortVignette && vignetteProgram_){
