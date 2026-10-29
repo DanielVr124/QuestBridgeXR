@@ -965,7 +965,9 @@ private:
         if (XR_FAILED(xrSyncActions(session_, &syncInfo))) return;
         const XrVector2f move = vector2Action(hands_[0].thumbstick, hands_[0].handPath);
         const XrVector2f turn = vector2Action(hands_[1].thumbstick, hands_[1].handPath);
-        const bool menuPressed = boolAction(hands_[0].menu, hands_[0].handPath);
+        // Quest may reserve the physical system-menu button; left Y is a deliberate in-app fallback.
+        const bool menuPressed = boolAction(hands_[0].menu, hands_[0].handPath) ||
+                                 boolAction(hands_[0].secondary, hands_[0].handPath);
         if (menuPressed && !previousMenuPressed_) room_.toggleMenu();
         previousMenuPressed_ = menuPressed;
         const bool menuSelectPressed = boolAction(hands_[0].primary, hands_[0].handPath);
