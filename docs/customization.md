@@ -72,7 +72,7 @@ These controls improve the existing prototype's sender/client/telemetry behavior
 
 ## Virtual Room
 
-- **Window scenery**: choose blossom/snow, night city, golden city, or one of two procedural scenes: an aurora sky with green/cyan curtains and stars, or a cyberpunk skyline with neon windows. These are still window views, not 360° environments.
+- **Window scenery**: choose from 28 scenes: blossom, night city, golden city, aurora, cyberpunk, sunset beach, snowy mountains, enchanted forest, desert dunes, ocean cliffs, space nebula, lunar base, volcanic world, underwater, autumn forest, tropical island, candy land, steampunk city, rainy Tokyo, sakura night, alpine lake, emerald valley, wasteland, midnight clouds, crystal cavern, lavender fields, firefly swamp, and polar station. The first three use bundled image assets; the other 25 are generated in-app as colorful skies, terrain, stars, foliage, and city silhouettes to avoid extra APK image files. They are window views, not 360° worlds.
 - **Room size**: changes room bounds and visual dimensions (small/medium/large).
 - **PC stream appears on**: routes the one current video source to desk monitor meshes, the TV, or both.
 - **Desk monitor count**: draws one to three monitor meshes; all mirror the same incoming video feed today.
@@ -93,3 +93,6 @@ Controller shortcuts while in the room: left stick click cycles monitor/TV/both;
 ## Quick Network Setup
 
 The **Quick Network Setup…** button in QuestBridge Studio detects the Windows IPv4 address selected by the PC's default route. If exactly one authorized ADB device is connected, it also tries to read that Quest's Wi-Fi IPv4 address. It only reads addresses until **Apply Found Addresses** is clicked; it does not install the APK, change the firewall, or modify the active OpenXR runtime. ADB discovery requires Android platform-tools and an authorized USB/Wi-Fi debugging connection. When no headset is connected, apply the PC address and fill in the Quest address later in the Connection tab.
+
+
+Controller scenery cycling now moves through all 28 options in order, then wraps to the blossom scene. Select an exact scene from **Virtual Room → Window scenery** in Studio before exporting/installing the Quest INI if you prefer not to cycle in-headset.

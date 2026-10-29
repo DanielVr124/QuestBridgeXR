@@ -3,8 +3,11 @@
 from __future__ import annotations
 import pathlib
 import unittest
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+from qbx_config import ROOM_ENVIRONMENTS
 
 class NativeSourceContractTests(unittest.TestCase):
     def test_room_renderer_contains_requested_environment_and_seating_paths(self):
@@ -17,8 +20,16 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("void toggleSitting(const XrPosef& headPose)", header)
         self.assertIn("aurora", header)
         self.assertIn("cyberpunk", header)
-        self.assertIn("createProceduralEnvironment(false)", source)
-        self.assertIn("createProceduralEnvironment(true)", source)
+        self.assertIn("createProceduralEnvironment(activeEnvironmentIndex_)", source)
+        self.assertIn("std::array<const char*, 28> kEnvironmentNames", source)
+        self.assertIn("environmentTextures_[activeEnvironmentIndex_]", source)
+        catalog_start = source.index("kEnvironmentNames")
+        catalog_end = source.index("};", catalog_start)
+        native_catalog = source[catalog_start:catalog_end]
+        for env in ROOM_ENVIRONMENTS:
+            with self.subTest(native_environment=env):
+                self.assertIn(f'"{env}"', native_catalog)
+        self.assertIn("environmentTextures_.size()", source)
         self.assertIn("Move close to the desk chair or couch", source)
         self.assertIn("Sat on the virtual", source)
         self.assertIn("settings_.showCouch", source)

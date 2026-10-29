@@ -151,7 +151,7 @@ class ConfigTests(unittest.TestCase):
             self.assertIn(expected, text)
 
     def test_all_room_environment_choices_validate_and_export(self):
-        for environment in ("blossom", "night_city", "golden_city", "aurora", "cyberpunk"):
+        for environment in qbx_config.ROOM_ENVIRONMENTS:
             with self.subTest(environment=environment):
                 cfg = copy.deepcopy(qbx_config.DEFAULT_CONFIG)
                 cfg["room"]["environment"] = environment

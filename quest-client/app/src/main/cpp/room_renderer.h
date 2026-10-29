@@ -8,7 +8,7 @@
 #include <openxr/openxr.h>
 
 struct RoomSettings {
-    std::string environment = "blossom";       // blossom | night_city | golden_city | aurora | cyberpunk
+    std::string environment = "blossom";       // 28 scenes; see Studio Virtual Room settings
     std::string roomSize = "medium";           // small | medium | large
     std::string screenDestination = "monitor"; // monitor | tv | both
     int monitorCount = 1;                       // 1..3, replicated stream
@@ -46,7 +46,7 @@ private:
     struct Vertex { float x, y, z, u, v; };
     GLuint compileShader(GLenum type, const char* source);
     GLuint loadRgbAsset(AAssetManager* assets, const char* filename);
-    GLuint createProceduralEnvironment(bool cyberpunk);
+    GLuint createProceduralEnvironment(int sceneIndex);
     void createGeometry();
     void chooseEnvironment();
     void drawBox(const float* projectionView, float x, float y, float z,
@@ -70,7 +70,7 @@ private:
     GLint locUvScale_ = -1;
     GLuint cubeTexture_ = 0;
     GLuint planeTexture_ = 0;
-    std::array<GLuint, 5> environmentTextures_{};
+    std::array<GLuint, 28> environmentTextures_{};
     int activeEnvironmentIndex_ = 0;
     GLuint videoFallbackTexture_ = 0;
     bool initialized_ = false;
