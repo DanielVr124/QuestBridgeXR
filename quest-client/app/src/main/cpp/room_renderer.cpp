@@ -955,6 +955,38 @@ void RoomRenderer::createGeometry() {
     glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(0));
     glEnableVertexAttribArray(1);glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(3*sizeof(float)));
     glBindVertexArray(0);
+
+    // Smooth UV sphere mesh used for rounded cushions, chair details and PC cooling fans.
+    // It is generated once and shared by every room object to keep draw overhead low.
+    std::vector<float> sphere;
+    constexpr int rings = 12, segments = 20;
+    sphere.reserve(static_cast<size_t>(rings * segments * 6 * 5));
+    auto vertex = [&](float lat, float lon) {
+        const float cl = std::cos(lat);
+        return std::array<float,5>{cl*std::cos(lon), std::sin(lat), cl*std::sin(lon),
+                                   lon/(2.0f*kPi)+0.5f, lat/kPi+0.5f};
+    };
+    for (int r = 0; r < rings; ++r) {
+        const float lat0 = -kPi*0.5f + kPi*float(r)/rings;
+        const float lat1 = -kPi*0.5f + kPi*float(r+1)/rings;
+        for (int s = 0; s < segments; ++s) {
+            const float lon0 = 2.0f*kPi*float(s)/segments;
+            const float lon1 = 2.0f*kPi*float(s+1)/segments;
+            const auto a=vertex(lat0,lon0), b=vertex(lat0,lon1), d=vertex(lat1,lon0), e=vertex(lat1,lon1);
+            for (const auto& v : {a,d,b,b,d,e}) sphere.insert(sphere.end(),v.begin(),v.end());
+        }
+    }
+    sphereVertexCount_ = static_cast<GLsizei>(sphere.size()/5);
+    glGenVertexArrays(1,&sphereVao_);
+    glGenBuffers(1,&sphereVbo_);
+    glBindVertexArray(sphereVao_);
+    glBindBuffer(GL_ARRAY_BUFFER,sphereVbo_);
+    glBufferData(GL_ARRAY_BUFFER,static_cast<GLsizeiptr>(sphere.size()*sizeof(float)),sphere.data(),GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(0));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(3*sizeof(float)));
+    glBindVertexArray(0);
 }
 
 void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; chooseEnvironment(); }
@@ -1033,6 +1065,17 @@ void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,floa
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniform4fv(locColor_,1,color.data());glUniform1i(locTextured_,0);
     glBindVertexArray(vao_);glDrawArrays(GL_TRIANGLES,0,36);glBindVertexArray(0);
 }
+void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color) {
+    Mat4 projectionView{}; std::copy(pv,pv+projectionView.size(),projectionView.begin());
+    const Mat4 model=mul(translation(x,y,z),scaling(sx,sy,sz));
+    const Mat4 mvp=mul(projectionView,model);
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
+    glUniform4fv(locColor_,1,color.data());
+    glUniform1i(locTextured_,0);
+    glBindVertexArray(sphereVao_);
+    glDrawArrays(GL_TRIANGLES,0,sphereVertexCount_);
+    glBindVertexArray(0);
+}
 void RoomRenderer::drawPlane(const float* pv,float x,float y,float z,float sx,float sy,GLuint texture,const std::array<float,4>& color,float yaw) {
     Mat4 projectionView{}; std::copy(pv, pv + projectionView.size(), projectionView.begin());
     Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,1)));Mat4 mvp=mul(projectionView,model);
@@ -1075,10 +1118,11 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
         return std::fabs(x-cx) < rx && std::fabs(z-cz) < rz;
     };
     // Simple non-physics collision boxes keep joystick movement from passing through furniture.
-    const float couchX = -halfW + 1.25f, couchZ = -halfD + 0.80f;
-    const bool hitsDesk = overlaps(moveX_, moveZ_, 0.0f, -1.75f, 1.72f, 0.68f);
-    const bool hitsChair = settings_.showChair && overlaps(moveX_, moveZ_, 0.85f, 1.6f, 0.55f, 0.54f);
-    const bool hitsCouch = settings_.showCouch && overlaps(moveX_, moveZ_, couchX, couchZ, 1.18f, 0.65f);
+    const float deskX=halfW-1.48f, deskZ=-halfD+1.35f;
+    const float couchX=halfW-1.25f, couchZ=.05f;
+    const bool hitsDesk=overlaps(moveX_,moveZ_,deskX,deskZ,1.45f,.70f);
+    const bool hitsChair=settings_.showChair && overlaps(moveX_,moveZ_,deskX-.25f,deskZ+1.20f,.55f,.55f);
+    const bool hitsCouch=settings_.showCouch && overlaps(moveX_,moveZ_,couchX,couchZ,.65f,1.20f);
     if (hitsDesk || hitsChair || hitsCouch) { moveX_ = oldMoveX; moveZ_ = oldMoveZ; }
     snapCooldown_=std::max(0.0f,snapCooldown_-dt);
     if(settings_.smoothTurn){virtualYaw_+=std::clamp(rightStickX,-1.0f,1.0f)*std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;}
@@ -1162,85 +1206,133 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(),0,ceilingY-1.05f,frontZ+0.02f,1.4f,2.1f,0.10f,wall);
     drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,std::min(halfW*1.35f,settings_.roomSize=="small"?3.4f:6.2f),activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f);
 
-    const float deskZ=-1.75f;
+    const float deskZ=-halfD+1.35f;
 
-    // QuestBridge ambience pass: layered architectural details in a restrained blue/violet palette.
-    // Geometry is deliberately low-cost and uses the existing box shader (no extra draw pipeline).
-    const auto accentBlue = rgb(.20f,.62f,1.0f);
-    const auto accentViolet = rgb(.49f,.30f,1.0f);
-    const auto trimDark = rgb(.055f,.075f,.13f);
+    const auto accentBlue = rgb(.16f,.58f,1.0f);
+    const auto accentViolet = rgb(.48f,.25f,1.0f);
+    const auto trimDark = rgb(.035f,.045f,.075f);
+    const auto silver = rgb(.55f,.61f,.70f);
     const float trimY = floorY + 3.72f;
-    // Floating ceiling coves and slim light bars create a premium studio silhouette.
     drawBox(pv.data(),0,trimY,0,halfW*1.62f,.035f,.045f,trimDark);
     drawBox(pv.data(),0,trimY-.035f,0,halfW*1.48f,.018f,.028f,accentViolet);
     drawBox(pv.data(),-halfW+.12f,trimY-.08f,0,.035f,.035f,halfD*1.65f,accentBlue);
     drawBox(pv.data(), halfW-.12f,trimY-.08f,0,.035f,.035f,halfD*1.65f,accentViolet);
-    // Back-wall acoustic panels frame the outside view without competing with it.
-    const float panelY = floorY + 2.48f;
-    const float panelZ = backZ + .16f;
-    for (int side : {-1, 1}) {
-        const float panelX = side * std::min(halfW*.72f, 2.65f);
-        drawBox(pv.data(),panelX,panelY,panelZ,.36f,1.02f,.055f,trimDark);
-        drawBox(pv.data(),panelX,panelY,panelZ+.035f,.025f,.83f,.018f,side<0?accentBlue:accentViolet);
-        drawBox(pv.data(),panelX+side*.11f,panelY,panelZ+.035f,.018f,.64f,.018f,rgb(.12f,.17f,.28f));
-    }
-    // A subtle floating console rail visually ties the screens and room together.
-    drawBox(pv.data(),0,floorY+1.02f,deskZ+.48f,3.0f,.025f,.025f,accentBlue);
-    drawBox(pv.data(),0,floorY+1.055f,deskZ+.48f,2.45f,.012f,.018f,accentViolet);
 
-    // Desk and monitor mount.
-    drawBox(pv.data(),0,floorY+0.78f,deskZ,3.25f,0.10f,0.82f,wood);
-    drawBox(pv.data(),-1.38f,floorY+0.37f,deskZ,0.10f,0.75f,0.72f,wood);
-    drawBox(pv.data(),1.38f,floorY+0.37f,deskZ,0.10f,0.75f,0.72f,wood);
+    // Acoustic wall panels with inset highlights; keep the selected environment as the window view.
+    const float panelY=floorY+2.48f, panelZ=backZ+.16f;
+    for(int side : {-1,1}) {
+        const float panelX=side*std::min(halfW*.72f,2.65f);
+        drawBox(pv.data(),panelX,panelY,panelZ,.42f,1.08f,.06f,trimDark);
+        drawBox(pv.data(),panelX,panelY,panelZ+.035f,.026f,.88f,.018f,side<0?accentBlue:accentViolet);
+        drawBox(pv.data(),panelX+side*.12f,panelY,panelZ+.035f,.018f,.68f,.018f,rgb(.12f,.17f,.28f));
+    }
+
+    // Gaming desk occupies the back-right corner, leaving the center of the room open.
+    const float deskX=halfW-1.48f;
+    const float deskWidth=std::min(2.65f,halfW*1.02f);
+    const float deskFrontZ=deskZ+.45f;
+    const float deskTopY=floorY+.78f;
+    drawBox(pv.data(),deskX,deskTopY,deskZ,deskWidth,.085f,.88f,wood);
+    drawBox(pv.data(),deskX-deskWidth*.42f,floorY+.39f,deskZ,.075f,.70f,.78f,trimDark);
+    drawBox(pv.data(),deskX+deskWidth*.42f,floorY+.39f,deskZ,.075f,.70f,.78f,trimDark);
+    drawBox(pv.data(),deskX,deskTopY+.055f,deskZ,deskWidth-.08f,.018f,.80f,rgb(.10f,.12f,.17f));
+    // Slim under-desk light, softly reflected by the floor.
+    drawBox(pv.data(),deskX,deskTopY-.10f,deskFrontZ,.95f,.018f,.025f,accentBlue);
+
+    // Clean premium monitor: layered thin bezel, inset screen, centered metal stand and weighted base.
     const int monitorCount=std::clamp(settings_.monitorCount,1,3);
-    const float monitorW=monitorCount==1?1.28f:monitorCount==2?0.90f:0.72f;
+    const float monitorW=monitorCount==1?1.12f:monitorCount==2?.78f:.62f;
     const float monitorH=monitorW*9.0f/16.0f;
-    const float monitorCenterY=floorY+1.35f;
-    const float deskTopY=floorY+0.83f;
-    const float standHeight=std::max(0.08f,monitorCenterY-monitorH*0.5f-deskTopY);
-    const float gap=0.08f;
-    for(int i=0;i<monitorCount;++i){
-        const float x=(i-(monitorCount-1)*0.5f)*(monitorW+gap);
-        const bool streamOn=(settings_.screenDestination=="monitor"||settings_.screenDestination=="both");
-        GLuint tex=(streamOn&&hasVideo)?videoTexture:videoFallbackTexture_;
-        drawBox(pv.data(),x,monitorCenterY,deskZ-0.05f,monitorW+0.05f,monitorH+0.05f,0.08f,rgb(.05f,.06f,.09f));
-        drawPlane(pv.data(),x,monitorCenterY,deskZ+0.001f,monitorW,monitorH,tex,rgb(1,1,1));
-        drawBox(pv.data(),x,deskTopY+standHeight*0.5f,deskZ,0.05f,standHeight,0.08f,wood);
+    const float monitorX=deskX-.36f;
+    const float monitorY=floorY+1.43f;
+    const float monitorZ=deskZ-.34f;
+    const float deskSurface=floorY+.83f;
+    const float standHeight=std::max(.08f,monitorY-monitorH*.5f-deskSurface);
+    const float monitorGap=.055f;
+    for(int i=0;i<monitorCount;++i) {
+        const float x=monitorX+(i-(monitorCount-1)*.5f)*(monitorW+monitorGap);
+        const bool streamOn=settings_.screenDestination=="monitor"||settings_.screenDestination=="both";
+        const GLuint tex=(streamOn&&hasVideo)?videoTexture:videoFallbackTexture_;
+        // Thin outer graphite shell, narrow satin-metal rim, then the live display plane.
+        drawBox(pv.data(),x,monitorY,monitorZ,monitorW+.075f,monitorH+.075f,.075f,trimDark);
+        drawBox(pv.data(),x,monitorY,monitorZ+.039f,monitorW+.025f,monitorH+.025f,.012f,silver);
+        drawPlane(pv.data(),x,monitorY,monitorZ+.047f,monitorW,monitorH,tex,rgb(1,1,1));
+        drawBox(pv.data(),x,deskSurface+standHeight*.5f,monitorZ,.045f,standHeight,.055f,silver);
+        drawBox(pv.data(),x,deskSurface+.018f,monitorZ+.035f,.30f,.035f,.20f,trimDark);
+        drawBox(pv.data(),x,deskSurface+.038f,monitorZ+.035f,.23f,.008f,.15f,silver);
     }
-    // Optional wall-mounted television on the right wall; source can be switched between monitor and TV or mirrored.
-    if(settings_.showTv){
-        const bool tvStream=(settings_.screenDestination=="tv"||settings_.screenDestination=="both");
-        GLuint tvTex=(tvStream&&hasVideo)?videoTexture:env;
-        drawBox(pv.data(),halfW-0.12f,floorY+2.0f,-2.4f,0.10f,1.32f,2.28f,rgb(.035f,.04f,.055f),0);
-        // The television screen faces toward room center (-X); rotate local +Z to -X.
-        drawPlane(pv.data(),halfW-0.055f,floorY+2.0f,-2.4f,1.95f,1.08f,tvTex,rgb(1,1,1),-kPi*.5f);
+
+    // A compact white gaming PC with a glass side panel, ventilation detail and three illuminated fans.
+    const float pcX=deskX+deskWidth*.31f;
+    const float pcY=deskSurface+.34f;
+    const float pcZ=deskZ+.12f;
+    const auto pcWhite=rgb(.88f,.91f,.96f);
+    const auto pcEdge=rgb(.66f,.72f,.80f);
+    drawBox(pv.data(),pcX,pcY,pcZ,.43f,.66f,.57f,pcWhite);
+    drawBox(pv.data(),pcX,pcY,pcZ+.292f,.37f,.60f,.012f,rgb(.10f,.13f,.20f));
+    drawBox(pv.data(),pcX-.16f,pcY,pcZ+.302f,.045f,.55f,.008f,rgb(.20f,.24f,.33f));
+    drawBox(pv.data(),pcX+.16f,pcY,pcZ+.302f,.045f,.55f,.008f,rgb(.20f,.24f,.33f));
+    for(int fan=0;fan<3;++fan) {
+        const float fy=pcY+.20f-fan*.20f;
+        drawSphere(pv.data(),pcX,fy,pcZ+.315f,.060f,.060f,.012f,fan==1?accentViolet:accentBlue);
+        drawSphere(pv.data(),pcX,fy,pcZ+.329f,.027f,.027f,.009f,rgb(.88f,.92f,1.0f));
     }
-    // Sofa with separate seat/back/arms; large enough to read as a comfortable place to sit.
-    if(settings_.showCouch){
-        const float couchX=-halfW+1.25f,couchZ=-halfD+0.80f;
-        drawBox(pv.data(),couchX,floorY+0.47f,couchZ,2.0f,0.35f,0.88f,sofa);
-        drawBox(pv.data(),couchX,floorY+0.88f,couchZ-0.31f,2.0f,0.62f,0.22f,sofa);
-        drawBox(pv.data(),couchX-0.91f,floorY+0.64f,couchZ,0.22f,0.48f,0.90f,sofa);
-        drawBox(pv.data(),couchX+0.91f,floorY+0.64f,couchZ,0.22f,0.48f,0.90f,sofa);
-        drawBox(pv.data(),couchX-0.48f,floorY+0.68f,couchZ+0.03f,0.78f,0.08f,0.70f,rgb(sofa[0]*1.12f,sofa[1]*1.12f,sofa[2]*1.12f));
-        drawBox(pv.data(),couchX+0.48f,floorY+0.68f,couchZ+0.03f,0.78f,0.08f,0.70f,rgb(sofa[0]*1.12f,sofa[1]*1.12f,sofa[2]*1.12f));
+    // Discreet top vent and power button.
+    for(int vent=0;vent<5;++vent)
+        drawBox(pv.data(),pcX-.12f+vent*.06f,pcY+.337f,pcZ,.035f,.006f,.24f,pcEdge);
+    drawSphere(pv.data(),pcX+.13f,pcY+.337f,pcZ+.18f,.018f,.012f,.018f,accentBlue);
+
+    // TV on the left wall, facing into the room; the couch across from it faces the TV.
+    if(settings_.showTv) {
+        const float tvX=-halfW+.075f, tvY=floorY+2.02f, tvZ=.05f;
+        const float tvW=std::min(2.0f,halfD*.58f), tvH=tvW*9.0f/16.0f;
+        const bool tvStream=settings_.screenDestination=="tv"||settings_.screenDestination=="both";
+        const GLuint tvTex=(tvStream&&hasVideo)?videoTexture:env;
+        drawBox(pv.data(),tvX,tvY,tvZ,.095f,tvH+.12f,tvW+.12f,trimDark);
+        drawBox(pv.data(),tvX+.05f,tvY,tvZ,.018f,tvH+.035f,tvW+.035f,silver);
+        drawPlane(pv.data(),tvX+.062f,tvY,tvZ,tvW,tvH,tvTex,rgb(1,1,1),kPi*.5f);
+        drawBox(pv.data(),tvX+.08f,tvY-tvH*.5f-.08f,tvZ,.025f,.018f,.28f,accentBlue);
     }
-    // A rolling desk chair behind the spawn position to walk back to and sit in physically.
-    if(settings_.showChair){
-        const float chairX=0.85f, chairZ=1.6f;
-        drawBox(pv.data(),chairX,floorY+0.58f,chairZ,0.72f,0.18f,0.66f,sofa);
-        drawBox(pv.data(),chairX,floorY+1.05f,chairZ-0.25f,0.72f,0.82f,0.16f,sofa);
-        drawBox(pv.data(),chairX,floorY+0.28f,chairZ,0.08f,0.52f,0.08f,wood);
-        for(int i=0;i<5;++i){float a=2*kPi*i/5;drawBox(pv.data(),chairX+std::cos(a)*.30f,floorY+0.05f,chairZ+std::sin(a)*.26f,.34f,.05f,.06f,wood,a);}
+
+    // Couch moved directly opposite the wall TV. Soft, rounded cushions replace the old blocky sofa.
+    if(settings_.showCouch) {
+        const float couchX=halfW-1.25f, couchZ=.05f, couchYaw=-kPi*.5f;
+        const float cx=couchX;
+        drawBox(pv.data(),cx,floorY+.38f,couchZ, .86f,.24f,1.92f,trimDark,couchYaw);
+        drawSphere(pv.data(),cx,floorY+.53f,couchZ,.48f,.24f,.82f,sofa);
+        drawSphere(pv.data(),cx-.22f,floorY+.68f,couchZ-.48f,.25f,.28f,.39f,sofa);
+        drawSphere(pv.data(),cx-.22f,floorY+.68f,couchZ+.48f,.25f,.28f,.39f,sofa);
+        drawSphere(pv.data(),cx-.12f,floorY+.75f,couchZ-.23f,.22f,.15f,.35f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
+        drawSphere(pv.data(),cx-.12f,floorY+.75f,couchZ+.23f,.22f,.15f,.35f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
+        // Rounded arm pads and short dark feet.
+        drawSphere(pv.data(),cx,floorY+.61f,couchZ-.88f,.48f,.27f,.16f,sofa);
+        drawSphere(pv.data(),cx,floorY+.61f,couchZ+.88f,.48f,.27f,.16f,sofa);
+        for(int side : {-1,1}) for(int end : {-1,1})
+            drawBox(pv.data(),cx+side*.29f,floorY+.15f,couchZ+end*.70f,.07f,.25f,.07f,trimDark,couchYaw);
     }
-    // Side lamps add warm points of color without expensive lights or post processing.
-    drawBox(pv.data(),-halfW+0.32f,floorY+1.45f,-1.7f,0.12f,1.0f,0.12f,wood);
-    const auto lampGlow = activeEnvironmentIndex_ == 0 ? rgb(.98f,.72f,.82f)
-        : (activeEnvironmentIndex_ == 3 || activeEnvironmentIndex_ == 26) ? rgb(.30f,1.0f,.70f)
-        : (activeEnvironmentIndex_ == 4 || activeEnvironmentIndex_ == 10 || activeEnvironmentIndex_ == 24) ? rgb(.25f,.72f,1.0f)
-        : (activeEnvironmentIndex_ == 16 || activeEnvironmentIndex_ == 19 || activeEnvironmentIndex_ == 25) ? rgb(1.0f,.53f,.82f)
-        : rgb(1.0f,.63f,.30f);
-    drawBox(pv.data(),-halfW+0.32f,floorY+2.02f,-1.7f,0.42f,0.28f,0.42f,lampGlow);
+
+    // Ergonomic gaming chair with rounded headrest, cushioned seat and five-star base.
+    if(settings_.showChair) {
+        const float chairX=deskX-.25f, chairZ=deskZ+1.20f;
+        drawSphere(pv.data(),chairX,floorY+.62f,chairZ,.36f,.13f,.34f,sofa);
+        drawSphere(pv.data(),chairX,floorY+1.00f,chairZ-.22f,.34f,.44f,.13f,sofa);
+        drawSphere(pv.data(),chairX,floorY+1.34f,chairZ-.24f,.20f,.18f,.12f,sofa);
+        drawBox(pv.data(),chairX,floorY+.27f,chairZ,.07f,.38f,.07f,silver);
+        for(int i=0;i<5;++i) {
+            const float a=2*kPi*i/5;
+            drawBox(pv.data(),chairX+std::cos(a)*.30f,floorY+.07f,chairZ+std::sin(a)*.28f,.32f,.045f,.055f,trimDark,a);
+        }
+        drawSphere(pv.data(),chairX-.25f,floorY+.57f,chairZ,.10f,.06f,.26f,trimDark);
+        drawSphere(pv.data(),chairX+.25f,floorY+.57f,chairZ,.10f,.06f,.26f,trimDark);
+    }
+
+    // Warm practical lamp and a restrained light accent near the PC setup.
+    drawBox(pv.data(),-halfW+.30f,floorY+1.35f,-1.45f,.09f,.90f,.09f,wood);
+    const auto lampGlow=activeEnvironmentIndex_==0?rgb(.98f,.72f,.82f):
+        (activeEnvironmentIndex_==3||activeEnvironmentIndex_==26)?rgb(.30f,1.0f,.70f):
+        (activeEnvironmentIndex_==4||activeEnvironmentIndex_==10||activeEnvironmentIndex_==24)?rgb(.25f,.72f,1.0f):
+        (activeEnvironmentIndex_==16||activeEnvironmentIndex_==19||activeEnvironmentIndex_==25)?rgb(1.0f,.53f,.82f):rgb(1.0f,.63f,.30f);
+    drawSphere(pv.data(),-halfW+.30f,floorY+1.92f,-1.45f,.20f,.15f,.20f,lampGlow);
     if(settings_.comfortVignette && vignetteProgram_){
         glDisable(GL_DEPTH_TEST);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(vignetteProgram_);glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);
@@ -1253,6 +1345,7 @@ void RoomRenderer::release() {
     if(!initialized_&&!program_&&!vao_)return;
     if(program_)glDeleteProgram(program_);if(vignetteProgram_)glDeleteProgram(vignetteProgram_);if(vao_)glDeleteVertexArrays(1,&vao_);if(vbo_)glDeleteBuffers(1,&vbo_);
     if(planeTexture_)glDeleteVertexArrays(1,&planeTexture_);if(cubeTexture_)glDeleteBuffers(1,&cubeTexture_);
+    if(sphereVao_)glDeleteVertexArrays(1,&sphereVao_);if(sphereVbo_)glDeleteBuffers(1,&sphereVbo_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=0;environmentTextures_.fill(0);initialized_=false;
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=sphereVao_=sphereVbo_=0;sphereVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
