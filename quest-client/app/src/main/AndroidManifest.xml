@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-feature android:name="android.hardware.vr.headtracking" android:required="true" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:label="QuestBridge XR"
+        android:hasCode="false"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true">
+        <!-- Quest/Meta Android runtime metadata for immersive NativeActivity launch. -->
+        <meta-data android:name="com.oculus.vr.application.mode" android:value="vr" />
+        <meta-data android:name="com.oculus.vr.focusaware" android:value="true" />
+        <activity
+            android:name="android.app.NativeActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|uiMode"
+            android:screenOrientation="landscape"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar.Fullscreen">
+            <meta-data android:name="android.app.lib_name" android:value="qbxquest" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="org.khronos.openxr.intent.category.IMMERSIVE_HMD" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

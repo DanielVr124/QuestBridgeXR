@@ -1,0 +1,27 @@
+{
+  "profile": "Cinema Quality",
+  "stream": {
+    "source": "test",
+    "width": 2560,
+    "height": 1440,
+    "fps": 72,
+    "bitrate_bps": 24000000,
+    "preset": "fast",
+    "tune": "film",
+    "h264_profile": "high",
+    "rate_control": "vbr",
+    "maxrate_factor": 1.8,
+    "vbv_buffer_ms": 220,
+    "threads": 0,
+    "udp_send_buffer_kib": 3072,
+    "gop_seconds": 1.0
+  },
+  "display": {
+    "aspect_mode": "fit",
+    "brightness": 0.0,
+    "contrast": 1.05,
+    "saturation": 1.0,
+    "gamma": 1.0
+  },
+  "transport": { "quest_receive_buffer_kib": 8192 }
+}

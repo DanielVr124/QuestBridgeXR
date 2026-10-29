@@ -1,0 +1,32 @@
+# Build outputs
+/dist/
+*.spec
+/build/
+**/build/
+**/.cxx/
+**/.externalNativeBuild/
+**/outputs/
+
+# Gradle / IDE
+.gradle/
+.idea/
+*.iml
+local.properties
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Native build artifacts
+*.obj
+*.o
+*.dll
+*.so
+*.exe
+*.pdb
+.generated/
+build/
+quest-client/.gradle/
+quest-client/app/build/
+__pycache__/
+*.pyc

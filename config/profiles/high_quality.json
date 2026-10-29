@@ -1,0 +1,14 @@
+{
+  "profile": "High Quality",
+  "stream": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 90,
+    "bitrate_bps": 18000000,
+    "preset": "veryfast",
+    "gop_seconds": 1.0
+  },
+  "tracking": {
+    "rate_hz": 90
+  }
+}

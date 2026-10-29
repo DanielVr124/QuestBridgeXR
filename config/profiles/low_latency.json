@@ -1,0 +1,17 @@
+{
+  "profile": "Low Latency",
+  "stream": {
+    "width": 1280,
+    "height": 720,
+    "fps": 72,
+    "bitrate_bps": 5000000,
+    "preset": "ultrafast",
+    "gop_seconds": 0.5
+  },
+  "tracking": {
+    "rate_hz": 90
+  },
+  "transport": {
+    "incomplete_frame_timeout_ms": 80
+  }
+}

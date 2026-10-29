@@ -1,0 +1,7 @@
+{
+  "file_format_version": "1.0.0",
+  "runtime": {
+    "name": "QuestBridge XR (experimental D3D11 compositor)",
+    "library_path": "./qbx_openxr_runtime.dll"
+  }
+}

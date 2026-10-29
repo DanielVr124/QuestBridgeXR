@@ -1,0 +1,22 @@
+{
+  "profile": "WiFi Stable",
+  "stream": {
+    "source": "test",
+    "width": 1280,
+    "height": 720,
+    "fps": 60,
+    "bitrate_bps": 5000000,
+    "preset": "ultrafast",
+    "tune": "zerolatency",
+    "h264_profile": "main",
+    "rate_control": "vbr",
+    "maxrate_factor": 1.2,
+    "vbv_buffer_ms": 80,
+    "udp_send_buffer_kib": 1024,
+    "gop_seconds": 0.5
+  },
+  "transport": {
+    "incomplete_frame_timeout_ms": 80,
+    "quest_receive_buffer_kib": 6144
+  }
+}

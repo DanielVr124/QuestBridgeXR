@@ -1,0 +1,15 @@
+{
+  "profile": "Network Debug",
+  "stream": {
+    "source": "test",
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "bitrate_bps": 2000000,
+    "preset": "ultrafast",
+    "gop_seconds": 1.0
+  },
+  "tracking": {
+    "rate_hz": 30
+  }
+}
