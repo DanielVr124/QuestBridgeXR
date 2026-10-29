@@ -780,8 +780,9 @@ private:
         bind(hands_[0].primary, "/user/hand/left/input/x/click");
         bind(hands_[0].secondary, "/user/hand/left/input/y/click");
         bind(hands_[0].thumbstickClick, "/user/hand/left/input/thumbstick/click");
-        // The left menu button is reserved by the system on many Quest runtimes.
-        // Do not suggest it as an application binding.
+        // Restore the left controller's three-line menu action. Some runtimes may reserve it,
+        // but keep the application binding so runtimes that expose it can deliver the press.
+        bind(hands_[0].menu, "/user/hand/left/input/menu/click");
         // OpenXR Touch profiles expose squeeze as a value, not a portable squeeze/click path.
         bind(hands_[1].pose, std::string("/user/hand/right/input/") + config_.controllerPose + "/pose");
         bind(hands_[1].trigger, "/user/hand/right/input/trigger/value");
