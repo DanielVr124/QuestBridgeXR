@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from qbx_paths import project_root
 from openxr_runtime import discover_runtimes, launch_with_runtime, resolve_runtime_manifest
+from network_setup import discover_pc_ipv4, discover_quest_ipv4
 
 import copy
 import json
@@ -74,7 +75,7 @@ SETTING_HELP = {
     "transport.max_frame_mib": "Maximum encoded frame/access-unit size accepted by the Quest receiver. Larger values allow unusually complex keyframes but allocate more memory and can prolong frame assembly. Keep this as low as your stream permits.",
     "transport.incomplete_frame_timeout_ms": "Time allowed for all UDP chunks of an encoded frame to arrive. Lower values discard lossy/incomplete frames quickly to protect latency; higher values may recover on slow networks but can show older frames later.",
     "transport.quest_receive_buffer_kib": "Requested kernel UDP receive-buffer capacity on the Quest in KiB. More buffer can reduce packet drops during bursts but may increase queuing latency; Android/driver limits may clamp it.",
-    "room.environment": "Choose the scenery visible through the room's actual 3D window: snowy pink blossoms, a dark reflective night skyline, or warm golden city lights. The photo is placed behind a modeled window frame; the room and furniture remain 3D.",
+    "room.environment": "Choose the scenery visible through the 3D window: snowy pink blossoms, a dark reflective night skyline, warm golden city lights, a procedural green/cyan aurora, or a neon cyberpunk skyline. The scenery is shown behind a modeled window frame; the room and furniture remain 3D.",
     "room.room_size": "Sets the walkable room footprint. Small is a compact cozy gaming room, Medium gives a comfortable desk-and-couch room, and Large allows more movement. Virtual movement is bounded by the room's outer walls.",
     "room.screen_destination": "Controls where the PC video stream appears. Monitor shows it on the desk display, TV shows it on the wall TV, and Both mirrors the same stream onto both. These are mirrored copies, not independent desktop captures yet.",
     "room.monitor_count": "Number of desk monitors rendered in the room (1–3). All monitors currently mirror the same decoded PC stream; separate capture sources are not implemented.",
@@ -236,8 +237,69 @@ class QuestBridgeStudio(tk.Tk):
         row3.grid(row=2, column=0, sticky="ew", pady=(8, 0))
         row3.columnconfigure(0, weight=1)
         row3.columnconfigure(1, weight=1)
+        row3.columnconfigure(2, weight=1)
         ttk.Button(row3, text="Run Setup Diagnostics", command=lambda: self._run_diagnostics(False)).grid(row=0, column=0, padx=(0, 6), sticky="ew")
-        ttk.Button(row3, text="Test PC Host Connection", command=lambda: self._run_diagnostics(True)).grid(row=0, column=1, padx=(6, 0), sticky="ew")
+        ttk.Button(row3, text="Test PC Host Connection", command=lambda: self._run_diagnostics(True)).grid(row=0, column=1, padx=6, sticky="ew")
+        ttk.Button(row3, text="Quick Network Setup…", command=self._quick_network_setup).grid(row=0, column=2, padx=(6, 0), sticky="ew")
+
+    def _quick_network_setup(self) -> None:
+        """Detect PC/Quest LAN addresses and let the user selectively apply them."""
+        self.status_var.set("Checking the PC network route and looking for one authorized Quest via ADB…")
+        self.update_idletasks()
+        pc_ip = discover_pc_ipv4()
+        quest_ip, quest_note = discover_quest_ipv4()
+
+        window = tk.Toplevel(self)
+        window.title("Quick Network Setup")
+        window.geometry("680x390")
+        window.minsize(600, 340)
+        window.transient(self)
+        window.grab_set()
+        body = ttk.Frame(window, padding=18)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="Find the two LAN addresses used by QuestBridge XR",
+                  font=("Segoe UI", 13, "bold")).pack(anchor="w", pady=(0, 8))
+        ttk.Label(
+            body,
+            text="The PC and Quest should be on the same private Wi-Fi/LAN. Detection is read-only until you choose Apply.",
+            wraplength=620,
+        ).pack(anchor="w", pady=(0, 12))
+        ttk.Label(body, text=f"Windows PC IPv4: {pc_ip or 'Not detected'}",
+                  font=("Consolas", 10)).pack(anchor="w", pady=3)
+        ttk.Label(body, text=f"Quest Wi-Fi IPv4: {quest_ip or 'Not detected'}",
+                  font=("Consolas", 10)).pack(anchor="w", pady=3)
+        ttk.Label(body, text=quest_note, wraplength=620, foreground="#666666").pack(anchor="w", pady=(7, 10))
+        ttk.Label(
+            body,
+            text="Quest IP discovery needs one authorized ADB device (usually USB debugging). If no Quest is connected right now, you can still apply the PC address and enter the Quest address later in the Connection tab.",
+            wraplength=620,
+        ).pack(anchor="w", pady=(0, 14))
+
+        buttons = ttk.Frame(body)
+        buttons.pack(fill="x", side="bottom")
+        found_any = bool(pc_ip or quest_ip)
+
+        def apply_addresses() -> None:
+            updated = []
+            if pc_ip and "network.pc_ip" in self.vars:
+                self.vars["network.pc_ip"].set(pc_ip)
+                updated.append(f"PC={pc_ip}")
+            if quest_ip and "network.quest_ip" in self.vars:
+                self.vars["network.quest_ip"].set(quest_ip)
+                updated.append(f"Quest={quest_ip}")
+            if not updated:
+                window.destroy()
+                return
+            if not self._save_settings():
+                return
+            self.status_var.set("Quick network setup saved: " + ", ".join(updated))
+            window.destroy()
+
+        ttk.Button(
+            buttons, text="Apply Found Addresses", command=apply_addresses,
+            state=("normal" if found_any else "disabled"),
+        ).pack(side="left")
+        ttk.Button(buttons, text="Close", command=window.destroy).pack(side="right")
 
     def _tab(self, notebook: ttk.Notebook, title: str) -> ttk.Frame:
         outer = ttk.Frame(notebook)
@@ -378,7 +440,7 @@ class QuestBridgeStudio(tk.Tk):
     def _add_room_tab(self, notebook: ttk.Notebook) -> None:
         f = self._tab(notebook, "Virtual Room")
         cfg = self.config_data["room"]
-        self._combo(f, "room.environment", "Window scenery", cfg["environment"], ("blossom", "night_city", "golden_city"), 0)
+        self._combo(f, "room.environment", "Window scenery", cfg["environment"], ("blossom", "night_city", "golden_city", "aurora", "cyberpunk"), 0)
         self._combo(f, "room.room_size", "Room size", cfg["room_size"], ("small", "medium", "large"), 1)
         self._combo(f, "room.screen_destination", "PC stream appears on", cfg["screen_destination"], ("monitor", "tv", "both"), 2)
         self._entry(f, "room.monitor_count", "Desk monitor count (1–3)", cfg["monitor_count"], 3)

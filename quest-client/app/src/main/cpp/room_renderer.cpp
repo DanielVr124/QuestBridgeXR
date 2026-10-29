@@ -128,6 +128,107 @@ GLuint RoomRenderer::loadRgbAsset(AAssetManager* assets, const char* filename) {
     glBindTexture(GL_TEXTURE_2D,0); LOGI("loaded %s (%ux%u)",filename,w,h); return t;
 }
 
+
+GLuint RoomRenderer::createProceduralEnvironment(bool cyberpunk) {
+    // Small deterministic skies avoid extra APK assets and load-time dependencies.
+    constexpr int width = 512;
+    constexpr int height = 256;
+    std::vector<uint8_t> pixels(static_cast<size_t>(width * height * 3), 0);
+    const auto hash32 = [](uint32_t value) {
+        value ^= value >> 16;
+        value *= 0x7feb352dU;
+        value ^= value >> 15;
+        value *= 0x846ca68bU;
+        value ^= value >> 16;
+        return value;
+    };
+    const auto byte = [](float value) {
+        return static_cast<uint8_t>(std::clamp(value, 0.0f, 255.0f));
+    };
+
+    for (int y = 0; y < height; ++y) {
+        const float v = static_cast<float>(y) / static_cast<float>(height - 1);
+        for (int x = 0; x < width; ++x) {
+            const float u = static_cast<float>(x) / static_cast<float>(width - 1);
+            float r = 0.0f, g = 0.0f, b = 0.0f;
+            if (!cyberpunk) {
+                // Aurora: deep blue night, layered green/cyan curtains, violet haze and stars.
+                r = 4.0f + 7.0f * v;
+                g = 6.0f + 9.0f * v;
+                b = 20.0f + 28.0f * (1.0f - v);
+                const float center = 0.39f + 0.065f * std::sin(u * 7.0f)
+                                   + 0.021f * std::sin(u * 23.0f);
+                const float shimmer = 0.28f + 0.72f * (0.5f + 0.5f * std::sin(u * 19.0f + v * 31.0f));
+                const float greenBand = std::exp(-std::pow((v - center) / 0.075f, 2.0f)) * shimmer;
+                const float cyanBand = std::exp(-std::pow((v - center - 0.045f) / 0.10f, 2.0f)) * (1.0f - shimmer * 0.28f);
+                const float violetBand = std::exp(-std::pow((v - center - 0.13f) / 0.060f, 2.0f))
+                                       * (0.35f + 0.65f * std::sin(u * 11.0f + 1.0f) * std::sin(u * 11.0f + 1.0f));
+                r += 24.0f * greenBand + 11.0f * cyanBand + 78.0f * violetBand;
+                g += 148.0f * greenBand + 47.0f * cyanBand + 17.0f * violetBand;
+                b += 88.0f * greenBand + 115.0f * cyanBand + 150.0f * violetBand;
+                const float ridge = 0.79f + 0.026f * std::sin(u * 12.0f) + 0.016f * std::sin(u * 31.0f);
+                if (v > ridge) {
+                    r = 3.0f + 2.0f * (1.0f - v);
+                    g = 7.0f + 4.0f * (1.0f - v);
+                    b = 17.0f + 8.0f * (1.0f - v);
+                } else if (v < 0.62f) {
+                    const uint32_t star = hash32(static_cast<uint32_t>(x) * 374761393U
+                                               + static_cast<uint32_t>(y) * 668265263U);
+                    if (star % 2048U < 3U) {
+                        const float shine = 120.0f + static_cast<float>((star >> 8) & 0x7fU);
+                        r += shine * 0.72f; g += shine * 0.84f; b += shine;
+                    }
+                }
+            } else {
+                // Cyberpunk: violet sky behind a jagged skyline with cyan and magenta windows.
+                r = 7.0f + 14.0f * v;
+                g = 5.0f + 5.0f * v;
+                b = 24.0f + 32.0f * (1.0f - v);
+                const int building = x / 16;
+                const uint32_t seed = hash32(static_cast<uint32_t>(building) * 7919U + 37U);
+                const float roof = 0.43f + static_cast<float>((seed >> 8) % 320U) / 1000.0f;
+                if (v > roof) {
+                    r = 8.0f + static_cast<float>(seed & 7U);
+                    g = 8.0f + static_cast<float>((seed >> 3) & 7U);
+                    b = 26.0f + static_cast<float>((seed >> 6) & 17U);
+                    const int localX = x % 16;
+                    const int row = static_cast<int>((v - roof) * 420.0f) % 18;
+                    const uint32_t windowSeed = hash32(static_cast<uint32_t>(building * 113 + row * 31 + 5));
+                    if (localX >= 3 && localX <= 8 && row >= 4 && row <= 11 && windowSeed % 7U < 3U) {
+                        if (windowSeed & 1U) { r = 235.0f; g = 39.0f; b = 157.0f; }
+                        else { r = 30.0f; g = 209.0f; b = 255.0f; }
+                    } else if (localX == 0) {
+                        r = 28.0f; g = 32.0f; b = 70.0f;
+                    }
+                } else if (v < 0.40f) {
+                    const uint32_t star = hash32(static_cast<uint32_t>(x) * 2246822519U
+                                               + static_cast<uint32_t>(y) * 3266489917U);
+                    if (star % 3072U < 2U) { r += 100.0f; g += 75.0f; b += 160.0f; }
+                }
+                if (std::fabs(v - roof) < 0.004f) { r += 65.0f; g += 18.0f; b += 100.0f; }
+            }
+            const size_t at = static_cast<size_t>((y * width + x) * 3);
+            pixels[at] = byte(r);
+            pixels[at + 1] = byte(g);
+            pixels[at + 2] = byte(b);
+        }
+    }
+
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    if (!texture) return 0;
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
+    LOGI("generated procedural %s window scenery", cyberpunk ? "cyberpunk" : "aurora");
+    return texture;
+}
+
 bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings) {
     if(initialized_) return true;
     settings_=settings;
@@ -145,6 +246,8 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     environmentTextures_[0]=loadRgbAsset(assets,"environments/blossom.rgb");
     environmentTextures_[1]=loadRgbAsset(assets,"environments/night_city.rgb");
     environmentTextures_[2]=loadRgbAsset(assets,"environments/golden_city.rgb");
+    environmentTextures_[3]=createProceduralEnvironment(false);
+    environmentTextures_[4]=createProceduralEnvironment(true);
     // A harmless fallback texture gives an intentional dark idle screen before a PC stream starts.
     const uint8_t idlePixels[4*4*3] = {
       18,24,39, 20,28,45, 20,28,45, 18,24,39, 20,28,45, 35,42,63, 35,42,63, 20,28,45,
@@ -194,7 +297,10 @@ void RoomRenderer::createGeometry() {
 
 void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; chooseEnvironment(); }
 void RoomRenderer::chooseEnvironment() {
-    activeEnvironmentIndex_=settings_.environment=="night_city"?1:settings_.environment=="golden_city"?2:0;
+    activeEnvironmentIndex_ = settings_.environment == "night_city" ? 1
+        : settings_.environment == "golden_city" ? 2
+        : settings_.environment == "aurora" ? 3
+        : settings_.environment == "cyberpunk" ? 4 : 0;
 }
 void RoomRenderer::cycleScreenDestination() {
     if (!settings_.roomControlsEnabled) return;
@@ -207,6 +313,8 @@ void RoomRenderer::cycleEnvironment() {
     if (!settings_.roomControlsEnabled) return;
     if (activeEnvironmentIndex_ == 0) settings_.environment = "night_city";
     else if (activeEnvironmentIndex_ == 1) settings_.environment = "golden_city";
+    else if (activeEnvironmentIndex_ == 2) settings_.environment = "aurora";
+    else if (activeEnvironmentIndex_ == 3) settings_.environment = "cyberpunk";
     else settings_.environment = "blossom";
     chooseEnvironment();
     LOGI("Room scenery changed to %s", settings_.environment.c_str());
@@ -322,10 +430,22 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     Mat4 camera=makeView(view.pose,moveX_,moveZ_,virtualYaw_,sittingDrop);
     Mat4 pv=mul(projection,camera);
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
-    std::array<float,4> wall=activeEnvironmentIndex_==0?rgb(.70f,.63f,.67f):activeEnvironmentIndex_==1?rgb(.10f,.13f,.20f):rgb(.20f,.15f,.12f);
-    std::array<float,4> floor=activeEnvironmentIndex_==0?rgb(.44f,.37f,.41f):activeEnvironmentIndex_==1?rgb(.10f,.14f,.19f):rgb(.17f,.12f,.09f);
-    std::array<float,4> wood=activeEnvironmentIndex_==0?rgb(.32f,.20f,.21f):activeEnvironmentIndex_==1?rgb(.12f,.14f,.17f):rgb(.30f,.18f,.09f);
-    std::array<float,4> sofa=activeEnvironmentIndex_==0?rgb(.63f,.38f,.48f):activeEnvironmentIndex_==1?rgb(.11f,.20f,.28f):rgb(.45f,.25f,.09f);
+    std::array<float,4> wall = activeEnvironmentIndex_ == 0 ? rgb(.70f,.63f,.67f)
+        : activeEnvironmentIndex_ == 1 ? rgb(.10f,.13f,.20f)
+        : activeEnvironmentIndex_ == 2 ? rgb(.20f,.15f,.12f)
+        : activeEnvironmentIndex_ == 3 ? rgb(.07f,.10f,.18f) : rgb(.09f,.055f,.16f);
+    std::array<float,4> floor = activeEnvironmentIndex_ == 0 ? rgb(.44f,.37f,.41f)
+        : activeEnvironmentIndex_ == 1 ? rgb(.10f,.14f,.19f)
+        : activeEnvironmentIndex_ == 2 ? rgb(.17f,.12f,.09f)
+        : activeEnvironmentIndex_ == 3 ? rgb(.035f,.055f,.10f) : rgb(.035f,.025f,.075f);
+    std::array<float,4> wood = activeEnvironmentIndex_ == 0 ? rgb(.32f,.20f,.21f)
+        : activeEnvironmentIndex_ == 1 ? rgb(.12f,.14f,.17f)
+        : activeEnvironmentIndex_ == 2 ? rgb(.30f,.18f,.09f)
+        : activeEnvironmentIndex_ == 3 ? rgb(.11f,.10f,.21f) : rgb(.12f,.045f,.20f);
+    std::array<float,4> sofa = activeEnvironmentIndex_ == 0 ? rgb(.63f,.38f,.48f)
+        : activeEnvironmentIndex_ == 1 ? rgb(.11f,.20f,.28f)
+        : activeEnvironmentIndex_ == 2 ? rgb(.45f,.25f,.09f)
+        : activeEnvironmentIndex_ == 3 ? rgb(.18f,.22f,.36f) : rgb(.18f,.08f,.23f);
     glUseProgram(program_);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDisable(GL_CULL_FACE);
     glUniform1i(locTexture_,0);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
@@ -341,7 +461,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(), (halfW+0.7f)*0.5f,(floorY+ceilingY)*0.5f,frontZ+0.02f,
             sidePanelWidth,ceilingY-floorY,0.10f,wall);
     drawBox(pv.data(),0,ceilingY-1.05f,frontZ+0.02f,1.4f,2.1f,0.10f,wall);
-    drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,std::min(halfW*1.35f,settings_.roomSize=="small"?3.4f:6.2f),activeEnvironmentIndex_==1?2.55f:1.8f);
+    drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,std::min(halfW*1.35f,settings_.roomSize=="small"?3.4f:6.2f),activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f);
     // Desk and monitor mount.
     const float deskZ=-1.75f;
     drawBox(pv.data(),0,floorY+0.78f,deskZ,3.25f,0.10f,0.82f,wood);
@@ -390,7 +510,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     }
     // Side lamps add warm points of color without expensive lights or post processing.
     drawBox(pv.data(),-halfW+0.32f,floorY+1.45f,-1.7f,0.12f,1.0f,0.12f,wood);
-    drawBox(pv.data(),-halfW+0.32f,floorY+2.02f,-1.7f,0.42f,0.28f,0.42f,activeEnvironmentIndex_==0?rgb(.98f,.72f,.82f):rgb(1.0f,.63f,.30f));
+    const auto lampGlow = activeEnvironmentIndex_ == 0 ? rgb(.98f,.72f,.82f)
+        : activeEnvironmentIndex_ == 3 ? rgb(.30f,1.0f,.70f)
+        : activeEnvironmentIndex_ == 4 ? rgb(.25f,.72f,1.0f) : rgb(1.0f,.63f,.30f);
+    drawBox(pv.data(),-halfW+0.32f,floorY+2.02f,-1.7f,0.42f,0.28f,0.42f,lampGlow);
     if(settings_.comfortVignette && vignetteProgram_){
         glDisable(GL_DEPTH_TEST);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(vignetteProgram_);glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);

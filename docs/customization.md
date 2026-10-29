@@ -72,7 +72,7 @@ These controls improve the existing prototype's sender/client/telemetry behavior
 
 ## Virtual Room
 
-- **Window scenery**: chooses the supplied blossom/snow, night-city, or golden-city image used in the rear window. It is a still window view, not a 360° image.
+- **Window scenery**: choose blossom/snow, night city, golden city, or one of two procedural scenes: an aurora sky with green/cyan curtains and stars, or a cyberpunk skyline with neon windows. These are still window views, not 360° environments.
 - **Room size**: changes room bounds and visual dimensions (small/medium/large).
 - **PC stream appears on**: routes the one current video source to desk monitor meshes, the TV, or both.
 - **Desk monitor count**: draws one to three monitor meshes; all mirror the same incoming video feed today.
@@ -88,3 +88,8 @@ Controller shortcuts while in the room: left stick click cycles monitor/TV/both;
 **Cozy Room / Fake VR** runs the QuestBridge room app on the headset. The PC desktop is a single 2D stream shown in that room, mirrored to both eyes. When enabled, the Windows head-look bridge maps tracked yaw/pitch to ordinary mouse movement in a foreground process listed in `config/fake_vr.ini`. It is opt-in, allowlisted, and does not modify/inject into game code. It may help with a game that accepts normal mouse-look input, but cannot provide native stereo/6DoF gameplay.
 
 **Real PCVR** uses Meta Quest Link and Meta's PC OpenXR runtime as a separate route. The Play Modes tab can launch the PC app if installed and links to setup information. This avoids requiring SteamVR for compatible Link/OpenXR apps, while QuestBridge's own D3D11 runtime is now available as an experimental, limited-API option. It has not passed conformance or been validated on hardware and should only be launched per process. See [play modes](play-modes.md).
+
+
+## Quick Network Setup
+
+The **Quick Network Setup…** button in QuestBridge Studio detects the Windows IPv4 address selected by the PC's default route. If exactly one authorized ADB device is connected, it also tries to read that Quest's Wi-Fi IPv4 address. It only reads addresses until **Apply Found Addresses** is clicked; it does not install the APK, change the firewall, or modify the active OpenXR runtime. ADB discovery requires Android platform-tools and an authorized USB/Wi-Fi debugging connection. When no headset is connected, apply the PC address and fill in the Quest address later in the Connection tab.

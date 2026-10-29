@@ -238,8 +238,8 @@ def validate_config(cfg: dict[str, Any]) -> dict[str, Any]:
     _integer(transport["quest_receive_buffer_kib"], "transport.quest_receive_buffer_kib", 256, 16384)
 
     room = cfg["room"]
-    if room["environment"] not in ("blossom", "night_city", "golden_city"):
-        raise ValueError("room.environment must be blossom, night_city, or golden_city")
+    if room["environment"] not in ("blossom", "night_city", "golden_city", "aurora", "cyberpunk"):
+        raise ValueError("room.environment must be blossom, night_city, golden_city, aurora, or cyberpunk")
     if room["room_size"] not in ("small", "medium", "large"):
         raise ValueError("room.room_size must be small, medium, or large")
     if room["screen_destination"] not in ("monitor", "tv", "both"):

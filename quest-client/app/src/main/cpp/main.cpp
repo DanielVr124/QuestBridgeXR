@@ -227,7 +227,7 @@ ClientConfig loadConfig(android_app* app) {
         } else if (key == "quest_receive_buffer_kib") {
             const int v = std::atoi(value.c_str());
             if (v >= 256 && v <= 16384) cfg.receiveBufferKiB = static_cast<uint32_t>(v);
-        } else if (key == "environment" && (value == "blossom" || value == "night_city" || value == "golden_city")) cfg.room.environment = value;
+        } else if (key == "environment" && (value == "blossom" || value == "night_city" || value == "golden_city" || value == "aurora" || value == "cyberpunk")) cfg.room.environment = value;
         else if (key == "room_size" && (value == "small" || value == "medium" || value == "large")) cfg.room.roomSize = value;
         else if (key == "screen_destination" && (value == "monitor" || value == "tv" || value == "both")) cfg.room.screenDestination = value;
         else if (key == "monitor_count") { const int v = std::atoi(value.c_str()); if (v >= 1 && v <= 3) cfg.room.monitorCount = v; }
