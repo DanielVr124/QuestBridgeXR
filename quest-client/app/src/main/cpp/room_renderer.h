@@ -10,10 +10,10 @@
 
 struct RoomSettings {
     std::string environment = "blossom";       // 328 scenes; see Studio Virtual Room settings
-    std::string mode = "explore";               // explore | workspace
+    std::string mode = "workspace";            // explore | workspace
     std::string monitorBehavior = "world";      // world | follow | summon
     bool monitorsVisible = true;
-    bool ambienceEnabled = true;
+    bool ambienceEnabled = false;
     std::string roomSize = "medium";           // small | medium | large
     std::string screenDestination = "monitor"; // monitor | tv | both
     int monitorCount = 1;                       // 1..3, replicated stream

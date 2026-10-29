@@ -158,10 +158,10 @@ ClientConfig loadConfig(android_app* app) {
             << "incomplete_frame_timeout_ms=120\n"
             << "quest_receive_buffer_kib=4096\n"
             << "environment=blossom\n"
-            << "room_mode=explore\n"
+            << "room_mode=workspace\n"
             << "monitor_behavior=world\n"
             << "monitors_visible=true\n"
-            << "ambience_enabled=true\n"
+            << "ambience_enabled=false\n"
             << "room_size=medium\n"
             << "screen_destination=monitor\n"
             << "monitor_count=1\n"
@@ -254,8 +254,18 @@ ClientConfig loadConfig(android_app* app) {
         else if (key == "comfort_vignette") cfg.room.comfortVignette = parseBool(value, cfg.room.comfortVignette);
         else if (key == "room_floor_offset_y") cfg.room.floorOffsetY = parseFloatInRange(value, cfg.room.floorOffsetY, -2.5f, 0.0f);
     }
-    LOGI("Config: host=%s:%u local_udp=%u room=%s/%s", cfg.hostIp.c_str(), cfg.hostPort, cfg.localPort,
-         cfg.room.environment.c_str(), cfg.room.roomSize.c_str());
+    // Startup-safe diagnostic mode: first get the app responding reliably, then enter Explore with left Y.
+    // Existing config.ini files may still request the heavier new world renderer and generated audio.
+    if (cfg.room.mode == "explore") {
+        LOGW("Startup safeguard: starting in Workspace; press left Y to enter Explore after launch");
+        cfg.room.mode = "workspace";
+    }
+    if (cfg.room.ambienceEnabled) {
+        LOGW("Startup safeguard: disabling generated ambience during launch diagnosis");
+        cfg.room.ambienceEnabled = false;
+    }
+    LOGI("Config: host=%s:%u local_udp=%u room=%s/%s ambience=%s", cfg.hostIp.c_str(), cfg.hostPort, cfg.localPort,
+         cfg.room.environment.c_str(), cfg.room.roomSize.c_str(), cfg.room.ambienceEnabled ? "on" : "off");
     return cfg;
 }
 
@@ -561,16 +571,22 @@ public:
     ~QuestRuntimeClient() { shutdown(); }
 
     bool initialize() {
+        LOGI("Startup: initializing network transport");
         if (!network_.start(config_)) return false;
+        LOGI("Startup: initializing EGL");
         if (!initializeEgl()) return false;
+        LOGI("Startup: initializing OpenXR");
         if (!initializeOpenXr()) return false;
+        LOGI("Startup: initializing video renderer");
         if (!video_.initGl()) LOGW("Video renderer unavailable: %s", video_.status());
+        LOGI("Startup: initializing room renderer (mode=%s, ambience=%s)", config_.room.mode.c_str(), config_.room.ambienceEnabled ? "on" : "off");
         if (!room_.initialize(app_ && app_->activity ? app_->activity->assetManager : nullptr, config_.room))
             LOGW("Room renderer initialization failed; check GLES shader logs");
         const int aspectMode = config_.aspectMode == "fit" ? 1 : config_.aspectMode == "crop" ? 2 : 0;
         video_.setImageControls(config_.brightness, config_.contrast, config_.saturation, config_.gamma,
                                 aspectMode, config_.flipHorizontal, config_.flipVertical);
         video_.setSwapEyes(config_.swapEyes);
+        LOGI("Startup: initialization complete; entering OpenXR event loop");
         return true;
     }
 
@@ -1037,9 +1053,9 @@ private:
     void renderFrame() {
         XrFrameWaitInfo waitInfo{XR_TYPE_FRAME_WAIT_INFO};
         XrFrameState frameState{XR_TYPE_FRAME_STATE};
-        if (!xrOk(xrWaitFrame(session_, &waitInfo, &frameState), "xrWaitFrame")) return;
+        if (!xrOk(xrWaitFrame(session_, &waitInfo, &frameState), "xrWaitFrame")) { usleep(10000); return; }
         XrFrameBeginInfo beginInfo{XR_TYPE_FRAME_BEGIN_INFO};
-        if (!xrOk(xrBeginFrame(session_, &beginInfo), "xrBeginFrame")) return;
+        if (!xrOk(xrBeginFrame(session_, &beginInfo), "xrBeginFrame")) { usleep(10000); return; }
 
         bool layerReady = false;
         if (frameState.shouldRender) {
@@ -1204,6 +1220,7 @@ private:
 void android_main(android_app* app) {
     app_dummy();
     if (!app) return;
+    LOGI("NativeActivity thread started");
     // NativeActivity creates the window before the immersive activity is launched, but wait defensively.
     while (!app->window && !app->destroyRequested) {
         int events = 0;
@@ -1212,6 +1229,7 @@ void android_main(android_app* app) {
         if (source) source->process(app, source);
     }
     if (app->destroyRequested) return;
+    LOGI("Startup: window is ready; constructing client");
     QuestRuntimeClient client(app);
     if (!client.initialize()) {
         LOGE("QuestBridge XR initialization failed; check logcat and config.ini");
