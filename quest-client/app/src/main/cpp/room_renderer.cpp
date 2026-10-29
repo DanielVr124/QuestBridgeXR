@@ -1481,7 +1481,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         // A restrained lower chin and tiny centered status light sit beneath the active image.
         drawBox(pv.data(),x,monitorY-monitorH*.5f-.014f,monitorZ+.070f,monitorW*.42f,.014f,.014f,trimDark);
         drawBox(pv.data(),x,monitorY-monitorH*.5f-.016f,monitorZ+.079f,.055f,.005f,.006f,accentBlue);
-        // Centered VESA-style mounting plate joins the panel to two separate metal uprights.
+        // Centered VESA-style mounting plate joins the panel to twin metal uprights.
         drawBox(pv.data(),x,monitorY-monitorH*.5f+.055f,monitorZ-.047f,.25f,.13f,.028f,trimDark);
         drawBox(pv.data(),x,monitorY-monitorH*.5f+.055f,monitorZ-.031f,.19f,.075f,.008f,silver);
         const float legOffset=monitorW*.205f;
