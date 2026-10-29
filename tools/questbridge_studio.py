@@ -167,8 +167,9 @@ class QuestBridgeStudio(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("QuestBridge Studio")
-        self.geometry("1040x820")
-        self.minsize(900, 680)
+        self.geometry("1180x860")
+        self.minsize(980, 720)
+        self._setup_visual_theme()
         self.config_data = load_config()
         self.vars: dict[str, tk.Variable] = {}
         self.host_process: subprocess.Popen | None = None
@@ -178,20 +179,76 @@ class QuestBridgeStudio(tk.Tk):
         self._load_form(self.config_data)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+    def _setup_visual_theme(self) -> None:
+        """Apply a cohesive dark, blue-violet Studio theme without changing settings behavior."""
+        self.palette = {
+            "bg": "#0b1020", "surface": "#121a2d", "surface2": "#18233b",
+            "surface3": "#202d49", "text": "#edf2ff", "muted": "#a3b1ce",
+            "accent": "#8b7cff", "accent_hover": "#a49aff", "cyan": "#64d9ff",
+            "border": "#2a3857", "warning": "#ffd28a",
+        }
+        self.configure(background=self.palette["bg"])
+        style = ttk.Style(self)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+        p = self.palette
+        style.configure(".", background=p["bg"], foreground=p["text"],
+                        font=("Segoe UI", 10), bordercolor=p["border"],
+                        lightcolor=p["surface"], darkcolor=p["surface"])
+        style.configure("TFrame", background=p["bg"])
+        style.configure("Card.TFrame", background=p["surface"], relief="flat")
+        style.configure("TLabel", background=p["bg"], foreground=p["text"])
+        style.configure("Muted.TLabel", background=p["bg"], foreground=p["muted"])
+        style.configure("Hero.TLabel", background=p["bg"], foreground=p["text"],
+                        font=("Segoe UI", 24, "bold"))
+        style.configure("Eyebrow.TLabel", background=p["bg"], foreground=p["cyan"],
+                        font=("Segoe UI", 9, "bold"))
+        style.configure("TButton", background=p["surface3"], foreground=p["text"],
+                        borderwidth=0, padding=(12, 9), focusthickness=0)
+        style.map("TButton", background=[("active", "#334365"), ("pressed", p["accent"])],
+                  foreground=[("disabled", "#65718b"), ("active", "#ffffff")])
+        style.configure("Accent.TButton", background=p["accent"], foreground="#ffffff",
+                        padding=(14, 10), font=("Segoe UI", 10, "bold"))
+        style.map("Accent.TButton", background=[("active", p["accent_hover"]),
+                                                ("pressed", "#7060ed")])
+        style.configure("TEntry", fieldbackground=p["surface2"], foreground=p["text"],
+                        insertcolor=p["text"], bordercolor=p["border"],
+                        padding=7, lightcolor=p["border"], darkcolor=p["border"])
+        style.configure("TCombobox", fieldbackground=p["surface2"], background=p["surface3"],
+                        foreground=p["text"], arrowcolor=p["cyan"], padding=7)
+        style.map("TCombobox", fieldbackground=[("readonly", p["surface2"])],
+                  foreground=[("readonly", p["text"])])
+        style.configure("TCheckbutton", background=p["bg"], foreground=p["text"], padding=5)
+        style.map("TCheckbutton", background=[("active", p["bg"])],
+                  foreground=[("active", p["cyan"])])
+        style.configure("TNotebook", background=p["bg"], borderwidth=0, tabmargins=(2, 4, 2, 0))
+        style.configure("TNotebook.Tab", background=p["surface"], foreground=p["muted"],
+                        padding=(15, 10), borderwidth=0)
+        style.map("TNotebook.Tab", background=[("selected", p["surface2"]), ("active", p["surface3"])],
+                  foreground=[("selected", p["cyan"]), ("active", p["text"])])
+        style.configure("TSeparator", background=p["border"])
+        style.configure("Vertical.TScrollbar", background=p["surface"], troughcolor=p["bg"],
+                        arrowcolor=p["muted"], bordercolor=p["bg"])
+
     def _build_ui(self) -> None:
         self.columnconfigure(0, weight=1)
         self.rowconfigure(2, weight=1)
 
-        header = ttk.Frame(self, padding=(16, 14, 16, 10))
+        header = ttk.Frame(self, padding=(24, 20, 24, 14))
         header.grid(row=0, column=0, sticky="ew")
         header.columnconfigure(0, weight=1)
-        ttk.Label(header, text="QuestBridge Studio", font=("Segoe UI", 20, "bold")).grid(row=0, column=0, sticky="w")
-        ttk.Label(header, text="Customize PC → Quest streaming, tracking, input, image processing, and transport", foreground="#555555").grid(row=1, column=0, sticky="w", pady=(2, 0))
-        ttk.Label(header, text="Hover any setting for a detailed explanation. A setting only changes features currently wired into the prototype.", foreground="#72531b").grid(row=2, column=0, sticky="w", pady=(3, 0))
-        self.status_var = tk.StringVar(value="Ready. Changes are saved to config/questbridge.json.")
-        ttk.Label(header, textvariable=self.status_var, wraplength=930).grid(row=3, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(header, text="QUESTBRIDGE  /  XR CONTROL CENTER", style="Eyebrow.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(header, text="QuestBridge Studio", style="Hero.TLabel").grid(row=1, column=0, sticky="w", pady=(3, 1))
+        ttk.Label(header, text="Your space. Your stream. Your settings.", style="Muted.TLabel").grid(row=2, column=0, sticky="w")
+        self.status_var = tk.StringVar(value="●  READY     Settings are saved to config/questbridge.json.")
+        ttk.Label(header, textvariable=self.status_var, wraplength=930,
+                  foreground=self.palette["cyan"]).grid(row=3, column=0, sticky="w", pady=(12, 0))
+        tk.Frame(self, height=2, background=self.palette["accent"]).grid(
+            row=0, column=0, sticky="new", padx=24, pady=(0, 0))
 
-        top = ttk.Frame(self, padding=(16, 0, 16, 8))
+        top = ttk.Frame(self, padding=(24, 8, 24, 12))
         top.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
         top.columnconfigure(0, weight=1)
         self.profile_var = tk.StringVar(value="Balanced")
@@ -202,7 +259,7 @@ class QuestBridgeStudio(tk.Tk):
         ttk.Button(top, text="Save Profile As…", command=self._save_profile_as).grid(row=0, column=3)
 
         notebook = ttk.Notebook(self)
-        notebook.grid(row=2, column=0, sticky="nsew", padx=16, pady=(0, 8))
+        notebook.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 12))
         self._add_network_tab(notebook)
         self._add_video_tab(notebook)
         self._add_tracking_tab(notebook)
@@ -212,14 +269,14 @@ class QuestBridgeStudio(tk.Tk):
         self._add_fake_vr_tab(notebook)
         self._add_play_modes_tab(notebook)
 
-        actions = ttk.Frame(self, padding=(16, 8, 16, 16))
+        actions = ttk.Frame(self, padding=(24, 10, 24, 20))
         actions.grid(row=3, column=0, sticky="ew")
         actions.columnconfigure(0, weight=1)
         row1 = ttk.Frame(actions)
         row1.grid(row=0, column=0, sticky="ew")
         for col in range(6):
             row1.columnconfigure(col, weight=1)
-        ttk.Button(row1, text="Save Settings", command=self._save_settings).grid(row=0, column=0, padx=(0, 6), sticky="ew")
+        ttk.Button(row1, text="Save Settings", style="Accent.TButton", command=self._save_settings).grid(row=0, column=0, padx=(0, 6), sticky="ew")
         ttk.Button(row1, text="Import JSON…", command=self._import_config).grid(row=0, column=1, padx=6, sticky="ew")
         ttk.Button(row1, text="Export Quest INI…", command=self._export_quest_ini).grid(row=0, column=2, padx=6, sticky="ew")
         ttk.Button(row1, text="Install Quest INI via ADB", command=self._install_quest_ini).grid(row=0, column=3, padx=6, sticky="ew")
@@ -270,7 +327,7 @@ class QuestBridgeStudio(tk.Tk):
                   font=("Consolas", 10)).pack(anchor="w", pady=3)
         ttk.Label(body, text=f"Quest Wi-Fi IPv4: {quest_ip or 'Not detected'}",
                   font=("Consolas", 10)).pack(anchor="w", pady=3)
-        ttk.Label(body, text=quest_note, wraplength=620, foreground="#666666").pack(anchor="w", pady=(7, 10))
+        ttk.Label(body, text=quest_note, wraplength=620, foreground="#a3b1ce").pack(anchor="w", pady=(7, 10))
         ttk.Label(
             body,
             text="Quest IP discovery needs one authorized ADB device (usually USB debugging). If no Quest is connected right now, you can still apply the PC address and enter the Quest address later in the Connection tab.",
@@ -312,7 +369,7 @@ class QuestBridgeStudio(tk.Tk):
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.grid(row=0, column=0, sticky="nsew")
         scrollbar.grid(row=0, column=1, sticky="ns")
-        frame = ttk.Frame(canvas, padding=18)
+        frame = ttk.Frame(canvas, padding=24)
         frame.columnconfigure(1, weight=1)
         window_id = canvas.create_window((0, 0), window=frame, anchor="nw")
         frame.bind("<Configure>", lambda _e, c=canvas: c.configure(scrollregion=c.bbox("all")))
@@ -461,7 +518,7 @@ class QuestBridgeStudio(tk.Tk):
         self._entry(f, "room.snap_turn_degrees", "Snap turn angle (degrees)", cfg["snap_turn_degrees"], 14)
         self._check(f, "room.comfort_vignette", "Comfort vignette during movement", cfg["comfort_vignette"], 15)
         self._entry(f, "room.floor_offset_y", "Floor vertical offset (m)", cfg["floor_offset_y"], 16)
-        ttk.Label(f, text="Controller shortcuts: left thumbstick click cycles Monitor → TV → Both; right thumbstick click cycles the scenery; left X toggles the seated camera height. Furniture is collidable at a simple box level, but seats do not use full physics.", foreground="#72531b", wraplength=760).grid(row=17, column=0, columnspan=3, sticky="w", pady=(18, 0))
+        ttk.Label(f, text="Controller shortcuts: left thumbstick click cycles Monitor → TV → Both; right thumbstick click cycles the scenery; left X toggles the seated camera height. Furniture is collidable at a simple box level, but seats do not use full physics.", foreground="#ffd28a", wraplength=760).grid(row=17, column=0, columnspan=3, sticky="w", pady=(18, 0))
         ttk.Label(f, text="This is the Quest standalone room client. It is not the missing Windows OpenXR compositor, and multiple virtual monitors currently mirror the same PC video source.", foreground="#666666", wraplength=760).grid(row=18, column=0, columnspan=3, sticky="w", pady=(10, 0))
 
     def _add_fake_vr_tab(self, notebook: ttk.Notebook) -> None:
@@ -519,7 +576,7 @@ class QuestBridgeStudio(tk.Tk):
             f,
             text=("Runtime helper: launches a chosen app with XR_RUNTIME_JSON set only in that app's environment. It does not change the Windows registry or stop a running runtime. "
                   "Meta mode selects Meta's installed runtime. QuestBridge mode selects the experimental D3D11 runtime shipped in the portable package; it is not conformance-tested and may not run arbitrary apps. Both overrides apply only to the child process."),
-            foreground="#555555", wraplength=740, justify="left").grid(row=9, column=0, columnspan=3, sticky="w", pady=(12, 0))
+            foreground="#a3b1ce", wraplength=740, justify="left").grid(row=9, column=0, columnspan=3, sticky="w", pady=(12, 0))
         ttk.Label(
             f,
             text=("Safety note: the head-look bridge starts OFF by default. It only sends ordinary mouse deltas while F8 is enabled and an allowlisted game is the foreground window. "
