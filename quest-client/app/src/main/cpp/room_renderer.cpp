@@ -1489,7 +1489,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float monitorX = deskX - 0.36f;
         const float monitorY = floorY + 1.43f;
         const float monitorZ = deskZ - 0.34f;
-        const float menuZ = monitorZ + 0.105f;
+        const float menuZ = monitorZ + 0.055f;
         const auto panel = rgb(0.025f, 0.032f, 0.065f, 0.98f);
         const auto row = rgb(0.075f, 0.090f, 0.145f, 0.98f);
         const auto selected = rgb(0.10f, 0.22f, 0.39f, 1.0f);
@@ -1500,24 +1500,24 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(program_);
         drawBox(pv.data(), monitorX, monitorY, menuZ, 1.02f, 0.60f, 0.008f, panel);
-        drawBox(pv.data(), monitorX, monitorY + 0.278f, menuZ - 0.006f, 0.96f, 0.012f, 0.006f, blue);
-        drawBox(pv.data(), monitorX - 0.43f, monitorY + 0.225f, menuZ - 0.008f, 0.035f, 0.035f, 0.006f, violet);
-        drawText(pv.data(), "QUESTBRIDGE", monitorX - 0.37f, monitorY + 0.218f, menuZ - 0.012f, 0.0060f, text);
+        drawBox(pv.data(), monitorX, monitorY + 0.278f, menuZ + 0.006f, 0.96f, 0.012f, 0.006f, blue);
+        drawBox(pv.data(), monitorX - 0.43f, monitorY + 0.225f, menuZ + 0.008f, 0.035f, 0.035f, 0.006f, violet);
+        drawText(pv.data(), "QUESTBRIDGE", monitorX - 0.37f, monitorY + 0.218f, menuZ + 0.012f, 0.0060f, text);
         const char* labels[5] = {"ENVIRONMENT", "DISPLAY MODE", "TV VISIBILITY", "COUCH VISIBILITY", "CLOSE MENU"};
         for (int i = 0; i < 5; ++i) {
             const float y = monitorY + 0.135f - static_cast<float>(i) * 0.091f;
-            drawBox(pv.data(), monitorX, y - 0.015f, menuZ - 0.006f, 0.94f, 0.073f, 0.006f,
+            drawBox(pv.data(), monitorX, y - 0.015f, menuZ + 0.006f, 0.94f, 0.073f, 0.006f,
                     i == menuSelection_ ? selected : row);
-            drawBox(pv.data(), monitorX - 0.415f, y - 0.015f, menuZ - 0.012f, 0.018f, 0.043f, 0.004f,
+            drawBox(pv.data(), monitorX - 0.415f, y - 0.015f, menuZ + 0.008f, 0.018f, 0.043f, 0.004f,
                     i == menuSelection_ ? blue : violet);
-            drawText(pv.data(), labels[i], monitorX - 0.37f, y + 0.015f, menuZ - 0.014f, 0.0052f, text);
-            if (i == 0) drawText(pv.data(), "NEXT", monitorX + 0.24f, y + 0.015f, menuZ - 0.014f, 0.0043f, blue);
+            drawText(pv.data(), labels[i], monitorX - 0.37f, y + 0.015f, menuZ + 0.012f, 0.0052f, text);
+            if (i == 0) drawText(pv.data(), "NEXT", monitorX + 0.24f, y + 0.015f, menuZ + 0.012f, 0.0043f, blue);
             else if (i == 1) {
                 const char* mode = settings_.screenDestination == "monitor" ? "MONITOR" :
                     (settings_.screenDestination == "tv" ? "TV" : "BOTH");
-                drawText(pv.data(), mode, monitorX + 0.20f, y + 0.015f, menuZ - 0.014f, 0.0043f, blue);
-            } else if (i == 2) drawText(pv.data(), settings_.showTv ? "ON" : "OFF", monitorX + 0.32f, y + 0.015f, menuZ - 0.014f, 0.0043f, blue);
-            else if (i == 3) drawText(pv.data(), settings_.showCouch ? "ON" : "OFF", monitorX + 0.32f, y + 0.015f, menuZ - 0.014f, 0.0043f, blue);
+                drawText(pv.data(), mode, monitorX + 0.20f, y + 0.015f, menuZ + 0.012f, 0.0043f, blue);
+            } else if (i == 2) drawText(pv.data(), settings_.showTv ? "ON" : "OFF", monitorX + 0.32f, y + 0.015f, menuZ + 0.012f, 0.0043f, blue);
+            else if (i == 3) drawText(pv.data(), settings_.showCouch ? "ON" : "OFF", monitorX + 0.32f, y + 0.015f, menuZ + 0.012f, 0.0043f, blue);
         }
         glDisable(GL_BLEND);
     }
