@@ -780,8 +780,9 @@ private:
         bind(hands_[0].primary, "/user/hand/left/input/x/click");
         bind(hands_[0].secondary, "/user/hand/left/input/y/click");
         bind(hands_[0].thumbstickClick, "/user/hand/left/input/thumbstick/click");
-        bind(hands_[0].menu, "/user/hand/left/input/menu/click");
-        bind(hands_[0].squeezeClick, "/user/hand/left/input/squeeze/click");
+        // The left menu button is reserved by the system on many Quest runtimes.
+        // Do not suggest it as an application binding.
+        // OpenXR Touch profiles expose squeeze as a value, not a portable squeeze/click path.
         bind(hands_[0].triggerClick, "/user/hand/left/input/trigger/click");
         bind(hands_[1].pose, std::string("/user/hand/right/input/") + config_.controllerPose + "/pose");
         bind(hands_[1].trigger, "/user/hand/right/input/trigger/value");
@@ -790,7 +791,6 @@ private:
         bind(hands_[1].primary, "/user/hand/right/input/a/click");
         bind(hands_[1].secondary, "/user/hand/right/input/b/click");
         bind(hands_[1].thumbstickClick, "/user/hand/right/input/thumbstick/click");
-        bind(hands_[1].squeezeClick, "/user/hand/right/input/squeeze/click");
         bind(hands_[1].triggerClick, "/user/hand/right/input/trigger/click");
         XrInteractionProfileSuggestedBinding suggested{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
         suggested.interactionProfile = profile;
