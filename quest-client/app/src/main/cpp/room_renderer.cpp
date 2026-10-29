@@ -348,19 +348,10 @@ XrQuaternionf quatMul(const XrQuaternionf& a,const XrQuaternionf& b) {
             a.w*b.z+a.x*b.y-a.y*b.x+a.z*b.w,
             a.w*b.w-a.x*b.x-a.y*b.y-a.z*b.z};
 }
-Mat4 makeView(const XrPosef& pose, float locomotionX, float locomotionZ, float virtualYaw, float sittingDrop) {
-    XrQuaternionf yawQ{0.0f, std::sin(virtualYaw*0.5f), 0.0f, std::cos(virtualYaw*0.5f)};
-    XrQuaternionf q=quatMul(yawQ, pose.orientation);
-    XrQuaternionf inv{-q.x,-q.y,-q.z,q.w};
-    Mat4 r=quatMatrix(inv);
-
-    // Snap/smooth turning changes the view direction around the player's
-    // current position. Do not rotate the camera's world position around the
-    // room origin: that makes the entire room drift farther as yaw accumulates.
-    // Locomotion offsets already live in the room's world coordinates.
-    Mat4 t=translation(-(pose.position.x+locomotionX),
-                       -(pose.position.y-sittingDrop),
-                       -(pose.position.z+locomotionZ));
+Mat4 makeView(const XrPosef& pose) {
+    XrQuaternionf inv{-pose.orientation.x,-pose.orientation.y,-pose.orientation.z,pose.orientation.w};
+    const Mat4 r=quatMatrix(inv);
+    const Mat4 t=translation(-pose.position.x,-pose.position.y,-pose.position.z);
     return mul(r,t);
 }
 Mat4 makeProjection(const XrFovf& fov) {
@@ -1076,8 +1067,10 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     leftX=smoothedMoveX_;
     leftY=smoothedMoveY_;
     // Reverse sign because forward is -Z in OpenXR.
-    const float forwardX=std::sin(yaw), forwardZ=-std::cos(yaw);
-    const float rightX=std::cos(yaw), rightZ=std::sin(yaw);
+    // Match OpenXR's +Y yaw convention: a positive head yaw rotates
+    // the -Z forward vector toward -X, not +X.
+    const float forwardX=-std::sin(yaw), forwardZ=-std::cos(yaw);
+    const float rightX=std::cos(yaw), rightZ=-std::sin(yaw);
     const float oldMoveX = moveX_, oldMoveZ = moveZ_;
     moveX_+=(rightX*leftX+forwardX*leftY)*speed*dt;
     moveZ_+=(rightZ*leftX+forwardZ*leftY)*speed*dt;
@@ -1206,15 +1199,33 @@ void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monito
     text("AIM WITH RIGHT CONTROLLER  -  TRIGGER TO SELECT",-.42f*w,centerY-h*.40f,.30f,rgb(.42f,.60f,1.0f));
 }
 
-void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,GLuint videoTexture,bool hasVideo) {
+XrPosef RoomRenderer::transformViewPose(const XrPosef& viewPose, const XrVector3f& headCenter) const {
+    XrPosef rendered=viewPose;
+    const XrQuaternionf yawQ{0.0f,std::sin(virtualYaw_*0.5f),0.0f,std::cos(virtualYaw_*0.5f)};
+    rendered.orientation=quatMul(yawQ,viewPose.orientation);
+
+    // Rotate each eye's IPD offset around the head center, not around the room
+    // origin. The compositor pose must match the virtual pose used to render.
+    const float c=std::cos(virtualYaw_), s=std::sin(virtualYaw_);
+    const float dx=viewPose.position.x-headCenter.x;
+    const float dz=viewPose.position.z-headCenter.z;
+    rendered.position.x=headCenter.x+c*dx+s*dz+moveX_;
+    rendered.position.y=viewPose.position.y-(sitting_?std::clamp(settings_.sittingHeadDropM,0.10f,0.75f):0.0f);
+    rendered.position.z=headCenter.z-s*dx+c*dz+moveZ_;
+    return rendered;
+}
+
+void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,
+                             const XrVector3f& headCenter,XrPosef& renderedPose,
+                             GLuint videoTexture,bool hasVideo) {
     if(!initialized_)return;
+    renderedPose=transformViewPose(view.pose,headCenter);
     float halfW=3.0f,halfD=3.8f;
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
     (void)eyeIndex; (void)width; (void)height;
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
     Mat4 projection=makeProjection(view.fov);
-    const float sittingDrop = sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f;
-    Mat4 camera=makeView(view.pose,moveX_,moveZ_,virtualYaw_,sittingDrop);
+    Mat4 camera=makeView(renderedPose);
     Mat4 pv=mul(projection,camera);
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
