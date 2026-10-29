@@ -36,6 +36,7 @@ public:
     void cycleScreenDestination();
     void cycleEnvironment();
     void toggleSitting(const XrPosef& headPose);
+    void toggleMenu();
     bool sitting() const { return sitting_; }
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
                    GLuint videoTexture, bool hasVideo);
@@ -94,4 +95,5 @@ private:
     bool previousTurnLeft_ = false;
     bool previousSmoothTurning_ = false;
     bool sitting_ = false;
+    bool menuVisible_ = false;
 };
