@@ -1096,6 +1096,98 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     }
 }
 
+
+void RoomRenderer::setPointerState(const XrPosef& pose, bool triggerPressed, bool menuTogglePressed) {
+    if (menuTogglePressed && !menuTogglePrevious_) menuOpen_ = !menuOpen_;
+    menuTogglePrevious_ = menuTogglePressed;
+    pointerTriggerPrevious_ = pointerTrigger_;
+    pointerTrigger_ = triggerPressed;
+    pointerPose_ = pose;
+    pointerPoseValid_ = true;
+}
+
+void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monitorH,
+                                   float centerY, float screenZ) {
+    const float s = monitorW / 1.28f;
+    const float w = monitorW, h = monitorH;
+    const float z = screenZ;
+    const auto panel = rgb(.025f,.035f,.075f);
+    const auto header = rgb(.055f,.075f,.15f);
+    const auto accent = rgb(.20f,.43f,.98f);
+    const auto muted = rgb(.10f,.14f,.25f);
+    const auto white = rgb(.88f,.93f,1.0f);
+    drawBox(pv,0,centerY,z,w,h,.012f,panel);
+    drawBox(pv,0,centerY+h*.39f,z+.009f,w,h*.22f,.008f,header);
+    drawBox(pv,-w*.36f,centerY-h*.07f,z+.009f,w*.27f,h*.66f,.008f,header);
+    drawBox(pv,0,centerY+h*.27f,z+.018f,w*.92f,.006f,.004f,accent);
+    // A tiny 3x5 bitmap font keeps the menu self-contained (no external font dependency).
+    auto glyph = [](char c) -> std::array<uint8_t,5> {
+        switch(c) {
+        case 'A': return {7,5,7,5,5}; case 'B': return {6,5,6,5,6};
+        case 'C': return {7,4,4,4,7}; case 'D': return {6,5,5,5,6};
+        case 'E': return {7,4,6,4,7}; case 'F': return {7,4,6,4,4};
+        case 'G': return {7,4,5,5,7}; case 'H': return {5,5,7,5,5};
+        case 'I': return {7,2,2,2,7}; case 'J': return {3,1,1,5,7};
+        case 'K': return {5,5,6,5,5}; case 'L': return {4,4,4,4,7};
+        case 'M': return {5,7,7,5,5}; case 'N': return {5,7,7,7,5};
+        case 'O': return {7,5,5,5,7}; case 'P': return {7,5,7,4,4};
+        case 'Q': return {7,5,5,7,1}; case 'R': return {6,5,6,5,5};
+        case 'S': return {7,4,7,1,7}; case 'T': return {7,2,2,2,2};
+        case 'U': return {5,5,5,5,7}; case 'V': return {5,5,5,5,2};
+        case 'W': return {5,5,7,7,5}; case 'X': return {5,5,2,5,5};
+        case 'Y': return {5,5,2,2,2}; case 'Z': return {7,1,2,4,7};
+        case '0': return {7,5,5,5,7}; case '1': return {2,6,2,2,7};
+        case '2': return {6,1,7,4,7}; case '3': return {6,1,3,1,6};
+        case '4': return {5,5,7,1,1}; case '5': return {7,4,6,1,6};
+        case '6': return {3,4,7,5,7}; case '7': return {7,1,2,2,2};
+        case '8': return {7,5,7,5,7}; case '9': return {7,5,7,1,6};
+        case '-': return {0,0,7,0,0}; case ':': return {0,2,0,2,0};
+        case '.': return {0,0,0,0,2}; case '/': return {1,1,2,4,4};
+        default: return {0,0,0,0,0};
+        }
+    };
+    auto text = [&](const char* str, float x, float y, float scale, const std::array<float,4>& color) {
+        const float px=.0050f*s*scale, py=.0068f*s*scale;
+        const float advance=px*4.0f;
+        for (size_t i=0; str[i] && i<20; ++i) {
+            const auto rows=glyph(str[i]);
+            for(int row=0;row<5;++row) for(int col=0;col<3;++col) {
+                if(rows[row] & (1u << (2-col))) {
+                    const float xx=x+static_cast<float>(i)*advance+static_cast<float>(col)*px;
+                    const float yy=y+(2.0f-static_cast<float>(row))*py;
+                    drawBox(pv,xx,yy,z+.022f,px*.72f,py*.72f,.002f,color);
+                }
+            }
+        }
+    };
+    text("QUESTBRIDGE XR",-w*.43f,centerY+h*.40f,.88f,white);
+    text("CONTROL CENTER",-w*.43f,centerY+h*.31f,.50f,rgb(.42f,.60f,1.0f));
+    const char* tabs[]={"HOME","ENV","DISP","COMFORT","HELP"};
+    const float tabX[]={-.35f,-.175f,0,.175f,.35f};
+    for(int i=0;i<5;++i) {
+        const bool selected=menuTab_==i;
+        drawBox(pv,tabX[i]*w,centerY+h*.19f,z+.015f,w*.155f,h*.105f,.006f,selected?accent:muted);
+        text(tabs[i],tabX[i]*w-w*.055f,centerY+h*.17f,.48f,white);
+    }
+    const char* titles[]={"WELCOME BACK","ENVIRONMENTS","DISPLAY OUTPUT","COMFORT SETTINGS","QUICK HELP"};
+    const char* subtitles[]={"Choose an action","Explore 208 scenes","Choose where PC video appears","Adjust your play position","Right B opens this menu"};
+    text(titles[menuTab_],-w*.02f,centerY+h*.04f,.68f,white);
+    text(subtitles[menuTab_],-w*.02f,centerY-h*.025f,.38f,rgb(.56f,.66f,.82f));
+    const char* labels[3][3]={{"CLOSE MENU","NEXT ENV","DISPLAY"},
+        {"PREVIOUS","NEXT ENV","HOME"},
+        {"MONITOR","TV","BOTH"}};
+    const char* comfort[]={"SIT / STAND","MOVE ROOM","CLOSE MENU"};
+    const char* help[]={"CLOSE MENU","NEXT ENV","DISPLAY"};
+    for(int i=0;i<3;++i) {
+        const float bx=(-.30f+.30f*i)*w;
+        const float by=centerY-h*.17f;
+        drawBox(pv,bx,by,z+.015f,w*.255f,h*.18f,.006f,muted);
+        const char* label=menuTab_==3?comfort[i]:menuTab_==4?help[i]:labels[menuTab_==2?2:menuTab_==1?1:0][i];
+        text(label,bx-w*.105f,by-h*.015f,.42f,white);
+    }
+    text("AIM WITH RIGHT CONTROLLER  -  TRIGGER TO SELECT",-.42f*w,centerY-h*.40f,.30f,rgb(.42f,.60f,1.0f));
+}
+
 void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,GLuint videoTexture,bool hasVideo) {
     if(!initialized_)return;
     float halfW=3.0f,halfD=3.8f;
@@ -1209,8 +1301,65 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const bool streamOn=(settings_.screenDestination=="monitor"||settings_.screenDestination=="both");
         GLuint tex=(streamOn&&hasVideo)?videoTexture:videoFallbackTexture_;
         drawBox(pv.data(),x,monitorCenterY,deskZ-0.05f,monitorW+0.05f,monitorH+0.05f,0.08f,rgb(.05f,.06f,.09f));
-        drawPlane(pv.data(),x,monitorCenterY,deskZ+0.001f,monitorW,monitorH,tex,rgb(1,1,1));
+        if (menuOpen_ && i == monitorCount/2) {
+            // Opaque menu replaces the PC image while open; closing it reveals the live stream.
+            drawControlMenu(pv.data(),monitorW,monitorH,monitorCenterY,deskZ+0.065f);
+        } else {
+            drawPlane(pv.data(),x,monitorCenterY,deskZ+0.001f,monitorW,monitorH,tex,rgb(1,1,1));
+        }
         drawBox(pv.data(),x,deskTopY+standHeight*0.5f,deskZ,0.05f,standHeight,0.08f,wood);
+    }
+    if (pointerPoseValid_) {
+        XrQuaternionf yawQ{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
+        XrQuaternionf q=quatMul(yawQ,pointerPose_.orientation);
+        const Mat4 rot=quatMatrix(q);
+        const float ox=pointerPose_.position.x*rot[0] + pointerPose_.position.y*rot[4] + pointerPose_.position.z*rot[8] + moveX_;
+        const float oy=pointerPose_.position.x*rot[1] + pointerPose_.position.y*rot[5] + pointerPose_.position.z*rot[9];
+        const float oz=pointerPose_.position.x*rot[2] + pointerPose_.position.y*rot[6] + pointerPose_.position.z*rot[10] + moveZ_;
+        const float dx=-rot[8], dy=-rot[9], dz=-rot[10];
+        const float screenZ=deskZ+0.070f;
+        float hitT=-1.0f;
+        if (std::fabs(dz)>0.0001f) {
+            const float t=(screenZ-oz)/dz;
+            if (t>0.0f && t<5.0f) hitT=t;
+        }
+        const float rayLength=hitT>0.0f?hitT:2.5f;
+        for(int i=1;i<=28;++i) {
+            const float t=rayLength*static_cast<float>(i)/28.0f;
+            drawBox(pv.data(),ox+dx*t,oy+dy*t,oz+dz*t,.009f,.009f,.009f,
+                    menuOpen_?rgb(.22f,.62f,1.0f):rgb(.10f,.42f,.85f));
+        }
+        if(menuOpen_ && hitT>0.0f && pointerTrigger_ && !pointerTriggerPrevious_) {
+            const float hx=ox+dx*hitT;
+            const float hy=oy+dy*hitT;
+            if(std::fabs(hx)<monitorW*.5f && std::fabs(hy-monitorCenterY)<monitorH*.5f) {
+                const float nx=hx/monitorW, ny=(hy-monitorCenterY)/monitorH;
+                if(ny>.12f && ny<.26f) {
+                    if(nx<-.26f) menuTab_=0;
+                    else if(nx<-.08f) menuTab_=1;
+                    else if(nx<.08f) menuTab_=2;
+                    else if(nx<.26f) menuTab_=3;
+                    else menuTab_=4;
+                } else if(ny<-.07f && ny>-.28f) {
+                    const int action=nx<-.15f?0:nx<.15f?1:2;
+                    if(menuTab_==0 || menuTab_==4) {
+                        if(action==0) menuOpen_=false;
+                        else if(action==1) cycleEnvironment();
+                        else cycleScreenDestination();
+                    } else if(menuTab_==1) {
+                        if(action==0) { activeEnvironmentIndex_=(activeEnvironmentIndex_+207)%208; chooseEnvironment(); }
+                        else if(action==1) cycleEnvironment();
+                        else menuTab_=0;
+                    } else if(menuTab_==2) {
+                        settings_.screenDestination=action==0?"monitor":action==1?"tv":"both";
+                    } else if(menuTab_==3) {
+                        if(action==0) sitting_=!sitting_;
+                        else if(action==1) { moveX_=0.0f; moveZ_=0.0f; }
+                        else menuOpen_=false;
+                    }
+                }
+            }
+        }
     }
     // Optional wall-mounted television on the right wall; source can be switched between monitor and TV or mirrored.
     if(settings_.showTv){
