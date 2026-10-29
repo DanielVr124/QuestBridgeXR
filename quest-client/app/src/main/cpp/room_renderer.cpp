@@ -1297,7 +1297,13 @@ void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monito
         const float advance = px*6.0f;
         std::vector<float> vertices;
         const size_t length = std::min<size_t>(std::strlen(str),48);
-        vertices.reserve(length*5*7*6*5);
+        size_t litPixels=0;
+        for(size_t i=0;i<length;++i) {
+            const auto rows=glyph(str[i]);
+            for(int row=0;row<7;++row) for(int col=0;col<5;++col)
+                if(rows[row] & (1u << (4-col))) ++litPixels;
+        }
+        vertices.reserve(litPixels*6*5);
         auto vertex = [&](float vx,float vy) {
             vertices.push_back(vx); vertices.push_back(vy);
             vertices.push_back(z+.0020f);
@@ -1442,7 +1448,7 @@ void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monito
     }
 
     drawBox(pv,0,centerY-h*.382f,z+.0010f,w*.94f,.0020f,.0005f,cardBorder);
-    centeredText("POINT AND TRIGGER TO SELECT  -  MENU BUTTON TO CLOSE",
+    centeredText("TRIGGER SELECTS  -  MENU BUTTON CLOSES",
                  0.0f,centerY-h*.432f,.27f,subdued);
 }
 
