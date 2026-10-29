@@ -38,7 +38,9 @@ public:
     void setPointerState(const XrPosef& pose, bool triggerPressed, bool menuTogglePressed, bool poseValid);
     void toggleSitting(const XrPosef& headPose);
     bool sitting() const { return sitting_; }
+    XrPosef transformViewPose(const XrPosef& viewPose, const XrVector3f& headCenter) const;
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
+                   const XrVector3f& headCenter, XrPosef& renderedPose,
                    GLuint videoTexture, bool hasVideo);
     float locomotionX() const { return moveX_; }
     float locomotionZ() const { return moveZ_; }
