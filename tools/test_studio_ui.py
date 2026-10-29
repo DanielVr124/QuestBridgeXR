@@ -27,6 +27,12 @@ class StudioUiTests(unittest.TestCase):
             except tk.TclError:
                 pass
 
+    def test_studio_uses_premium_blue_violet_theme(self):
+        self.assertEqual(self.app.palette["bg"], "#0b1020")
+        self.assertEqual(self.app.palette["accent"], "#8b7cff")
+        style = self.app.tk.call("ttk::style", "lookup", "Hero.TLabel", "-font")
+        self.assertTrue(style)
+
     def test_play_modes_and_virtual_room_tabs_exist(self):
         notebooks = []
         def visit(widget):
