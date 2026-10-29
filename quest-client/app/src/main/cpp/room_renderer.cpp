@@ -353,7 +353,16 @@ Mat4 makeView(const XrPosef& pose, float locomotionX, float locomotionZ, float v
     XrQuaternionf q=quatMul(yawQ, pose.orientation);
     XrQuaternionf inv{-q.x,-q.y,-q.z,q.w};
     Mat4 r=quatMatrix(inv);
-    Mat4 t=translation(-(pose.position.x+locomotionX),-(pose.position.y-sittingDrop),-(pose.position.z+locomotionZ));
+
+    // Apply the same virtual-room rotation to the camera position as to its
+    // orientation. Rotating only the view orientation makes the whole room
+    // appear to shear/slide when the player turns with the right stick.
+    const float c=std::cos(virtualYaw), s=std::sin(virtualYaw);
+    const float localX=pose.position.x+locomotionX;
+    const float localZ=pose.position.z+locomotionZ;
+    const float worldX=c*localX+s*localZ;
+    const float worldZ=-s*localX+c*localZ;
+    Mat4 t=translation(-worldX,-(pose.position.y-sittingDrop),-worldZ);
     return mul(r,t);
 }
 Mat4 makeProjection(const XrFovf& fov) {
@@ -1059,11 +1068,16 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     if(dt<0.0f||dt>0.1f)dt=0.0f;
     // Pushing the left stick stands up automatically; the virtual seat is not a locked animation state.
     if(sitting_ && (std::fabs(leftX)>0.22f || std::fabs(leftY)>0.22f)) sitting_=false;
-    // Keep locomotion aligned to the virtual room's forward axis, not the headset's
-    // instantaneous yaw. Turning the head to look around should not redirect movement.
-    const float yaw=virtualYaw_;
+    // Forward follows the direction the user is looking, including the virtual room turn.
+    // This is the expected head-relative locomotion used by most standalone VR apps.
+    const float yaw=headYaw(headPose)+virtualYaw_;
     const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
-    // Left stick uses room-relative direction; reverse sign because forward is -Z in OpenXR.
+    const float inputAlpha=1.0f-std::exp(-dt*14.0f);
+    smoothedMoveX_ += (leftX-smoothedMoveX_)*inputAlpha;
+    smoothedMoveY_ += (leftY-smoothedMoveY_)*inputAlpha;
+    leftX=smoothedMoveX_;
+    leftY=smoothedMoveY_;
+    // Reverse sign because forward is -Z in OpenXR.
     const float forwardX=std::sin(yaw), forwardZ=-std::cos(yaw);
     const float rightX=std::cos(yaw), rightZ=std::sin(yaw);
     const float oldMoveX = moveX_, oldMoveZ = moveZ_;
