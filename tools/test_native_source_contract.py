@@ -36,12 +36,12 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("settings_.showCouch", source)
         self.assertIn("settings_.showChair", source)
 
-    def test_room_controls_use_real_controller_actions(self):
+    def test_room_controls_keep_locomotion_but_have_no_hidden_click_shortcuts(self):
         source = (ROOT / "quest-client/app/src/main/cpp/main.cpp").read_text(encoding="utf-8")
-        self.assertIn("room_.cycleScreenDestination()", source)
-        self.assertIn("room_.cycleEnvironment()", source)
-        self.assertIn("room_.toggleSitting(headPose)", source)
         self.assertIn("room_.updateLocomotion(moveX, moveY, turnX, dt, headPose)", source)
+        self.assertNotIn("room_.cycleScreenDestination()", source)
+        self.assertNotIn("room_.cycleEnvironment()", source)
+        self.assertNotIn("room_.toggleSitting(headPose)", source)
 
     def test_fake_vr_bridge_is_connected_and_default_off(self):
         host = (ROOT / "host/src/main.cpp").read_text(encoding="utf-8")
