@@ -1043,7 +1043,7 @@ void RoomRenderer::drawPlane(const float* pv,float x,float y,float z,float sx,fl
 
 void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floorY,float backZ,GLuint tex,float windowW,float windowH) {
     (void)halfW;
-    const float windowY=floorY+2.4f;
+    const float windowY=floorY+1.95f;
     // A broad window with warm wooden frame rails. The photo becomes the outside view; all nearby surfaces are real 3D geometry.
     drawPlane(pv,0,windowY,backZ+0.035f,windowW,windowH,tex,rgb(1,1,1));
     const auto frame=rgb(0.20f,0.14f,0.13f);
@@ -1188,7 +1188,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(), (halfW+0.7f)*0.5f,(floorY+ceilingY)*0.5f,frontZ+0.02f,
             sidePanelWidth,ceilingY-floorY,0.10f,wall);
     drawBox(pv.data(),0,ceilingY-1.05f,frontZ+0.02f,1.4f,2.1f,0.10f,wall);
-    drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,std::min(halfW*1.35f,settings_.roomSize=="small"?3.4f:6.2f),activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f);
+    // Panoramic scenery window: let the selected world occupy a large part of the view.
+    drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,
+                          std::min(halfW*1.75f,settings_.roomSize=="small"?4.8f:8.0f),
+                          activeEnvironmentIndex_==1?2.85f:2.65f);
     // Desk and monitor mount.
     const float deskZ=-1.75f;
     drawBox(pv.data(),0,floorY+0.78f,deskZ,3.25f,0.10f,0.82f,wood);
