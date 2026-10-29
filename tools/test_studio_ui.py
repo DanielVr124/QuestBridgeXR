@@ -50,11 +50,11 @@ class StudioUiTests(unittest.TestCase):
                 visit(child)
         visit(self.app)
         expected_labels = set(ROOM_ENVIRONMENT_LABELS.values())
-        self.assertEqual(len(expected_labels), 208)
+        self.assertEqual(len(expected_labels), 328)
         self.assertTrue(any(expected_labels.issubset(set(values)) for values in combo_values))
 
     def test_each_config_setting_has_a_widget(self):
-        self.assertEqual(len(self.app.vars), 75)
+        self.assertEqual(len(self.app.vars), 79)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
