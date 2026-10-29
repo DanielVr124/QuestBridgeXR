@@ -150,6 +150,17 @@ class ConfigTests(unittest.TestCase):
         ):
             self.assertIn(expected, text)
 
+    def test_all_room_environment_choices_validate_and_export(self):
+        for environment in ("blossom", "night_city", "golden_city", "aurora", "cyberpunk"):
+            with self.subTest(environment=environment):
+                cfg = copy.deepcopy(qbx_config.DEFAULT_CONFIG)
+                cfg["room"]["environment"] = environment
+                qbx_config.validate_config(cfg)
+                with tempfile.TemporaryDirectory() as tmp:
+                    target = pathlib.Path(tmp) / "config.ini"
+                    qbx_config.save_quest_ini(cfg, target)
+                    self.assertIn(f"environment={environment}", target.read_text(encoding="utf-8"))
+
     def test_invalid_room_enum_is_rejected(self):
         cfg = copy.deepcopy(qbx_config.DEFAULT_CONFIG)
         cfg["room"]["environment"] = "random_world"

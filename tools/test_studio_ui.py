@@ -40,6 +40,16 @@ class StudioUiTests(unittest.TestCase):
         self.assertIn("Fake VR / Game Bridge", labels)
         self.assertIn("Play Modes", labels)
 
+    def test_virtual_room_exposes_new_scenery_choices(self):
+        combo_values = []
+        def visit(widget):
+            if widget.winfo_class() == "TCombobox":
+                combo_values.append(tuple(self.app.tk.splitlist(widget.cget("values"))))
+            for child in widget.winfo_children():
+                visit(child)
+        visit(self.app)
+        self.assertTrue(any({"blossom", "night_city", "golden_city", "aurora", "cyberpunk"}.issubset(set(values)) for values in combo_values))
+
     def test_each_config_setting_has_a_widget(self):
         self.assertEqual(len(self.app.vars), 75)
 
