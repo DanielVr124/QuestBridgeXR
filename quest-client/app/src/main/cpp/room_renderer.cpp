@@ -1345,6 +1345,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         // The controller position is already in reference space: rotate its aim direction,
         // not its position by its own orientation (which caused the pointer to drift).
         const float ox=pointerPose_.position.x+moveX_;
+        const float sittingDrop = sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f;
         const float oy=pointerPose_.position.y-sittingDrop;
         const float oz=pointerPose_.position.z+moveZ_;
         const float dx=-rot[8], dy=-rot[9], dz=-rot[10];
