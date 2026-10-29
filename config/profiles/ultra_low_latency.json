@@ -1,0 +1,24 @@
+{
+  "profile": "Ultra Low Latency",
+  "stream": {
+    "source": "test",
+    "width": 1280,
+    "height": 720,
+    "fps": 90,
+    "bitrate_bps": 8000000,
+    "preset": "ultrafast",
+    "tune": "zerolatency",
+    "h264_profile": "main",
+    "rate_control": "cbr",
+    "maxrate_factor": 1.0,
+    "vbv_buffer_ms": 40,
+    "threads": 0,
+    "udp_send_buffer_kib": 512,
+    "gop_seconds": 0.5
+  },
+  "tracking": { "rate_hz": 120 },
+  "transport": {
+    "incomplete_frame_timeout_ms": 60,
+    "quest_receive_buffer_kib": 2048
+  }
+}
