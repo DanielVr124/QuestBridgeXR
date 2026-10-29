@@ -70,6 +70,8 @@ private:
     GLuint vignetteProgram_ = 0;
     GLuint vao_ = 0;
     GLuint vbo_ = 0;
+    GLuint menuTextVao_ = 0;
+    GLuint menuTextVbo_ = 0;
     GLint locMvp_ = -1;
     GLint locColor_ = -1;
     GLint locTexture_ = -1;
