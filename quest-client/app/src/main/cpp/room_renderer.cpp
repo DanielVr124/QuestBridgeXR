@@ -1118,6 +1118,59 @@ void RoomRenderer::setPointerState(const XrPosef& pose, bool triggerPressed, boo
     }
 }
 
+void RoomRenderer::setControllerState(const XrPosef& leftPose, bool leftValid, float leftTrigger, float leftGrip,
+                                      const XrPosef& rightPose, bool rightValid, float rightTrigger, float rightGrip) {
+    controllerPoses_[0] = leftPose;
+    controllerPoses_[1] = rightPose;
+    controllerPoseValid_[0] = leftValid;
+    controllerPoseValid_[1] = rightValid;
+    controllerTriggers_[0] = std::clamp(leftTrigger, 0.0f, 1.0f);
+    controllerTriggers_[1] = std::clamp(rightTrigger, 0.0f, 1.0f);
+    controllerGrips_[0] = std::clamp(leftGrip, 0.0f, 1.0f);
+    controllerGrips_[1] = std::clamp(rightGrip, 0.0f, 1.0f);
+}
+
+void RoomRenderer::drawControllerModel(const float* pv, const XrPosef& pose, bool leftHand, float trigger, float grip) {
+    Mat4 viewProjection{};
+    std::copy(pv, pv + viewProjection.size(), viewProjection.begin());
+    const Mat4 orientation = quatMatrix(pose.orientation);
+    const auto shell = rgb(.075f,.090f,.125f);
+    const auto highlight = rgb(.20f,.24f,.31f);
+    const auto rubber = rgb(.035f,.042f,.060f);
+    const auto accent = leftHand ? rgb(.18f,.62f,1.0f) : rgb(.68f,.34f,1.0f);
+    const auto button = rgb(.82f,.86f,.94f);
+    auto part = [&](float x,float y,float z,float sx,float sy,float sz,
+                    const std::array<float,4>& color,float localYaw=0.0f) {
+        const Mat4 local = mul(translation(x,y,z),mul(rotateY(localYaw),scaling(sx,sy,sz)));
+        const Mat4 model = mul(translation(pose.position.x,pose.position.y,pose.position.z),mul(orientation,local));
+        const Mat4 mvp = mul(viewProjection,model);
+        glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
+        glUniform4fv(locColor_,1,color.data());
+        glUniform1i(locTextured_,0);
+        glBindVertexArray(vao_); glDrawArrays(GL_TRIANGLES,0,36); glBindVertexArray(0);
+    };
+    // Multi-piece Touch-style controller: palm shell, rubberized grip, halo,
+    // face controls, thumbstick, trigger, seam accents and live status light.
+    part(0,-.040f,.018f,.060f,.105f,.075f,rubber,-.10f);
+    part(0,.012f,-.025f,.104f,.070f,.105f,shell,-.08f);
+    part(0,.040f,-.035f,.086f,.018f,.080f,highlight,-.08f);
+    part(0,-.006f,.060f,.054f,.022f,.012f,highlight);
+    for(int i=0;i<7;++i) {
+        const float a=-.12f+2.0f*kPi*static_cast<float>(i)/6.0f;
+        part(std::sin(a)*.073f,.068f+std::cos(a)*.060f,-.050f,.018f,.018f,.018f,highlight,a);
+    }
+    part(0,.075f,-.050f,.014f,.014f,.014f,accent);
+    part(leftHand?-.027f:.027f,.050f,-.012f,.028f,.012f,.028f,rubber);
+    part(leftHand?-.027f:.027f,.061f,-.012f,.016f,.010f,.016f,highlight);
+    part(leftHand?.027f:-.027f,.050f,-.020f,.014f,.009f,.014f,button);
+    part(leftHand?.027f:-.027f,.050f,-.044f,.014f,.009f,.014f,button);
+    part(0,.052f,-.062f,.030f,.010f,.008f,highlight);
+    part(0,.032f,.028f-trigger*.010f,.038f,.014f,.030f,button,-trigger*.24f);
+    part(0,-.038f,.021f-grip*.004f,.046f,.070f,.056f,
+         rgb(.055f+grip*.045f,.065f+grip*.045f,.085f+grip*.045f),-grip*.08f);
+    part(0,.078f,-.030f,.024f,.004f,.004f,accent);
+}
+
 void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monitorH,
                                    float centerY, float screenZ) {
     const float s = monitorW / 1.28f;
@@ -1201,13 +1254,18 @@ void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monito
 }
 
 XrPosef RoomRenderer::transformViewPose(const XrPosef& viewPose, const XrVector3f& headCenter) const {
-    // Keep the OpenXR view orientation physically tracked. Artificial turning is
-    // applied to the room geometry below, not to the compositor's head pose.
-    XrPosef rendered=viewPose;
-    rendered.position.x=viewPose.position.x+moveX_;
-    rendered.position.y=viewPose.position.y-(sitting_?std::clamp(settings_.sittingHeadDropM,0.10f,0.75f):0.0f);
-    rendered.position.z=viewPose.position.z+moveZ_;
-    (void)headCenter;
+    // Artificial yaw belongs on the virtual tracking rig, not on the room mesh.
+    // Render and submit the same transformed pose so OpenXR's late reprojection
+    // agrees with the camera that produced the pixels.
+    const XrQuaternionf yawQ{0.0f, std::sin(virtualYaw_ * 0.5f), 0.0f, std::cos(virtualYaw_ * 0.5f)};
+    XrPosef rendered = viewPose;
+    rendered.orientation = quatMul(yawQ, viewPose.orientation);
+    const Mat4 yaw = rotateY(virtualYaw_);
+    const float dx = viewPose.position.x - headCenter.x;
+    const float dz = viewPose.position.z - headCenter.z;
+    rendered.position.x = headCenter.x + yaw[0] * dx + yaw[8] * dz + moveX_;
+    rendered.position.y = viewPose.position.y - (sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f);
+    rendered.position.z = headCenter.z + yaw[2] * dx + yaw[10] * dz + moveZ_;
     return rendered;
 }
 
@@ -1222,18 +1280,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
     Mat4 projection=makeProjection(view.fov);
     Mat4 camera=makeView(renderedPose);
-    // Turn the virtual room around the user's current position. Rotating the
-    // submitted head pose made the compositor treat stick-turn as real head
-    // motion, which can drag the scene like a floating window and expose black.
-    // Both eyes must use the exact same world-space turn pivot. Using each
-    // eye's pose separately rotates the scene around two different points and
-    // creates stereo divergence that looks like the room is warping.
-    const float pivotX=headCenter.x+moveX_;
-    const float pivotY=headCenter.y-(sitting_?std::clamp(settings_.sittingHeadDropM,0.10f,0.75f):0.0f);
-    const float pivotZ=headCenter.z+moveZ_;
-    const Mat4 roomTurn=mul(translation(pivotX,pivotY,pivotZ),
-                            mul(rotateY(-virtualYaw_),translation(-pivotX,-pivotY,-pivotZ)));
-    Mat4 pv=mul(projection,mul(camera,roomTurn));
+    // World geometry stays fixed; virtual yaw is applied to the camera pose
+    // above and that exact pose is submitted to the compositor.
+    Mat4 pv=mul(projection,camera);
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
     std::array<float,4> floor = rgb(.09f,.12f,.18f);
@@ -1460,6 +1509,19 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         : (activeEnvironmentIndex_ == 16 || activeEnvironmentIndex_ == 19 || activeEnvironmentIndex_ == 25) ? rgb(1.0f,.53f,.82f)
         : rgb(1.0f,.63f,.30f);
     drawBox(pv.data(),-halfW+0.32f,floorY+2.02f,-1.7f,0.42f,0.28f,0.42f,lampGlow);
+    // Both tracked controller replicas follow the same artificial-turn rig as the HMD.
+    for(int hand=0;hand<2;++hand) {
+        if(!controllerPoseValid_[hand]) continue;
+        XrPosef controller=controllerPoses_[hand];
+        const XrQuaternionf yawQ{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
+        controller.orientation=quatMul(yawQ,controller.orientation);
+        const Mat4 yaw=rotateY(virtualYaw_);
+        const float dx=controller.position.x-headCenter.x, dz=controller.position.z-headCenter.z;
+        controller.position.x=headCenter.x+yaw[0]*dx+yaw[8]*dz+moveX_;
+        controller.position.y-=sitting_?std::clamp(settings_.sittingHeadDropM,.10f,.75f):0.0f;
+        controller.position.z=headCenter.z+yaw[2]*dx+yaw[10]*dz+moveZ_;
+        drawControllerModel(pv.data(),controller,hand==0,controllerTriggers_[hand],controllerGrips_[hand]);
+    }
     if(settings_.comfortVignette && vignetteProgram_){
         glDisable(GL_DEPTH_TEST);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(vignetteProgram_);glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);
