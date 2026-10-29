@@ -1192,6 +1192,56 @@ void RoomRenderer::drawPlane(const float* pv,float x,float y,float z,float sx,fl
     glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);glBindTexture(GL_TEXTURE_2D,0);
 }
 
+void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
+                                    float width, float height, float curveDepth, GLuint texture,
+                                    const std::array<float,4>& color, int segments) {
+    segments = std::clamp(segments, 8, 48);
+    std::vector<Vertex> vertices;
+    vertices.reserve(static_cast<size_t>(segments) * 6u);
+    auto point = [&](float u, float v) {
+        const float localX = (u - 0.5f) * width;
+        const float normalized = 2.0f * u - 1.0f;
+        const float localZ = curveDepth * (1.0f - normalized * normalized);
+        return Vertex{localX, (v - 0.5f) * height, localZ, u, 1.0f - v};
+    };
+    for (int i = 0; i < segments; ++i) {
+        const float u0 = static_cast<float>(i) / static_cast<float>(segments);
+        const float u1 = static_cast<float>(i + 1) / static_cast<float>(segments);
+        const Vertex bl = point(u0, 0.0f), br = point(u1, 0.0f);
+        const Vertex tr = point(u1, 1.0f), tl = point(u0, 1.0f);
+        vertices.insert(vertices.end(), {bl, br, tr, bl, tr, tl});
+    }
+    if (!curvedVao_) {
+        glGenVertexArrays(1, &curvedVao_);
+        glGenBuffers(1, &curvedVbo_);
+        glBindVertexArray(curvedVao_);
+        glBindBuffer(GL_ARRAY_BUFFER, curvedVbo_);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              reinterpret_cast<void*>(3 * sizeof(float)));
+        glBindVertexArray(0);
+    }
+    const Mat4 model = translation(x, y, z);
+    Mat4 projectionView{};
+    std::copy(pv, pv + projectionView.size(), projectionView.begin());
+    const Mat4 mvp = mul(projectionView, model);
+    glUniformMatrix4fv(locMvp_, 1, GL_FALSE, mvp.data());
+    glUniform4fv(locColor_, 1, color.data());
+    glUniform1i(locTextured_, texture ? 1 : 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture ? texture : videoFallbackTexture_);
+    glUniform1i(locTexture_, 0);
+    glBindVertexArray(curvedVao_);
+    glBindBuffer(GL_ARRAY_BUFFER, curvedVbo_);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertices.size()));
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floorY,float backZ,GLuint tex,float windowW,float windowH) {
     (void)halfW;
     const float windowY=floorY+2.4f;
@@ -1383,9 +1433,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Slim under-desk light, softly reflected by the floor.
     drawBox(pv.data(),deskX,deskTopY-.10f,deskFrontZ,.95f,.018f,.025f,accentBlue);
 
-    // Clean premium monitor: layered thin bezel, inset screen, centered metal stand and weighted base.
+    // Premium curved ultrawide display: continuous curved shell, satin rim, inset live panel and twin-foot stand.
     const int monitorCount=std::clamp(settings_.monitorCount,1,3);
-    const float monitorW=monitorCount==1?1.12f:monitorCount==2?.78f:.62f;
+    const float monitorW=monitorCount==1?1.30f:monitorCount==2?.82f:.64f;
     const float monitorH=monitorW*9.0f/16.0f;
     const float monitorX=deskX-.36f;
     const float monitorY=floorY+1.43f;
@@ -1393,17 +1443,28 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float deskSurface=floorY+.83f;
     const float standHeight=std::max(.08f,monitorY-monitorH*.5f-deskSurface);
     const float monitorGap=.055f;
+    const float curve=.082f;
     for(int i=0;i<monitorCount;++i) {
         const float x=monitorX+(i-(monitorCount-1)*.5f)*(monitorW+monitorGap);
         const bool streamOn=settings_.screenDestination=="monitor"||settings_.screenDestination=="both";
         const GLuint tex=(streamOn&&hasVideo)?videoTexture:videoFallbackTexture_;
-        // Thin outer graphite shell, narrow satin-metal rim, then the live display plane.
-        drawBox(pv.data(),x,monitorY,monitorZ,monitorW+.075f,monitorH+.075f,.075f,trimDark);
-        drawBox(pv.data(),x,monitorY,monitorZ+.039f,monitorW+.025f,monitorH+.025f,.012f,silver);
-        drawPlane(pv.data(),x,monitorY,monitorZ+.047f,monitorW,monitorH,tex,rgb(1,1,1));
-        drawBox(pv.data(),x,deskSurface+standHeight*.5f,monitorZ,.045f,standHeight,.055f,silver);
-        drawBox(pv.data(),x,deskSurface+.018f,monitorZ+.035f,.30f,.035f,.20f,trimDark);
-        drawBox(pv.data(),x,deskSurface+.038f,monitorZ+.035f,.23f,.008f,.15f,silver);
+        // Rear shell and separate metallic rim follow the same arc as the display glass.
+        drawCurvedPanel(pv.data(),x,monitorY,monitorZ+.018f,monitorW+.090f,monitorH+.090f,curve+.008f,0,trimDark,32);
+        drawCurvedPanel(pv.data(),x,monitorY,monitorZ+.032f,monitorW+.040f,monitorH+.040f,curve*.88f,0,silver,32);
+        drawCurvedPanel(pv.data(),x,monitorY,monitorZ+.044f,monitorW,monitorH,curve*.76f,tex,rgb(1,1,1),32);
+        // Small dark chin with a restrained illuminated status line.
+        drawBox(pv.data(),x,monitorY-monitorH*.5f-.012f,monitorZ+.070f,monitorW*.42f,.012f,.012f,trimDark);
+        drawBox(pv.data(),x,monitorY-monitorH*.5f-.014f,monitorZ+.078f,.055f,.006f,.006f,accentBlue);
+        // Twin metal uprights instead of a bulky center pedestal.
+        const float legOffset=monitorW*.205f;
+        for(int side=-1;side<=1;side+=2) {
+            const float legX=x+side*legOffset;
+            drawBox(pv.data(),legX,deskSurface+standHeight*.5f,monitorZ+.005f,.027f,standHeight,.035f,silver);
+            drawBox(pv.data(),legX,deskSurface+.018f,monitorZ+.105f,.075f,.030f,.34f,trimDark,side*.10f);
+            drawBox(pv.data(),legX,deskSurface+.035f,monitorZ+.105f,.042f,.008f,.29f,silver,side*.10f);
+            // Tiny blue status accents on the feet give the stand a deliberate premium finish.
+            drawBox(pv.data(),legX,deskSurface+.040f,monitorZ+.055f,.026f,.004f,.045f,accentBlue,side*.10f);
+        }
     }
 
     // A compact white gaming PC with a glass side panel, ventilation detail and three illuminated fans.
@@ -1490,7 +1551,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float monitorX = deskX - 0.36f;
         const float monitorY = floorY + 1.43f;
         const float monitorZ = deskZ - 0.34f;
-        const float menuZ = monitorZ + 0.055f;
+        const float menuZ = monitorZ + 0.132f;
         const auto panel = rgb(0.025f, 0.032f, 0.065f, 0.98f);
         const auto row = rgb(0.075f, 0.090f, 0.145f, 0.98f);
         const auto selected = rgb(0.10f, 0.22f, 0.39f, 1.0f);
@@ -1532,7 +1593,8 @@ void RoomRenderer::release() {
     if(program_)glDeleteProgram(program_);if(vignetteProgram_)glDeleteProgram(vignetteProgram_);if(vao_)glDeleteVertexArrays(1,&vao_);if(vbo_)glDeleteBuffers(1,&vbo_);
     if(planeTexture_)glDeleteVertexArrays(1,&planeTexture_);if(cubeTexture_)glDeleteBuffers(1,&cubeTexture_);
     if(textVao_)glDeleteVertexArrays(1,&textVao_);if(textVbo_)glDeleteBuffers(1,&textVbo_);
+    if(curvedVao_)glDeleteVertexArrays(1,&curvedVao_);if(curvedVbo_)glDeleteBuffers(1,&curvedVbo_);
     if(sphereVao_)glDeleteVertexArrays(1,&sphereVao_);if(sphereVbo_)glDeleteBuffers(1,&sphereVbo_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=0;sphereVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;sphereVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
