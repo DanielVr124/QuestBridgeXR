@@ -8,6 +8,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from questbridge_studio import QuestBridgeStudio
+from qbx_config import ROOM_ENVIRONMENTS
 
 class StudioUiTests(unittest.TestCase):
     @classmethod
@@ -48,7 +49,7 @@ class StudioUiTests(unittest.TestCase):
             for child in widget.winfo_children():
                 visit(child)
         visit(self.app)
-        self.assertTrue(any({"blossom", "night_city", "golden_city", "aurora", "cyberpunk"}.issubset(set(values)) for values in combo_values))
+        self.assertTrue(any(set(ROOM_ENVIRONMENTS).issubset(set(values)) for values in combo_values))
 
     def test_each_config_setting_has_a_widget(self):
         self.assertEqual(len(self.app.vars), 75)

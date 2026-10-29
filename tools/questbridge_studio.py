@@ -75,7 +75,7 @@ SETTING_HELP = {
     "transport.max_frame_mib": "Maximum encoded frame/access-unit size accepted by the Quest receiver. Larger values allow unusually complex keyframes but allocate more memory and can prolong frame assembly. Keep this as low as your stream permits.",
     "transport.incomplete_frame_timeout_ms": "Time allowed for all UDP chunks of an encoded frame to arrive. Lower values discard lossy/incomplete frames quickly to protect latency; higher values may recover on slow networks but can show older frames later.",
     "transport.quest_receive_buffer_kib": "Requested kernel UDP receive-buffer capacity on the Quest in KiB. More buffer can reduce packet drops during bursts but may increase queuing latency; Android/driver limits may clamp it.",
-    "room.environment": "Choose the scenery visible through the 3D window: snowy pink blossoms, a dark reflective night skyline, warm golden city lights, a procedural green/cyan aurora, or a neon cyberpunk skyline. The scenery is shown behind a modeled window frame; the room and furniture remain 3D.",
+    "room.environment": "Choose from 28 window scenes: blossom, night and golden cities, aurora, cyberpunk, sunset beach, snowy mountains, enchanted/autumn forests, desert dunes, ocean cliffs, space nebula, lunar base, volcano, underwater, tropical island, candy land, steampunk/rainy Tokyo, sakura night, alpine lake, emerald valley, wasteland, midnight clouds, crystal cavern, lavender fields, firefly swamp, and polar station. Most new scenes are generated in-app.",
     "room.room_size": "Sets the walkable room footprint. Small is a compact cozy gaming room, Medium gives a comfortable desk-and-couch room, and Large allows more movement. Virtual movement is bounded by the room's outer walls.",
     "room.screen_destination": "Controls where the PC video stream appears. Monitor shows it on the desk display, TV shows it on the wall TV, and Both mirrors the same stream onto both. These are mirrored copies, not independent desktop captures yet.",
     "room.monitor_count": "Number of desk monitors rendered in the room (1–3). All monitors currently mirror the same decoded PC stream; separate capture sources are not implemented.",
@@ -151,13 +151,13 @@ class Tooltip:
 try:
     from qbx_config import (
         DEFAULT_CONFIG, DEFAULT_CONFIG_PATH, PROFILE_DIR, apply_profile, load_config, profile_filename, profile_names,
-        save_config, save_quest_ini, save_fake_vr_ini, validate_config,
+        save_config, save_quest_ini, save_fake_vr_ini, validate_config, ROOM_ENVIRONMENTS,
     )
 except ModuleNotFoundError:
     sys.path.insert(0, str(TOOLS))
     from qbx_config import (
         DEFAULT_CONFIG, DEFAULT_CONFIG_PATH, PROFILE_DIR, apply_profile, load_config, profile_filename, profile_names,
-        save_config, save_quest_ini, save_fake_vr_ini, validate_config,
+        save_config, save_quest_ini, save_fake_vr_ini, validate_config, ROOM_ENVIRONMENTS,
     )
 
 
@@ -440,7 +440,7 @@ class QuestBridgeStudio(tk.Tk):
     def _add_room_tab(self, notebook: ttk.Notebook) -> None:
         f = self._tab(notebook, "Virtual Room")
         cfg = self.config_data["room"]
-        self._combo(f, "room.environment", "Window scenery", cfg["environment"], ("blossom", "night_city", "golden_city", "aurora", "cyberpunk"), 0)
+        self._combo(f, "room.environment", "Window scenery", cfg["environment"], ROOM_ENVIRONMENTS, 0)
         self._combo(f, "room.room_size", "Room size", cfg["room_size"], ("small", "medium", "large"), 1)
         self._combo(f, "room.screen_destination", "PC stream appears on", cfg["screen_destination"], ("monitor", "tv", "both"), 2)
         self._entry(f, "room.monitor_count", "Desk monitor count (1–3)", cfg["monitor_count"], 3)

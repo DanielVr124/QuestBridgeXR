@@ -14,6 +14,38 @@ ROOT = project_root(__file__)
 DEFAULT_CONFIG_PATH = ROOT / "config" / "questbridge.json"
 PROFILE_DIR = ROOT / "config" / "profiles"
 
+# Keep Studio, validation, and Quest INI export aligned with the native room renderer.
+ROOM_ENVIRONMENTS = (
+    "blossom",
+    "night_city",
+    "golden_city",
+    "aurora",
+    "cyberpunk",
+    "sunset_beach",
+    "snowy_mountains",
+    "enchanted_forest",
+    "desert_dunes",
+    "ocean_cliffs",
+    "space_nebula",
+    "lunar_base",
+    "volcanic",
+    "underwater",
+    "autumn_forest",
+    "tropical_island",
+    "candy_land",
+    "steampunk_city",
+    "rainy_tokyo",
+    "sakura_night",
+    "alpine_lake",
+    "emerald_valley",
+    "wasteland",
+    "midnight_clouds",
+    "crystal_cavern",
+    "lavender_fields",
+    "firefly_swamp",
+    "polar_station",
+)
+
 DEFAULT_CONFIG: dict[str, Any] = {
     "schema_version": 1,
     "profile": "Balanced",
@@ -238,8 +270,8 @@ def validate_config(cfg: dict[str, Any]) -> dict[str, Any]:
     _integer(transport["quest_receive_buffer_kib"], "transport.quest_receive_buffer_kib", 256, 16384)
 
     room = cfg["room"]
-    if room["environment"] not in ("blossom", "night_city", "golden_city", "aurora", "cyberpunk"):
-        raise ValueError("room.environment must be blossom, night_city, golden_city, aurora, or cyberpunk")
+    if room["environment"] not in ROOM_ENVIRONMENTS:
+        raise ValueError("room.environment must be one of: " + ", ".join(ROOM_ENVIRONMENTS))
     if room["room_size"] not in ("small", "medium", "large"):
         raise ValueError("room.room_size must be small, medium, or large")
     if room["screen_destination"] not in ("monitor", "tv", "both"):
