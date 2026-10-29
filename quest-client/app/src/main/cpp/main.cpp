@@ -548,6 +548,11 @@ struct EyeSwapchain {
     uint32_t width = 0;
     uint32_t height = 0;
     std::vector<XrSwapchainImageOpenGLESKHR> images;
+    // Keep an acquired image across frames if the runtime temporarily cannot make it ready.
+    // This prevents an infinite xrWaitSwapchainImage wait from freezing the native app thread.
+    uint32_t acquiredImageIndex = 0;
+    bool imageAcquired = false;
+    bool imageWaited = false;
 };
 
 struct HandActions {
@@ -1078,23 +1083,38 @@ private:
                 bool allEyesRendered = true;
                 for (uint32_t eye = 0; eye < viewCount; ++eye) {
                     auto& sc = swapchains_[eye];
-                    uint32_t imageIndex = 0;
-                    XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-                    const XrResult acquireResult = xrAcquireSwapchainImage(sc.handle, &acquireInfo, &imageIndex);
-                    if (XR_FAILED(acquireResult)) {
-                        LOGE("xrAcquireSwapchainImage failed for eye %u: %d", eye, static_cast<int>(acquireResult));
-                        allEyesRendered = false;
-                        break;
+                    if (!sc.imageAcquired) {
+                        XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+                        const XrResult acquireResult = xrAcquireSwapchainImage(sc.handle, &acquireInfo, &sc.acquiredImageIndex);
+                        if (XR_FAILED(acquireResult)) {
+                            LOGE("xrAcquireSwapchainImage failed for eye %u: %d", eye, static_cast<int>(acquireResult));
+                            allEyesRendered = false;
+                            break;
+                        }
+                        sc.imageAcquired = true;
+                        sc.imageWaited = false;
                     }
-                    XrSwapchainImageWaitInfo waitSwapInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
-                    waitSwapInfo.timeout = XR_INFINITE_DURATION;
-                    const XrResult waitImageResult = xrWaitSwapchainImage(sc.handle, &waitSwapInfo);
-                    if (XR_FAILED(waitImageResult)) {
-                        LOGE("xrWaitSwapchainImage failed for eye %u: %d", eye, static_cast<int>(waitImageResult));
-                        XrSwapchainImageReleaseInfo rel{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-                        xrReleaseSwapchainImage(sc.handle, &rel);
-                        allEyesRendered = false;
-                        break;
+                    const uint32_t imageIndex = sc.acquiredImageIndex;
+                    if (!sc.imageWaited) {
+                        XrSwapchainImageWaitInfo waitSwapInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
+                        // Never let a compositor stall block the Android app thread indefinitely.
+                        // On timeout, retain the acquired image and retry on a later frame.
+                        waitSwapInfo.timeout = 100'000'000; // 100 ms in nanoseconds
+                        const XrResult waitImageResult = xrWaitSwapchainImage(sc.handle, &waitSwapInfo);
+                        if (waitImageResult == XR_TIMEOUT_EXPIRED) {
+                            if (renderFrameCount_ % 60 == 1) {
+                                LOGW("xrWaitSwapchainImage timed out for eye %u; will retry next frame", eye);
+                            }
+                            allEyesRendered = false;
+                            break;
+                        }
+                        if (XR_FAILED(waitImageResult)) {
+                            LOGE("xrWaitSwapchainImage failed for eye %u: %d; retaining acquired image for retry",
+                                 eye, static_cast<int>(waitImageResult));
+                            allEyesRendered = false;
+                            break;
+                        }
+                        sc.imageWaited = true;
                     }
                     const GLuint desktopTexture = video_.renderEyeTexture(static_cast<int>(eye), 1024, 576);
                     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
@@ -1117,10 +1137,13 @@ private:
                     XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
                     const XrResult releaseResult = xrReleaseSwapchainImage(sc.handle, &releaseInfo);
                     if (XR_FAILED(releaseResult)) {
-                        LOGE("xrReleaseSwapchainImage failed for eye %u: %d", eye, static_cast<int>(releaseResult));
+                        LOGE("xrReleaseSwapchainImage failed for eye %u: %d; retaining image state for retry",
+                             eye, static_cast<int>(releaseResult));
                         allEyesRendered = false;
                         break;
                     }
+                    sc.imageAcquired = false;
+                    sc.imageWaited = false;
 
                     projectionViews_[eye] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
                     projectionViews_[eye].pose = views_[eye].pose;
