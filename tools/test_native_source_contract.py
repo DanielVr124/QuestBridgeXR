@@ -42,6 +42,12 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertNotIn("room_.cycleScreenDestination()", source)
         self.assertNotIn("room_.cycleEnvironment()", source)
         self.assertNotIn("room_.toggleSitting(headPose)", source)
+        self.assertIn('bind(hands_[0].menu, "/user/hand/left/input/menu/click")', source)
+        self.assertIn("if (menuPressed && !previousMenuPressed_) room_.toggleMenu()", source)
+        self.assertIn("config_.invertThumbstickY ? move.y : -move.y", source)
+        renderer = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
+        self.assertIn("void RoomRenderer::toggleMenu()", renderer)
+        self.assertIn("if (menuVisible_)", renderer)
 
     def test_fake_vr_bridge_is_connected_and_default_off(self):
         host = (ROOT / "host/src/main.cpp").read_text(encoding="utf-8")
