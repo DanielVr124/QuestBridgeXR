@@ -1062,6 +1062,12 @@ private:
             if (XR_SUCCEEDED(located) && viewCount == views_.size()) {
                 sendTracking(frameState.predictedDisplayTime);
                 video_.pumpOutput();
+                // The midpoint of the stereo eye positions is the tracked head center.
+                XrVector3f headCenter{
+                    (views_[0].pose.position.x+views_[1].pose.position.x)*0.5f,
+                    (views_[0].pose.position.y+views_[1].pose.position.y)*0.5f,
+                    (views_[0].pose.position.z+views_[1].pose.position.z)*0.5f
+                };
                 bool allEyesRendered = true;
                 for (uint32_t eye = 0; eye < viewCount; ++eye) {
                     auto& sc = swapchains_[eye];
@@ -1094,8 +1100,9 @@ private:
                     const float shade = eye == 0 ? 0.035f : 0.055f;
                     glClearColor(shade, shade, shade + 0.025f, 1.0f);
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                    XrPosef renderedPose{};
                     room_.renderEye(static_cast<int>(eye), static_cast<int>(sc.width), static_cast<int>(sc.height),
-                                    views_[eye], desktopTexture, video_.hasFrame());
+                                    views_[eye], headCenter, renderedPose, desktopTexture, video_.hasFrame());
                     glBindFramebuffer(GL_FRAMEBUFFER, 0);
                     XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
                     if (XR_FAILED(xrReleaseSwapchainImage(sc.handle, &releaseInfo))) {
@@ -1104,7 +1111,7 @@ private:
                     }
 
                     projectionViews_[eye] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
-                    projectionViews_[eye].pose = views_[eye].pose;
+                    projectionViews_[eye].pose = renderedPose;
                     projectionViews_[eye].fov = views_[eye].fov;
                     projectionViews_[eye].subImage.swapchain = sc.handle;
                     projectionViews_[eye].subImage.imageRect.offset = {0, 0};
