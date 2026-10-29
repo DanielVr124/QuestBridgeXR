@@ -1036,9 +1036,10 @@ void RoomRenderer::toggleSitting(const XrPosef& headPose) {
     const float playerX=headPose.position.x+moveX_;
     const float playerZ=headPose.position.z+moveZ_;
     struct Seat { float x,z,yaw; const char* name; bool enabled; };
+    const float deskX=halfW-1.48f, deskZ=-halfD+1.35f;
     const Seat seats[] = {
-        {0.85f, 1.6f, 0.0f, "desk chair", settings_.showChair},
-        {-halfW+1.25f, -halfD+0.80f, kPi, "couch", settings_.showCouch}
+        {deskX-.25f, deskZ+1.20f, 0.0f, "desk chair", settings_.showChair},
+        {halfW-1.25f, .05f, -kPi*.5f, "couch", settings_.showCouch}
     };
     const Seat* nearest=nullptr;
     float nearestDistance=1.10f;
@@ -1300,8 +1301,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float cx=couchX;
         drawBox(pv.data(),cx,floorY+.38f,couchZ, .86f,.24f,1.92f,trimDark,couchYaw);
         drawSphere(pv.data(),cx,floorY+.53f,couchZ,.48f,.24f,.82f,sofa);
-        drawSphere(pv.data(),cx-.22f,floorY+.68f,couchZ-.48f,.25f,.28f,.39f,sofa);
-        drawSphere(pv.data(),cx-.22f,floorY+.68f,couchZ+.48f,.25f,.28f,.39f,sofa);
+        // Raised back is on the +X side, so the sitting position faces the TV on the -X wall.
+        drawSphere(pv.data(),cx+.22f,floorY+.68f,couchZ-.48f,.25f,.28f,.39f,sofa);
+        drawSphere(pv.data(),cx+.22f,floorY+.68f,couchZ+.48f,.25f,.28f,.39f,sofa);
         drawSphere(pv.data(),cx-.12f,floorY+.75f,couchZ-.23f,.22f,.15f,.35f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
         drawSphere(pv.data(),cx-.12f,floorY+.75f,couchZ+.23f,.22f,.15f,.35f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
         // Rounded arm pads and short dark feet.
