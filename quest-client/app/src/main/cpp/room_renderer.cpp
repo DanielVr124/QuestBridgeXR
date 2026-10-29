@@ -1076,10 +1076,16 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     };
     // Simple non-physics collision boxes keep joystick movement from passing through furniture.
     const float couchX = -halfW + 1.25f, couchZ = -halfD + 0.80f;
-    const bool hitsDesk = overlaps(moveX_, moveZ_, 0.0f, -1.75f, 1.72f, 0.68f);
-    const bool hitsChair = settings_.showChair && overlaps(moveX_, moveZ_, 0.85f, 1.6f, 0.55f, 0.54f);
-    const bool hitsCouch = settings_.showCouch && overlaps(moveX_, moveZ_, couchX, couchZ, 1.18f, 0.65f);
-    if (hitsDesk || hitsChair || hitsCouch) { moveX_ = oldMoveX; moveZ_ = oldMoveZ; }
+    // Resolve X and Z separately so a collision slides along furniture instead of
+    // freezing both axes (the old all-or-nothing test made corners feel sticky).
+    const auto blocked = [&](float x, float z) {
+        const bool hitsDesk = overlaps(x, z, 0.0f, -1.75f, 1.72f, 0.68f);
+        const bool hitsChair = settings_.showChair && overlaps(x, z, 0.85f, 1.6f, 0.55f, 0.54f);
+        const bool hitsCouch = settings_.showCouch && overlaps(x, z, couchX, couchZ, 1.18f, 0.65f);
+        return hitsDesk || hitsChair || hitsCouch;
+    };
+    if (blocked(moveX_, oldMoveZ)) moveX_ = oldMoveX;
+    if (blocked(moveX_, moveZ_)) moveZ_ = oldMoveZ;
     snapCooldown_=std::max(0.0f,snapCooldown_-dt);
     if(settings_.smoothTurn){virtualYaw_+=std::clamp(rightStickX,-1.0f,1.0f)*std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;}
     else {
@@ -1149,7 +1155,29 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform1i(locTexture_,0);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
     drawBox(pv.data(),0,floorY-0.08f,0,halfW*2+0.1f,0.16f,halfD*2+0.1f,floor);
+
+    // A layered rug breaks up the large flat floor and gives the furniture a visual anchor.
+    const auto rug = activeEnvironmentIndex_ == 0 ? rgb(.34f,.17f,.26f)
+        : activeEnvironmentIndex_ == 1 || activeEnvironmentIndex_ == 4 ? rgb(.025f,.055f,.10f)
+        : activeEnvironmentIndex_ == 6 || activeEnvironmentIndex_ == 7 ? rgb(.08f,.20f,.18f)
+        : activeEnvironmentIndex_ == 5 || activeEnvironmentIndex_ == 8 ? rgb(.43f,.23f,.13f)
+        : rgb(wood[0]*.72f,wood[1]*.72f,wood[2]*.72f);
+    const auto rugEdge = rgb(std::min(1.0f,rug[0]*1.35f),std::min(1.0f,rug[1]*1.35f),std::min(1.0f,rug[2]*1.35f));
+    drawBox(pv.data(),0,floorY+0.012f,0.25f,3.35f,0.025f,3.75f,rug);
+    drawBox(pv.data(),0,floorY+0.029f,-1.59f,3.12f,0.012f,0.035f,rugEdge);
+    drawBox(pv.data(),0,floorY+0.029f,2.09f,3.12f,0.012f,0.035f,rugEdge);
+    drawBox(pv.data(),-1.55f,floorY+0.029f,0.25f,0.035f,0.012f,3.68f,rugEdge);
+    drawBox(pv.data(),1.55f,floorY+0.029f,0.25f,0.035f,0.012f,3.68f,rugEdge);
+
     drawBox(pv.data(),0,ceilingY+0.05f,0,halfW*2+0.1f,0.1f,halfD*2+0.1f,wall);
+    // Subtle skirting makes the wall/floor join read as a finished room.
+    const auto trim = rgb(std::min(1.0f,wood[0]*1.35f),std::min(1.0f,wood[1]*1.35f),std::min(1.0f,wood[2]*1.35f));
+    drawBox(pv.data(),-halfW+0.06f,floorY+0.12f,0,0.055f,0.22f,halfD*2-0.1f,trim);
+    drawBox(pv.data(), halfW-0.06f,floorY+0.12f,0,0.055f,0.22f,halfD*2-0.1f,trim);
+    drawBox(pv.data(),0,floorY+0.12f,backZ+0.06f,halfW*2-0.1f,0.22f,0.055f,trim);
+    // A clean ceiling light fixture adds a focal point overhead without costly dynamic lights.
+    drawBox(pv.data(),0,ceilingY-0.10f,0.0f,1.25f,0.07f,0.62f,trim);
+    drawBox(pv.data(),0,ceilingY-0.145f,0.0f,1.08f,0.025f,0.46f,lampGlow);
     drawBox(pv.data(),-halfW-0.05f,(floorY+ceilingY)*.5f,0,0.1f,ceilingY-floorY,halfD*2,wall);
     drawBox(pv.data(),halfW+0.05f,(floorY+ceilingY)*.5f,0,0.1f,ceilingY-floorY,halfD*2,wall);
     drawBox(pv.data(),0,(floorY+ceilingY)*.5f,backZ-0.05f,halfW*2,ceilingY-floorY,0.1f,wall);
