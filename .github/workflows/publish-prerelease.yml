@@ -1,0 +1,50 @@
+name: Publish successful builds as pre-releases
+
+on:
+  workflow_run:
+    workflows:
+      - QuestBridge XR Build
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    name: Publish downloadable pre-release
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+          path: dist
+
+      - name: Verify downloadable files exist
+        shell: bash
+        run: |
+          find dist -type f -maxdepth 4 -print
+          if ! find dist -type f \\( -name '*.zip' -o -name '*.apk' \\) -print -quit | grep -q .; then
+            echo "No ZIP or APK build outputs were downloaded." >&2
+            exit 1
+          fi
+
+      - name: Publish pre-release with all downloadable builds
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: prerelease-build-${{ github.event.workflow_run.id }}
+          name: QuestBridgeXR Pre-release #${{ github.event.workflow_run.run_number }}
+          prerelease: true
+          make_latest: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/**/*.zip
+            dist/**/*.apk
+            dist/**/*.sha256
