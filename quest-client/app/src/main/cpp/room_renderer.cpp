@@ -1184,8 +1184,7 @@ void RoomRenderer::rebaseYawPivot(const XrPosef& headPose) {
     yawPivotZ_ = headPose.position.z;
 }
 
-void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,
-                             const XrPosef& headCenterPose,GLuint videoTexture,bool hasVideo) {
+void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,GLuint videoTexture,bool hasVideo) {
     if(!initialized_)return;
     float halfW=3.0f,halfD=3.8f;
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
