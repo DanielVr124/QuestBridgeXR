@@ -35,7 +35,7 @@ public:
                           const XrPosef& headPose);
     void cycleScreenDestination();
     void cycleEnvironment();
-    void setPointerState(const XrPosef& pose, bool triggerPressed, bool menuTogglePressed);
+    void setPointerState(const XrPosef& pose, bool triggerPressed, bool menuTogglePressed, bool poseValid);
     void toggleSitting(const XrPosef& headPose);
     bool sitting() const { return sitting_; }
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
