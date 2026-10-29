@@ -75,7 +75,11 @@ SETTING_HELP = {
     "transport.max_frame_mib": "Maximum encoded frame/access-unit size accepted by the Quest receiver. Larger values allow unusually complex keyframes but allocate more memory and can prolong frame assembly. Keep this as low as your stream permits.",
     "transport.incomplete_frame_timeout_ms": "Time allowed for all UDP chunks of an encoded frame to arrive. Lower values discard lossy/incomplete frames quickly to protect latency; higher values may recover on slow networks but can show older frames later.",
     "transport.quest_receive_buffer_kib": "Requested kernel UDP receive-buffer capacity on the Quest in KiB. More buffer can reduce packet drops during bursts but may increase queuing latency; Android/driver limits may clamp it.",
-    "room.environment": "Choose from 208 generated scenery environments, including dreamcore and liminal spaces, cozy cabins and reading nooks, rainy cafes, peaceful gardens, fairy worlds, Japanese scenes, aquatic worlds, cosmic skies, pastel dreamscapes, city nights, zen retreats, and mystical forests. Scenery is generated on-device and designed to stay lightweight.",
+    "room.environment": "Choose from 328 environments. Explore mode builds stylized 3D spaces you can walk around in; the collection includes dreamcore/weirdcore, quiet liminal places, backrooms-style corridors, poolrooms, mysterious hotel doorways, nature, cities, and fantasy worlds. All of the new world geometry is generated on-device and intentionally lightweight.",
+    "room.mode": "Explore creates an open, walkable procedural 3D world. Workspace keeps the familiar bounded room with the scenery window. Your PC stream remains available in either mode.",
+    "room.monitor_behavior": "World keeps screens anchored at the workstation. Follow places them in front of your view while you move. Summon uses the same floating placement but lets you hide/show it with right-controller B. Right-controller B also toggles screens in World mode.",
+    "room.monitors_visible": "Initial visibility for virtual PC screens. When running, right-controller B toggles the screens on/off regardless of the selected placement mode.",
+    "room.ambience_enabled": "Enable a quiet procedural ambience bed that changes with the selected environment (soft wind, low room hum, water-like noise, rain-like hiss, or dreamy drone). It is synthesized in the native client; it is not yet a library of recorded positional sound effects.",
     "room.room_size": "Sets the walkable room footprint. Small is a compact cozy gaming room, Medium gives a comfortable desk-and-couch room, and Large allows more movement. Virtual movement is bounded by the room's outer walls.",
     "room.screen_destination": "Controls where the PC video stream appears. Monitor shows it on the desk display, TV shows it on the wall TV, and Both mirrors the same stream onto both. These are mirrored copies, not independent desktop captures yet.",
     "room.monitor_count": "Number of desk monitors rendered in the room (1–3). All monitors currently mirror the same decoded PC stream; separate capture sources are not implemented.",
@@ -442,27 +446,31 @@ class QuestBridgeStudio(tk.Tk):
     def _add_room_tab(self, notebook: ttk.Notebook) -> None:
         f = self._tab(notebook, "Virtual Room")
         cfg = self.config_data["room"]
-        self._combo(f, "room.environment", "Window scenery",
+        self._combo(f, "room.environment", "Environment",
                     ROOM_ENVIRONMENT_LABELS.get(cfg["environment"], cfg["environment"]),
                     tuple(ROOM_ENVIRONMENT_LABELS.values()), 0)
-        self._combo(f, "room.room_size", "Room size", cfg["room_size"], ("small", "medium", "large"), 1)
-        self._combo(f, "room.screen_destination", "PC stream appears on", cfg["screen_destination"], ("monitor", "tv", "both"), 2)
-        self._entry(f, "room.monitor_count", "Desk monitor count (1–3)", cfg["monitor_count"], 3)
-        self._check(f, "room.show_tv", "Show wall TV", cfg["show_tv"], 4)
-        self._check(f, "room.show_couch", "Show couch", cfg["show_couch"], 5)
-        self._check(f, "room.show_chair", "Show desk chair behind spawn", cfg["show_chair"], 6)
-        self._check(f, "room.room_controls_enabled", "Enable in-room controller shortcuts", cfg["room_controls_enabled"], 7)
-        self._check(f, "room.sitting_toggle_enabled", "Enable seated-view toggle (left X)", cfg["sitting_toggle_enabled"], 8)
-        self._entry(f, "room.sitting_head_drop_m", "Seated camera drop (m)", cfg["sitting_head_drop_m"], 9)
-        self._check(f, "room.movement_enabled", "Enable joystick room locomotion", cfg["movement_enabled"], 10)
-        self._entry(f, "room.movement_speed", "Walk speed (m/s)", cfg["movement_speed"], 11)
-        self._check(f, "room.smooth_turn", "Use smooth turning (otherwise snap turn)", cfg["smooth_turn"], 12)
-        self._entry(f, "room.turn_speed", "Smooth-turn speed (rad/s)", cfg["turn_speed"], 13)
-        self._entry(f, "room.snap_turn_degrees", "Snap turn angle (degrees)", cfg["snap_turn_degrees"], 14)
-        self._check(f, "room.comfort_vignette", "Comfort vignette during movement", cfg["comfort_vignette"], 15)
-        self._entry(f, "room.floor_offset_y", "Floor vertical offset (m)", cfg["floor_offset_y"], 16)
-        ttk.Label(f, text="Controller shortcuts: left thumbstick click cycles Monitor → TV → Both; right thumbstick click cycles the scenery; left X toggles the seated camera height. Furniture is collidable at a simple box level, but seats do not use full physics.", foreground="#72531b", wraplength=760).grid(row=17, column=0, columnspan=3, sticky="w", pady=(18, 0))
-        ttk.Label(f, text="This is the Quest standalone room client. It is not the missing Windows OpenXR compositor, and multiple virtual monitors currently mirror the same PC video source.", foreground="#666666", wraplength=760).grid(row=18, column=0, columnspan=3, sticky="w", pady=(10, 0))
+        self._combo(f, "room.mode", "World mode", cfg["mode"], ("explore", "workspace"), 1)
+        self._combo(f, "room.monitor_behavior", "Monitor placement", cfg["monitor_behavior"], ("world", "follow", "summon"), 2)
+        self._check(f, "room.monitors_visible", "Start with monitors visible", cfg["monitors_visible"], 3)
+        self._check(f, "room.ambience_enabled", "Environment atmosphere audio", cfg["ambience_enabled"], 4)
+        self._combo(f, "room.room_size", "Room size (Workspace mode)", cfg["room_size"], ("small", "medium", "large"), 5)
+        self._combo(f, "room.screen_destination", "PC stream appears on", cfg["screen_destination"], ("monitor", "tv", "both"), 6)
+        self._entry(f, "room.monitor_count", "Desk monitor count (1–3)", cfg["monitor_count"], 7)
+        self._check(f, "room.show_tv", "Show TV (Workspace + Explore station)", cfg["show_tv"], 8)
+        self._check(f, "room.show_couch", "Show couch (Workspace)", cfg["show_couch"], 9)
+        self._check(f, "room.show_chair", "Show desk chair (Workspace)", cfg["show_chair"], 10)
+        self._check(f, "room.room_controls_enabled", "Enable in-world controller shortcuts", cfg["room_controls_enabled"], 11)
+        self._check(f, "room.sitting_toggle_enabled", "Enable seated-view toggle (left X)", cfg["sitting_toggle_enabled"], 12)
+        self._entry(f, "room.sitting_head_drop_m", "Seated camera drop (m)", cfg["sitting_head_drop_m"], 13)
+        self._check(f, "room.movement_enabled", "Enable joystick locomotion", cfg["movement_enabled"], 14)
+        self._entry(f, "room.movement_speed", "Walk speed (m/s)", cfg["movement_speed"], 15)
+        self._check(f, "room.smooth_turn", "Use smooth turning (otherwise snap turn)", cfg["smooth_turn"], 16)
+        self._entry(f, "room.turn_speed", "Smooth-turn speed (rad/s)", cfg["turn_speed"], 17)
+        self._entry(f, "room.snap_turn_degrees", "Snap turn angle (degrees)", cfg["snap_turn_degrees"], 18)
+        self._check(f, "room.comfort_vignette", "Comfort vignette during movement", cfg["comfort_vignette"], 19)
+        self._entry(f, "room.floor_offset_y", "Floor vertical offset (m)", cfg["floor_offset_y"], 20)
+        ttk.Label(f, text="Controller shortcuts: left thumbstick click cycles Monitor → TV → Both; right thumbstick click changes environment; left X toggles seated camera height; left Y switches Explore/Workspace; right B hides/shows monitors. Joystick motion uses eased acceleration and gentle deceleration. Interior worlds have walkable door openings and simple wall collisions.", foreground="#72531b", wraplength=760).grid(row=21, column=0, columnspan=3, sticky="w", pady=(18, 0))
+        ttk.Label(f, text="Explore is a lightweight procedural 3D foundation, with a new layout template applied by environment family rather than 328 separately modeled asset packs. Monitor content is currently the same decoded PC stream mirrored onto each virtual screen; independent multi-desktop capture and controller grab/drag placement remain future work.", foreground="#666666", wraplength=760).grid(row=22, column=0, columnspan=3, sticky="w", pady=(8, 0))
 
     def _add_fake_vr_tab(self, notebook: ttk.Notebook) -> None:
         f = self._tab(notebook, "Fake VR / Game Bridge")
