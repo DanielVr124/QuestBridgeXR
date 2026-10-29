@@ -18,7 +18,7 @@ class ProjectPathTests(unittest.TestCase):
             exe.touch()
             with patch.object(qbx_paths.sys, 'frozen', True, create=True), \
                  patch.object(qbx_paths.sys, 'executable', str(exe)):
-                self.assertEqual(qbx_paths.project_root('ignored.py'), root)
+                self.assertEqual(qbx_paths.project_root('ignored.py'), root.resolve())
 
     def test_frozen_tool_executable_resolves_parent_of_tools_folder(self):
         with tempfile.TemporaryDirectory() as temp:
