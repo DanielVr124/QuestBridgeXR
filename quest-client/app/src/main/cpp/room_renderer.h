@@ -35,6 +35,7 @@ public:
                           const XrPosef& headPose);
     void cycleScreenDestination();
     void cycleEnvironment();
+    void setPointerState(const XrPosef& pose, bool triggerPressed, bool menuTogglePressed);
     void toggleSitting(const XrPosef& headPose);
     bool sitting() const { return sitting_; }
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
@@ -57,6 +58,7 @@ private:
                    float yaw = 0.0f);
     void drawEnvironmentWindow(const float* projectionView, float halfW, float floorY, float backZ,
                                GLuint environmentTexture, float windowW, float windowH);
+    void drawControlMenu(const float* projectionView, float monitorW, float monitorH, float centerY, float screenZ);
 
     RoomSettings settings_{};
     GLuint program_ = 0;
@@ -81,4 +83,11 @@ private:
     bool previousTurnRight_ = false;
     bool previousTurnLeft_ = false;
     bool sitting_ = false;
+    bool menuOpen_ = false;
+    bool pointerTrigger_ = false;
+    bool pointerTriggerPrevious_ = false;
+    bool menuTogglePrevious_ = false;
+    int menuTab_ = 0;
+    XrPosef pointerPose_{};
+    bool pointerPoseValid_ = false;
 };
