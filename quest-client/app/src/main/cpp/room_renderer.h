@@ -36,6 +36,8 @@ public:
     void cycleScreenDestination();
     void cycleEnvironment();
     void setPointerState(const XrPosef& pose, bool triggerPressed, bool menuTogglePressed, bool poseValid);
+    void setControllerState(const XrPosef& leftPose, bool leftValid, float leftTrigger, float leftGrip,
+                            const XrPosef& rightPose, bool rightValid, float rightTrigger, float rightGrip);
     void toggleSitting(const XrPosef& headPose);
     bool sitting() const { return sitting_; }
     XrPosef transformViewPose(const XrPosef& viewPose, const XrVector3f& headCenter) const;
@@ -61,6 +63,7 @@ private:
     void drawEnvironmentWindow(const float* projectionView, float halfW, float floorY, float backZ,
                                GLuint environmentTexture, float windowW, float windowH);
     void drawControlMenu(const float* projectionView, float monitorW, float monitorH, float centerY, float screenZ);
+    void drawControllerModel(const float* projectionView, const XrPosef& pose, bool leftHand, float trigger, float grip);
 
     RoomSettings settings_{};
     GLuint program_ = 0;
@@ -94,4 +97,8 @@ private:
     int menuTab_ = 0;
     XrPosef pointerPose_{};
     bool pointerPoseValid_ = false;
+    std::array<XrPosef, 2> controllerPoses_{};
+    std::array<bool, 2> controllerPoseValid_{};
+    std::array<float, 2> controllerTriggers_{};
+    std::array<float, 2> controllerGrips_{};
 };
