@@ -1081,7 +1081,7 @@ private:
                     }
 
                     projectionViews_[eye] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
-                    projectionViews_[eye].pose = room_.compositionPose(views_[eye].pose);
+                    projectionViews_[eye].pose = views_[eye].pose;
                     projectionViews_[eye].fov = views_[eye].fov;
                     projectionViews_[eye].subImage.swapchain = sc.handle;
                     projectionViews_[eye].subImage.imageRect.offset = {0, 0};
