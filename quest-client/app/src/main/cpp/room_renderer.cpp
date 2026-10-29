@@ -977,6 +977,17 @@ void RoomRenderer::createGeometry() {
     glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(0));
     glEnableVertexAttribArray(1);glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(3*sizeof(float)));
     glBindVertexArray(0);
+
+    glGenVertexArrays(1,&menuTextVao_);
+    glGenBuffers(1,&menuTextVbo_);
+    glBindVertexArray(menuTextVao_);
+    glBindBuffer(GL_ARRAY_BUFFER,menuTextVbo_);
+    glBufferData(GL_ARRAY_BUFFER,0,nullptr,GL_STREAM_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(0));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(3*sizeof(float)));
+    glBindVertexArray(0);
 }
 
 void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; chooseEnvironment(); }
@@ -1206,91 +1217,233 @@ void RoomRenderer::drawControllerModel(const float* pv, const XrPosef& pose, boo
 void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monitorH,
                                    float centerY, float screenZ) {
     const float s = monitorW / 1.28f;
-    const float w = monitorW, h = monitorH;
-    const float z = screenZ;
-    const auto panel = rgb(.025f,.035f,.075f);
-    const auto header = rgb(.055f,.075f,.15f);
-    const auto accent = rgb(.20f,.43f,.98f);
-    const auto muted = rgb(.10f,.14f,.25f);
+    const float w = monitorW, h = monitorH, z = screenZ;
+    const auto panel = rgb(.018f,.028f,.055f);
+    const auto header = rgb(.027f,.043f,.080f);
+    const auto card = rgb(.030f,.047f,.086f);
+    const auto cardBorder = rgb(.070f,.110f,.185f);
+    const auto accent = rgb(.20f,.53f,1.0f);
+    const auto cyan = rgb(.24f,.82f,.91f);
     const auto white = rgb(.88f,.93f,1.0f);
-    drawBox(pv,0,centerY,z,w,h,.012f,panel);
-    drawBox(pv,0,centerY+h*.39f,z+.009f,w,h*.22f,.008f,header);
-    drawBox(pv,-w*.36f,centerY-h*.07f,z+.009f,w*.27f,h*.66f,.008f,header);
-    drawBox(pv,0,centerY+h*.27f,z+.018f,w*.92f,.006f,.004f,accent);
-    // A tiny 3x5 bitmap font keeps the menu self-contained (no external font dependency).
-    auto glyph = [](char c) -> std::array<uint8_t,5> {
+    const auto secondary = rgb(.48f,.59f,.75f);
+    const auto subdued = rgb(.27f,.36f,.51f);
+
+    // The menu is layered only a few millimetres in front of the actual display plane.
+    // Its shallow depth keeps it visually attached to the monitor rather than floating.
+    drawBox(pv,0,centerY,z,w,h,.0010f,panel);
+    drawBox(pv,0,centerY,z+.00045f,w*.992f,h*.986f,.0007f,cardBorder);
+    drawBox(pv,0,centerY,z+.00085f,w*.987f,h*.980f,.0007f,panel);
+    drawBox(pv,-w*.491f,centerY,z+.0010f,w*.008f,h*.945f,.0008f,accent);
+
+    // A small purpose-built 5x7 bitmap typeface is batched into one draw call per
+    // label. That is considerably cheaper on Quest than drawing every pixel as a cube.
+    auto glyph = [](char c) -> std::array<uint8_t,7> {
+        if (c >= 'a' && c <= 'z') c = static_cast<char>(c - ('a' - 'A'));
+        if (c == '_') c = ' ';
         switch(c) {
-        case 'A': return {7,5,7,5,5}; case 'B': return {6,5,6,5,6};
-        case 'C': return {7,4,4,4,7}; case 'D': return {6,5,5,5,6};
-        case 'E': return {7,4,6,4,7}; case 'F': return {7,4,6,4,4};
-        case 'G': return {7,4,5,5,7}; case 'H': return {5,5,7,5,5};
-        case 'I': return {7,2,2,2,7}; case 'J': return {3,1,1,5,7};
-        case 'K': return {5,5,6,5,5}; case 'L': return {4,4,4,4,7};
-        case 'M': return {5,7,7,5,5}; case 'N': return {5,7,7,7,5};
-        case 'O': return {7,5,5,5,7}; case 'P': return {7,5,7,4,4};
-        case 'Q': return {7,5,5,7,1}; case 'R': return {6,5,6,5,5};
-        case 'S': return {7,4,7,1,7}; case 'T': return {7,2,2,2,2};
-        case 'U': return {5,5,5,5,7}; case 'V': return {5,5,5,5,2};
-        case 'W': return {5,5,7,7,5}; case 'X': return {5,5,2,5,5};
-        case 'Y': return {5,5,2,2,2}; case 'Z': return {7,1,2,4,7};
-        case '0': return {7,5,5,5,7}; case '1': return {2,6,2,2,7};
-        case '2': return {6,1,7,4,7}; case '3': return {6,1,3,1,6};
-        case '4': return {5,5,7,1,1}; case '5': return {7,4,6,1,6};
-        case '6': return {3,4,7,5,7}; case '7': return {7,1,2,2,2};
-        case '8': return {7,5,7,5,7}; case '9': return {7,5,7,1,6};
-        case '-': return {0,0,7,0,0}; case ':': return {0,2,0,2,0};
-        case '.': return {0,0,0,0,2}; case '/': return {1,1,2,4,4};
-        default: return {0,0,0,0,0};
+        case 'A': return {14,17,17,31,17,17,17};
+        case 'B': return {30,17,17,30,17,17,30};
+        case 'C': return {14,17,16,16,16,17,14};
+        case 'D': return {30,17,17,17,17,17,30};
+        case 'E': return {31,16,16,30,16,16,31};
+        case 'F': return {31,16,16,30,16,16,16};
+        case 'G': return {14,17,16,23,17,17,15};
+        case 'H': return {17,17,17,31,17,17,17};
+        case 'I': return {31,4,4,4,4,4,31};
+        case 'J': return {7,2,2,2,18,18,12};
+        case 'K': return {17,18,20,24,20,18,17};
+        case 'L': return {16,16,16,16,16,16,31};
+        case 'M': return {17,27,21,21,17,17,17};
+        case 'N': return {17,25,25,21,19,19,17};
+        case 'O': return {14,17,17,17,17,17,14};
+        case 'P': return {30,17,17,30,16,16,16};
+        case 'Q': return {14,17,17,17,21,18,13};
+        case 'R': return {30,17,17,30,20,18,17};
+        case 'S': return {15,16,16,14,1,1,30};
+        case 'T': return {31,4,4,4,4,4,4};
+        case 'U': return {17,17,17,17,17,17,14};
+        case 'V': return {17,17,17,17,17,10,4};
+        case 'W': return {17,17,17,21,21,21,10};
+        case 'X': return {17,17,10,4,10,17,17};
+        case 'Y': return {17,17,10,4,4,4,4};
+        case 'Z': return {31,1,2,4,8,16,31};
+        case '0': return {14,17,19,21,25,17,14};
+        case '1': return {4,12,4,4,4,4,14};
+        case '2': return {14,17,1,2,4,8,31};
+        case '3': return {30,1,1,14,1,1,30};
+        case '4': return {2,6,10,18,31,2,2};
+        case '5': return {31,16,16,30,1,1,30};
+        case '6': return {14,16,16,30,17,17,14};
+        case '7': return {31,1,2,4,8,8,8};
+        case '8': return {14,17,17,14,17,17,14};
+        case '9': return {14,17,17,15,1,1,14};
+        case '-': return {0,0,0,31,0,0,0};
+        case '+': return {0,4,4,31,4,4,0};
+        case ':': return {0,12,12,0,12,12,0};
+        case '.': return {0,0,0,0,0,12,12};
+        case '/': return {1,1,2,4,8,16,16};
+        case '>': return {16,8,4,2,4,8,16};
+        case '<': return {1,2,4,8,4,2,1};
+        case ' ': return {0,0,0,0,0,0,0};
+        default: return {0,0,0,0,0,0,0};
         }
     };
-    auto text = [&](const char* str, float x, float y, float scale, const std::array<float,4>& color) {
-        const float px=.0050f*s*scale, py=.0068f*s*scale;
-        const float advance=px*4.0f;
-        for (size_t i=0; str[i] && i<20; ++i) {
+
+    auto text = [&](const char* str, float x, float y, float scale,
+                    const std::array<float,4>& color) {
+        if (!str || !menuTextVao_ || !menuTextVbo_) return;
+        const float px = .0040f*s*scale;
+        const float py = .0054f*s*scale;
+        const float advance = px*6.0f;
+        std::vector<float> vertices;
+        const size_t length = std::min<size_t>(std::strlen(str),48);
+        vertices.reserve(length*5*7*6*5);
+        auto vertex = [&](float vx,float vy) {
+            vertices.push_back(vx); vertices.push_back(vy);
+            vertices.push_back(z+.0020f);
+            vertices.push_back(0.0f); vertices.push_back(0.0f);
+        };
+        for(size_t i=0;i<length;++i) {
             const auto rows=glyph(str[i]);
-            for(int row=0;row<5;++row) for(int col=0;col<3;++col) {
-                if(rows[row] & (1u << (2-col))) {
-                    const float xx=x+static_cast<float>(i)*advance+static_cast<float>(col)*px;
-                    const float yy=y+(2.0f-static_cast<float>(row))*py;
-                    drawBox(pv,xx,yy,z+.022f,px*.72f,py*.72f,.002f,color);
+            for(int row=0;row<7;++row) for(int col=0;col<5;++col) {
+                if(rows[row] & (1u << (4-col))) {
+                    const float cx=x+static_cast<float>(i)*advance+static_cast<float>(col)*px;
+                    const float cy=y+(3.0f-static_cast<float>(row))*py;
+                    const float x0=cx-px*.42f, x1=cx+px*.42f;
+                    const float y0=cy-py*.42f, y1=cy+py*.42f;
+                    vertex(x0,y0); vertex(x1,y0); vertex(x1,y1);
+                    vertex(x0,y0); vertex(x1,y1); vertex(x0,y1);
                 }
             }
         }
+        if(vertices.empty()) return;
+        glBindBuffer(GL_ARRAY_BUFFER,menuTextVbo_);
+        glBufferData(GL_ARRAY_BUFFER,static_cast<GLsizeiptr>(vertices.size()*sizeof(float)),
+                     vertices.data(),GL_STREAM_DRAW);
+        glBindVertexArray(menuTextVao_);
+        glUniformMatrix4fv(locMvp_,1,GL_FALSE,pv);
+        glUniform4fv(locColor_,1,color.data());
+        glUniform1i(locTextured_,0);
+        glDrawArrays(GL_TRIANGLES,0,static_cast<GLsizei>(vertices.size()/5));
+        glBindVertexArray(0);
     };
-    text("QUESTBRIDGE XR",-w*.43f,centerY+h*.40f,.88f,white);
-    text("CONTROL CENTER",-w*.43f,centerY+h*.31f,.50f,rgb(.42f,.60f,1.0f));
-    const char* tabs[]={"HOME","ENV","DISP","COMFORT","HELP"};
-    const float tabX[]={-.35f,-.175f,0,.175f,.35f};
+    auto centeredText = [&](const char* str,float cx,float y,float scale,
+                            const std::array<float,4>& color) {
+        const float px=.0040f*s*scale;
+        const float textWidth=static_cast<float>(std::min<size_t>(str?std::strlen(str):0,48))*px*6.0f;
+        text(str,cx-textWidth*.5f,y,scale,color);
+    };
+
+    // Premium, minimal header.
+    drawBox(pv,0,centerY+h*.405f,z+.00065f,w*.985f,h*.170f,.0007f,header);
+    drawBox(pv,-w*.457f,centerY+h*.405f,z+.00105f,w*.008f,h*.073f,.0007f,cyan);
+    drawBox(pv,-w*.444f,centerY+h*.405f,z+.00105f,w*.008f,h*.045f,.0007f,accent);
+    text("QUESTBRIDGE XR",-w*.420f,centerY+h*.421f,.63f,white);
+    text("SPATIAL CONTROL STUDIO",-w*.420f,centerY+h*.369f,.30f,secondary);
+    drawBox(pv,w*.365f,centerY+h*.405f,z+.0010f,w*.192f,h*.073f,.0008f,rgb(.035f,.075f,.125f));
+    drawBox(pv,w*.280f,centerY+h*.405f,z+.0014f,w*.006f,h*.030f,.0005f,cyan);
+    centeredText("XR READY",w*.365f,centerY+h*.405f,.39f,white);
+    drawBox(pv,0,centerY+h*.311f,z+.0010f,w*.94f,.0025f,.0005f,cardBorder);
+
+    // Horizontal navigation: the hit regions match the controller's existing five-tab map.
+    const char* tabs[]={"HOME","SCENES","DISPLAY","COMFORT","HELP"};
+    const float tabX[]={-.35f,-.175f,0.0f,.175f,.35f};
     for(int i=0;i<5;++i) {
         const bool selected=menuTab_==i;
-        drawBox(pv,tabX[i]*w,centerY+h*.19f,z+.015f,w*.155f,h*.105f,.006f,selected?accent:muted);
-        text(tabs[i],tabX[i]*w-w*.055f,centerY+h*.17f,.48f,white);
+        const float tx=tabX[i]*w;
+        drawBox(pv,tx,centerY+h*.215f,z+.0008f,w*.158f,h*.092f,.0008f,
+                selected?rgb(.045f,.095f,.185f):rgb(.026f,.041f,.075f));
+        if(selected) {
+            drawBox(pv,tx,centerY+h*.165f,z+.00135f,w*.112f,h*.0045f,.0006f,accent);
+            drawBox(pv,tx+w*.044f,centerY+h*.215f,z+.0014f,w*.006f,h*.026f,.0005f,cyan);
+        }
+        centeredText(tabs[i],tx,centerY+h*.215f,.39f,selected?white:secondary);
     }
-    const char* titles[]={"WELCOME BACK","ENVIRONMENTS","DISPLAY OUTPUT","COMFORT SETTINGS","QUICK HELP"};
-    const char* subtitles[]={"Choose an action","Explore 208 scenes","Choose where PC video appears","Adjust your play position","Left Menu button opens this menu"};
-    text(titles[menuTab_],-w*.02f,centerY+h*.04f,.68f,white);
-    text(subtitles[menuTab_],-w*.02f,centerY-h*.025f,.38f,rgb(.56f,.66f,.82f));
-    const char* labels[3][3]={{"CLOSE MENU","NEXT ENV","DISPLAY"},
-        {"PREVIOUS","NEXT ENV","HOME"},
-        {"MONITOR","TV","BOTH"}};
-    const char* comfort[]={"SIT / STAND","MOVE ROOM","CLOSE MENU"};
-    const char* help[]={"CLOSE MENU","NEXT ENV","DISPLAY"};
-    for(int i=0;i<3;++i) {
-        const float bx=(-.30f+.30f*i)*w;
-        const float by=centerY-h*.17f;
-        drawBox(pv,bx,by,z+.015f,w*.255f,h*.18f,.006f,muted);
-        const char* label=menuTab_==3?comfort[i]:menuTab_==4?help[i]:labels[menuTab_==2?2:menuTab_==1?1:0][i];
-        text(label,bx-w*.105f,by-h*.015f,.42f,white);
-    }
-    text("AIM WITH RIGHT CONTROLLER  -  TRIGGER TO SELECT",-.42f*w,centerY-h*.40f,.30f,rgb(.42f,.60f,1.0f));
-}
 
-XrPosef RoomRenderer::transformViewPose(const XrPosef& viewPose, const XrVector3f& headCenter) const {
-    // Never synthesize or rotate the real OpenXR eye pose. The compositor relies
-    // on this pose matching the headset's tracked view; virtual locomotion and
-    // turning are applied to the virtual world transform in renderEye instead.
-    (void)headCenter;
-    return viewPose;
+    const char* titles[]={"YOUR WORKSPACE","SCENE LIBRARY","DISPLAY OUTPUT","COMFORT SETTINGS","QUICK HELP"};
+    const char* subtitles[]={
+        "A calm space for your PC and apps",
+        "Explore 208 immersive environments",
+        "Choose where your PC video appears",
+        "Make the room work for your play style",
+        "Point with the right controller and press trigger"
+    };
+    text("CONTROL PANEL",-w*.425f,centerY+h*.117f,.31f,cyan);
+    text(titles[std::clamp(menuTab_,0,4)],-w*.425f,centerY+h*.068f,.78f,white);
+    text(subtitles[std::clamp(menuTab_,0,4)],-w*.425f,centerY+h*.014f,.36f,secondary);
+
+    std::string sceneName=kEnvironmentNames[std::clamp(activeEnvironmentIndex_,0,207)];
+    for(char& c:sceneName) if(c=='_') c=' ';
+    const char* destination=settings_.screenDestination=="tv"?"TV ONLY"
+        :(settings_.screenDestination=="both"?"MONITOR + TV":"MONITOR ONLY");
+    const char* rightLabel="VIDEO DESTINATION";
+    const char* rightValue=destination;
+    if(menuTab_==1) { rightLabel="LIBRARY STATUS"; rightValue="208 ENVIRONMENTS"; }
+    else if(menuTab_==2) { rightLabel="CURRENT OUTPUT"; rightValue=destination; }
+    else if(menuTab_==3) { rightLabel="PLAYER MODE"; rightValue=sitting_?"SEATED MODE":"STANDING MODE"; }
+    else if(menuTab_==4) { rightLabel="POINTER INPUT"; rightValue="RIGHT TRIGGER"; }
+    const float infoY=centerY-h*.052f;
+    const float infoH=h*.090f;
+    const float infoX[]={-w*.225f,w*.225f};
+    for(int i=0;i<2;++i) {
+        const float ix=infoX[i];
+        drawBox(pv,ix,infoY,z+.00075f,w*.433f,infoH,.0009f,cardBorder);
+        drawBox(pv,ix,infoY,z+.00115f,w*.428f,infoH-h*.007f,.0007f,card);
+    }
+    text(menuTab_==1?"SELECTED ENVIRONMENT":"CURRENT ENVIRONMENT",
+         -w*.425f,infoY+h*.017f,.29f,subdued);
+    text(sceneName.c_str(),-w*.425f,infoY-h*.020f,.43f,white);
+    text(rightLabel,w*.015f,infoY+h*.017f,.29f,subdued);
+    text(rightValue,w*.015f,infoY-h*.020f,.43f,white);
+
+    const char* actionLabels[5][3]={
+        {"CLOSE MENU","NEXT SCENE","DISPLAY SETUP"},
+        {"PREVIOUS SCENE","NEXT SCENE","BACK HOME"},
+        {"MONITOR ONLY","TV ONLY","MIRROR BOTH"},
+        {"SIT / STAND","RECENTER ROOM","CLOSE MENU"},
+        {"CLOSE MENU","NEXT SCENE","DISPLAY SETUP"}
+    };
+    const char* actionHints[5][3]={
+        {"Return to desktop","Browse environments","Choose video target"},
+        {"One step back","Explore the library","Return to overview"},
+        {"Use main monitor","Use room television","Duplicate the video"},
+        {"Toggle seated mode","Reset room position","Return to desktop"},
+        {"Return to desktop","Browse environments","Choose video target"}
+    };
+    const float buttonX[]={-.30f,0.0f,.30f};
+    const float buttonY=centerY-h*.175f;
+    const float buttonW=w*.275f, buttonH=h*.180f;
+    for(int i=0;i<3;++i) {
+        const float bx=buttonX[i]*w;
+        bool selected=false;
+        if(menuTab_==2) selected=(i==0&&settings_.screenDestination=="monitor")
+            ||(i==1&&settings_.screenDestination=="tv")
+            ||(i==2&&settings_.screenDestination=="both");
+        if(menuTab_==3&&i==0) selected=sitting_;
+        const auto border=selected?accent:cardBorder;
+        const auto fill=selected?rgb(.035f,.076f,.145f):card;
+        const auto icon=selected?cyan:accent;
+        drawBox(pv,bx,buttonY,z+.00085f,buttonW,buttonH,.0009f,border);
+        drawBox(pv,bx,buttonY,z+.00125f,buttonW-w*.006f,buttonH-h*.008f,.0007f,fill);
+        drawBox(pv,bx-buttonW*.5f+w*.012f,buttonY,z+.00165f,w*.006f,buttonH*.69f,.0005f,icon);
+
+        // Three clean vertical marks form a compact, consistent action icon.
+        drawBox(pv,bx-w*.094f,buttonY+h*.022f,z+.0017f,w*.010f,h*.034f,.0006f,icon);
+        drawBox(pv,bx-w*.078f,buttonY+h*.022f,z+.0017f,w*.010f,h*.047f,.0006f,icon);
+        drawBox(pv,bx-w*.062f,buttonY+h*.022f,z+.0017f,w*.010f,h*.025f,.0006f,icon);
+
+        text(actionLabels[std::clamp(menuTab_,0,4)][i],bx-w*.048f,buttonY+h*.016f,.37f,white);
+        text(actionHints[std::clamp(menuTab_,0,4)][i],bx-w*.048f,buttonY-h*.043f,.245f,
+             selected?rgb(.55f,.78f,1.0f):secondary);
+        if(selected) {
+            drawBox(pv,bx+buttonW*.37f,buttonY+buttonH*.30f,z+.0018f,
+                    w*.010f,h*.014f,.0006f,cyan);
+        }
+    }
+
+    drawBox(pv,0,centerY-h*.382f,z+.0010f,w*.94f,.0020f,.0005f,cardBorder);
+    centeredText("POINT AND TRIGGER TO SELECT  -  MENU BUTTON TO CLOSE",
+                 0.0f,centerY-h*.432f,.27f,subdued);
 }
 
 void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,
@@ -1426,7 +1579,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawBox(pv.data(),x,monitorCenterY,deskZ-0.05f,monitorW+0.05f,monitorH+0.05f,0.08f,rgb(.05f,.06f,.09f));
         if (menuOpen_ && i == monitorCount/2) {
             // Opaque menu replaces the PC image while open; closing it reveals the live stream.
-            drawControlMenu(pv.data(),monitorW,monitorH,monitorCenterY,deskZ+0.012f);
+            drawControlMenu(pv.data(),monitorW,monitorH,monitorCenterY,deskZ+0.0018f);
         } else {
             drawPlane(pv.data(),x,monitorCenterY,deskZ+0.001f,monitorW,monitorH,tex,rgb(1,1,1));
         }
@@ -1456,7 +1609,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             localDirection[1]/=localDirectionLength;
             localDirection[2]/=localDirectionLength;
         }
-        const float screenZ=deskZ+0.022f;
+        const float screenZ=deskZ+0.0037f;
         float hitT=-1.0f;
         if (std::fabs(localDirection[2])>0.0001f) {
             const float t=(screenZ-localOrigin[2])/localDirection[2];
@@ -1577,7 +1730,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 void RoomRenderer::release() {
     if(!initialized_&&!program_&&!vao_)return;
     if(program_)glDeleteProgram(program_);if(vignetteProgram_)glDeleteProgram(vignetteProgram_);if(vao_)glDeleteVertexArrays(1,&vao_);if(vbo_)glDeleteBuffers(1,&vbo_);
+    if(menuTextVao_)glDeleteVertexArrays(1,&menuTextVao_);if(menuTextVbo_)glDeleteBuffers(1,&menuTextVbo_);
     if(planeTexture_)glDeleteVertexArrays(1,&planeTexture_);if(cubeTexture_)glDeleteBuffers(1,&cubeTexture_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=0;environmentTextures_.fill(0);initialized_=false;
+    program_=vignetteProgram_=vao_=vbo_=menuTextVao_=menuTextVbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=0;environmentTextures_.fill(0);initialized_=false;
 }
