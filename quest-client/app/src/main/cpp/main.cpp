@@ -965,9 +965,13 @@ private:
         if (XR_FAILED(xrSyncActions(session_, &syncInfo))) return;
         const XrVector2f move = vector2Action(hands_[0].thumbstick, hands_[0].handPath);
         const XrVector2f turn = vector2Action(hands_[1].thumbstick, hands_[1].handPath);
+        const bool menuPressed = boolAction(hands_[0].menu, hands_[0].handPath);
+        if (menuPressed && !previousMenuPressed_) room_.toggleMenu();
+        previousMenuPressed_ = menuPressed;
         // Controller clicks no longer trigger room shortcuts.
         float moveX = applyDeadzone(std::clamp(config_.invertThumbstickX ? -move.x : move.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
-        float moveY = applyDeadzone(std::clamp(config_.invertThumbstickY ? -move.y : move.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
+        // OpenXR thumbstick +Y is forward, but this renderer maps forward to -Z. Keep the default mapping aligned with that convention; the config flag explicitly flips it back.
+        float moveY = applyDeadzone(std::clamp(config_.invertThumbstickY ? move.y : -move.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
         const float turnX = applyDeadzone(std::clamp(turn.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
         // Walking can be disabled independently; turning must remain available in either mode.
         if (!config_.roomMovementEnabled) { moveX = 0.0f; moveY = 0.0f; }
@@ -1170,6 +1174,7 @@ private:
     std::vector<XrCompositionLayerProjectionView> projectionViews_;
     GLuint framebuffer_ = 0;
     Clock::time_point lastTrackingSend_{};
+    bool previousMenuPressed_ = false;
 };
 
 } // namespace
