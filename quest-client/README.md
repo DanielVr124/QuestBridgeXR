@@ -43,6 +43,18 @@ incomplete_frame_timeout_ms=120
 
 `controller_pose` is `grip` or `aim`. `reference_space` is `local` or `stage`; STAGE is selected only if the active Quest OpenXR runtime reports it as supported. `brightness` is bounded to -0.5..0.5 and `contrast` to 0.25..2.5. Positions are scaled in the outgoing tracking telemetry, not in the local compositor's pose used to render the Quest app.
 
+## Quest room controls
+
+With the default room controls enabled:
+
+- **Left thumbstick:** walk around the room.
+- **Right thumbstick:** turn; snap-turn is enabled by default.
+- **Click the right thumbstick (R3):** cycle to the next environment. There are 208 scenes, so this currently advances one at a time and wraps around at the end.
+- **Click the left thumbstick (L3):** cycle the desktop display between the monitor, TV, and both.
+- **Press X on the left controller:** toggle the seated-height mode. Moving with the left thumbstick automatically stands you back up.
+
+If a control does not respond, check that `room_controls_enabled=true`, `room_movement_enabled=true`, and `sitting_toggle_enabled=true` are present in the active `config.ini`. Controller input forwarding and room navigation use the same OpenXR actions.
+
 ## Diagnostics
 
 Use `adb logcat -s QuestBridgeXR` to see OpenXR initialization, network connection, video configuration, and decoder messages. The client app running locally on Quest does not itself turn the Windows host into a PC OpenXR runtime. The Windows host can optionally forward accepted tracking/controller packets to `127.0.0.1:9945` for diagnostic/future runtime consumers; that feed is configured in the root JSON profile and is not used by a finished compositor yet.
