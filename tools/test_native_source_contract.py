@@ -21,8 +21,11 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("aurora", source)
         self.assertIn("cyberpunk", source)
         self.assertIn("createProceduralEnvironment(activeEnvironmentIndex_)", source)
-        self.assertIn("std::array<const char*, 208> kEnvironmentNames", source)
+        self.assertIn("std::array<const char*, 328> kEnvironmentNames", source)
         self.assertIn("environmentTextures_[activeEnvironmentIndex_]", source)
+        self.assertIn("renderExploreWorld", source)
+        self.assertIn("collidesWithInteriorGrid", source)
+        self.assertIn("ambience_.setEnvironment", source)
         catalog_start = source.index("kEnvironmentNames")
         catalog_end = source.index("};", catalog_start)
         native_catalog = source[catalog_start:catalog_end]
