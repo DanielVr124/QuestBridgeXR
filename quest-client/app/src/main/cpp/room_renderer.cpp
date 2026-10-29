@@ -1059,9 +1059,11 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     if(dt<0.0f||dt>0.1f)dt=0.0f;
     // Pushing the left stick stands up automatically; the virtual seat is not a locked animation state.
     if(sitting_ && (std::fabs(leftX)>0.22f || std::fabs(leftY)>0.22f)) sitting_=false;
-    const float yaw=headYaw(headPose)+virtualYaw_;
+    // Keep locomotion aligned to the virtual room's forward axis, not the headset's
+    // instantaneous yaw. Turning the head to look around should not redirect movement.
+    const float yaw=virtualYaw_;
     const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
-    // Left stick uses head-relative direction; reverse sign because forward is -Z in OpenXR.
+    // Left stick uses room-relative direction; reverse sign because forward is -Z in OpenXR.
     const float forwardX=std::sin(yaw), forwardZ=-std::cos(yaw);
     const float rightX=std::cos(yaw), rightZ=std::sin(yaw);
     const float oldMoveX = moveX_, oldMoveZ = moveZ_;
