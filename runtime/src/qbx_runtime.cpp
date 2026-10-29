@@ -182,6 +182,8 @@ void PumpTrackingFeed() {
     }
 }
 
+} // namespace — close helpers; define the OpenXR opaque handles in global namespace.
+
 struct XrInstance_T;
 struct XrSession_T;
 struct XrSpace_T;
@@ -269,6 +271,8 @@ struct XrAction_T {
     std::vector<XrPath> bindings;
     std::array<ActionStateCache, 2> cached{};
 };
+
+namespace {
 
 XrPath StringToPathInternal(XrInstance_T* instance, const char* text) {
     if (!instance || !text || text[0] != '/') return XR_NULL_PATH;
@@ -676,7 +680,7 @@ XrResult XRAPI_CALL qbxGetInstanceProcAddr(XrInstance instanceHandle, const char
 }
 #undef QBX_ENTRY
 
-XrResult XRAPI_CALL qbxEnumerateInstanceVersion(uint32_t* version) {
+XrResult XRAPI_CALL qbxEnumerateInstanceVersion(XrVersion* version) {
     if (!version) return XR_ERROR_VALIDATION_FAILURE;
     *version = XR_MAKE_VERSION(1, 0, 0);
     return XR_SUCCESS;
@@ -690,7 +694,7 @@ XrResult XRAPI_CALL qbxEnumerateInstanceExtensionProperties(const char* layerNam
     if (!props) return XR_ERROR_VALIDATION_FAILURE;
     if (capacity < 1) return XR_ERROR_SIZE_INSUFFICIENT;
     if (props[0].type != XR_TYPE_EXTENSION_PROPERTIES) return XR_ERROR_VALIDATION_FAILURE;
-    props[0].extensionVersion = XR_KHR_D3D11_ENABLE_SPEC_VERSION;
+    props[0].extensionVersion = XR_KHR_D3D11_enable_SPEC_VERSION;
     std::strncpy(props[0].extensionName, XR_KHR_D3D11_ENABLE_EXTENSION_NAME, XR_MAX_EXTENSION_NAME_SIZE - 1);
     props[0].extensionName[XR_MAX_EXTENSION_NAME_SIZE - 1] = '\0';
     return XR_SUCCESS;
@@ -777,7 +781,7 @@ XrResult XRAPI_CALL qbxCreateSession(XrInstance instHandle, const XrSessionCreat
     if (!binding || !binding->device || binding->device->GetFeatureLevel() < D3D_FEATURE_LEVEL_11_0) return XR_ERROR_GRAPHICS_DEVICE_INVALID;
     auto session = std::make_unique<XrSession_T>(); session->instance = inst; session->device = binding->device;
     session->device->GetImmediateContext(&session->context);
-    ComPtr<ID3D11Multithread> mt; if (SUCCEEDED(session->context.As(&mt))) mt->SetMultithreadProtected(TRUE);
+    
     auto* ptr = session.release(); inst->sessions.push_back(reinterpret_cast<XrSession>(ptr));
     StartTrackingFeed(); QueueSessionState(ptr, XR_SESSION_STATE_READY);
     *output = reinterpret_cast<XrSession>(ptr); return XR_SUCCESS;
@@ -930,7 +934,7 @@ XrResult XRAPI_CALL qbxEnumerateSwapchainImages(XrSwapchain handle, uint32_t cap
     if (cap == 0) return XR_SUCCESS; if (!out) return XR_ERROR_VALIDATION_FAILURE; if (cap < sc->images.size()) return XR_ERROR_SIZE_INSUFFICIENT;
     for (uint32_t i = 0; i < sc->images.size(); ++i) {
         if (out[i].type != XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR) return XR_ERROR_VALIDATION_FAILURE;
-        auto* d3d = reinterpret_cast<XrSwapchainImageD3D11KHR*>(&out[i]); d3d->image = sc->images[i].Get();
+        auto* d3d = reinterpret_cast<XrSwapchainImageD3D11KHR*>(&out[i]); d3d->texture = sc->images[i].Get();
     }
     return XR_SUCCESS;
 }
@@ -1190,7 +1194,7 @@ XrResult XRAPI_CALL qbxStopHapticFeedback(XrSession handle, const XrHapticAction
 }
 XrResult XRAPI_CALL qbxGetD3D11GraphicsRequirementsKHR(XrInstance handle, XrSystemId id, XrGraphicsRequirementsD3D11KHR* req) {
     auto* i = AsInstance(handle); if (!i || id != 1 || !req || req->type != XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR) return XR_ERROR_VALIDATION_FAILURE;
-    req->minFeatureLevel = D3D_FEATURE_LEVEL_11_0; req->maxFeatureLevel = D3D_FEATURE_LEVEL_11_1;
+    req->minFeatureLevel = D3D_FEATURE_LEVEL_11_0;
     ComPtr<IDXGIFactory1> factory; ComPtr<IDXGIAdapter1> adapter;
     if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))) && SUCCEEDED(factory->EnumAdapters1(0, &adapter))) {
         DXGI_ADAPTER_DESC1 desc{}; if (SUCCEEDED(adapter->GetDesc1(&desc))) req->adapterLuid = desc.AdapterLuid;
