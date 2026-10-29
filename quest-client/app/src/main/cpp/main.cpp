@@ -968,11 +968,19 @@ private:
         const bool menuPressed = boolAction(hands_[0].menu, hands_[0].handPath);
         if (menuPressed && !previousMenuPressed_) room_.toggleMenu();
         previousMenuPressed_ = menuPressed;
-        // Controller clicks no longer trigger room shortcuts.
+        const bool menuSelectPressed = boolAction(hands_[0].primary, hands_[0].handPath);
+        const bool menuSelectEdge = menuSelectPressed && !previousMenuSelectPressed_;
+        previousMenuSelectPressed_ = menuSelectPressed;
+        // OpenXR thumbstick +Y is forward. The room renderer treats positive Y as forward (-Z),
+        // so preserve that sign unless the user explicitly enables inversion.
         float moveX = applyDeadzone(std::clamp(config_.invertThumbstickX ? -move.x : move.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
-        // OpenXR thumbstick +Y is forward, but this renderer maps forward to -Z. Keep the default mapping aligned with that convention; the config flag explicitly flips it back.
-        float moveY = applyDeadzone(std::clamp(config_.invertThumbstickY ? move.y : -move.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
+        float moveY = applyDeadzone(std::clamp(config_.invertThumbstickY ? -move.y : move.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
         const float turnX = applyDeadzone(std::clamp(turn.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
+        if (room_.menuVisible()) {
+            room_.handleMenuInput(move.y, menuSelectEdge);
+            moveX = 0.0f;
+            moveY = 0.0f;
+        }
         // Walking can be disabled independently; turning must remain available in either mode.
         if (!config_.roomMovementEnabled) { moveX = 0.0f; moveY = 0.0f; }
         room_.updateLocomotion(moveX, moveY, turnX, dt, headPose);
@@ -1175,6 +1183,7 @@ private:
     GLuint framebuffer_ = 0;
     Clock::time_point lastTrackingSend_{};
     bool previousMenuPressed_ = false;
+    bool previousMenuSelectPressed_ = false;
 };
 
 } // namespace
