@@ -1133,14 +1133,43 @@ void RoomRenderer::drawText(const float* pv, const char* text, float x, float y,
         default: return std::array<uint8_t,7>{0,0,0,0,0,0,0};
         }
     };
+    std::vector<Vertex> vertices;
+    vertices.reserve(std::strlen(text) * 30u * 6u);
+    auto addVertex = [&](float px, float py) { vertices.push_back({px, py, z, 0.0f, 0.0f}); };
     for (int index = 0; text[index] != '\0'; ++index) {
         const auto rows = glyph(static_cast<char>(std::toupper(static_cast<unsigned char>(text[index]))));
         for (int row = 0; row < 7; ++row) for (int col = 0; col < 5; ++col) {
             if ((rows[row] & (1u << (4 - col))) == 0) continue;
-            drawBox(pv, x + static_cast<float>(index) * pixelSize * 6.0f + col * pixelSize,
-                    y - row * pixelSize, z, pixelSize * 0.78f, pixelSize * 0.78f, 0.002f, color);
+            const float x0 = x + static_cast<float>(index) * pixelSize * 6.0f + col * pixelSize;
+            const float y0 = y - row * pixelSize;
+            const float x1 = x0 + pixelSize * 0.78f;
+            const float y1 = y0 - pixelSize * 0.78f;
+            addVertex(x0,y0); addVertex(x1,y0); addVertex(x1,y1);
+            addVertex(x0,y0); addVertex(x1,y1); addVertex(x0,y1);
         }
     }
+    if (vertices.empty()) return;
+    if (!textVao_) {
+        glGenVertexArrays(1, &textVao_);
+        glGenBuffers(1, &textVbo_);
+        glBindVertexArray(textVao_);
+        glBindBuffer(GL_ARRAY_BUFFER, textVbo_);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                              reinterpret_cast<void*>(3 * sizeof(float)));
+        glBindVertexArray(0);
+    }
+    glUniformMatrix4fv(locMvp_, 1, GL_FALSE, pv);
+    glUniform4fv(locColor_, 1, color.data());
+    glUniform1i(locTextured_, 0);
+    glBindVertexArray(textVao_);
+    glBindBuffer(GL_ARRAY_BUFFER, textVbo_);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertices.size()));
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color) {
@@ -1499,7 +1528,8 @@ void RoomRenderer::release() {
     if(!initialized_&&!program_&&!vao_)return;
     if(program_)glDeleteProgram(program_);if(vignetteProgram_)glDeleteProgram(vignetteProgram_);if(vao_)glDeleteVertexArrays(1,&vao_);if(vbo_)glDeleteBuffers(1,&vbo_);
     if(planeTexture_)glDeleteVertexArrays(1,&planeTexture_);if(cubeTexture_)glDeleteBuffers(1,&cubeTexture_);
+    if(textVao_)glDeleteVertexArrays(1,&textVao_);if(textVbo_)glDeleteBuffers(1,&textVbo_);
     if(sphereVao_)glDeleteVertexArrays(1,&sphereVao_);if(sphereVbo_)glDeleteBuffers(1,&sphereVbo_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=sphereVao_=sphereVbo_=0;sphereVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=0;sphereVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
