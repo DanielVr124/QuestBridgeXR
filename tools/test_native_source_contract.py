@@ -15,11 +15,11 @@ class NativeSourceContractTests(unittest.TestCase):
         source = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
         for env in ("blossom", "night_city", "golden_city"):
             with self.subTest(environment=env):
-                self.assertIn(env, header)
+                self.assertIn(env, source)
                 self.assertIn(f"environments/{env}.rgb", source)
         self.assertIn("void toggleSitting(const XrPosef& headPose)", header)
-        self.assertIn("aurora", header)
-        self.assertIn("cyberpunk", header)
+        self.assertIn("aurora", source)
+        self.assertIn("cyberpunk", source)
         self.assertIn("createProceduralEnvironment(activeEnvironmentIndex_)", source)
         self.assertIn("std::array<const char*, 28> kEnvironmentNames", source)
         self.assertIn("environmentTextures_[activeEnvironmentIndex_]", source)
