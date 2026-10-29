@@ -1,0 +1,75 @@
+name: Import source archive and start builds
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'QuestBridgeXR-v0.8.1-verified-source.zip'
+      - 'QuestBridgeXR-v0.8.1-source.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  import-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Extract and validate QuestBridge XR source
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=""
+          for candidate in QuestBridgeXR-v0.8.1-verified-source.zip QuestBridgeXR-v0.8.1-source.zip; do
+            if [ -f "$candidate" ]; then archive="$candidate"; break; fi
+          done
+          if [ -z "$archive" ]; then
+            echo "Upload QuestBridgeXR-v0.8.1-verified-source.zip (or QuestBridgeXR-v0.8.1-source.zip) to the repository root first."
+            exit 1
+          fi
+          python3 - "$archive" <<'PY'
+          import pathlib, sys, zipfile
+          archive = pathlib.Path(sys.argv[1])
+          with zipfile.ZipFile(archive) as z:
+              bad = z.testzip()
+              if bad:
+                  raise SystemExit(f"Corrupt ZIP member: {bad}")
+              names = z.namelist()
+              if not any(n.startswith("QuestBridgeXR/.github/workflows/build-release.yml") for n in names):
+                  raise SystemExit("Archive is missing QuestBridgeXR/.github/workflows/build-release.yml")
+              if not any(n.startswith("QuestBridgeXR/runtime/src/qbx_runtime.cpp") for n in names):
+                  raise SystemExit("Archive is missing the native runtime source")
+              z.extractall("/tmp/qbx-extract")
+          PY
+          if [ ! -d /tmp/qbx-extract/QuestBridgeXR ]; then
+            echo "Expected top-level QuestBridgeXR/ directory not found in archive."
+            exit 1
+          fi
+          rsync -a --exclude='.git/' /tmp/qbx-extract/QuestBridgeXR/ ./
+          rm -f "$archive"
+          test -s .github/workflows/build-release.yml
+          test -s runtime/src/qbx_runtime.cpp
+          test -s quest-client/app/src/main/cpp/main.cpp
+
+      - name: Commit imported source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No source changes to commit."
+          else
+            git commit -m "Import QuestBridge XR source tree"
+            git push origin HEAD:main
+          fi
+
+      - name: Start Windows and Quest builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build-release.yml --repo "${GITHUB_REPOSITORY}" --ref main
