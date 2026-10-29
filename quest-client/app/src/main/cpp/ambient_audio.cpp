@@ -41,11 +41,11 @@ bool AmbientAudio::initialize(bool enabled) {
     if ((*queue_)->RegisterCallback(queue_, queueCallback, this) != SL_RESULT_SUCCESS) { shutdown(); return false; }
     for (unsigned int i=0;i<buffers_.size();++i) {
         renderBuffer(buffers_[i]);
-        if ((*queue_)->Enqueue(queue_, buffers_[i].data(), sizeof(buffers_[i])) != SL_RESULT_SUCCESS) { shutdown(); return false; }
+        if ((*queue_)->Enqueue(queue_, buffers_[i].data(), buffers_[i].size() * sizeof(int16_t)) != SL_RESULT_SUCCESS) { shutdown(); return false; }
     }
     nextBuffer_ = 0;
+    initialized_ = true; // The queue callback must be allowed to refill the queue as soon as playback starts.
     if ((*play_)->SetPlayState(play_, SL_PLAYSTATE_PLAYING) != SL_RESULT_SUCCESS) { shutdown(); return false; }
-    initialized_ = true;
     return true;
 }
 
@@ -99,7 +99,7 @@ void AmbientAudio::fillNextBuffer() {
     auto& buffer = buffers_[nextBuffer_ % buffers_.size()];
     nextBuffer_ = (nextBuffer_ + 1U) % static_cast<unsigned int>(buffers_.size());
     renderBuffer(buffer);
-    (*queue_)->Enqueue(queue_, buffer.data(), sizeof(buffer));
+    (*queue_)->Enqueue(queue_, buffer.data(), buffer.size() * sizeof(int16_t));
 }
 
 void AmbientAudio::renderBuffer(std::array<int16_t, 4096>& buffer) {
