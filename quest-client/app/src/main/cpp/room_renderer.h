@@ -87,6 +87,8 @@ private:
     bool initialized_ = false;
     float moveX_ = 0.0f;
     float moveZ_ = 0.0f;
+    float velocityX_ = 0.0f;
+    float velocityZ_ = 0.0f;
     float virtualYaw_ = 0.0f;
     float snapCooldown_ = 0.0f;
     bool previousTurnRight_ = false;
