@@ -52,6 +52,8 @@ private:
     void drawBox(const float* projectionView, float x, float y, float z,
                  float sx, float sy, float sz, const std::array<float, 4>& color,
                  float yaw = 0.0f);
+    void drawSphere(const float* projectionView, float x, float y, float z,
+                    float sx, float sy, float sz, const std::array<float, 4>& color);
     void drawPlane(const float* projectionView, float x, float y, float z,
                    float sx, float sy, GLuint texture, const std::array<float, 4>& color,
                    float yaw = 0.0f);
@@ -63,6 +65,9 @@ private:
     GLuint vignetteProgram_ = 0;
     GLuint vao_ = 0;
     GLuint vbo_ = 0;
+    GLuint sphereVao_ = 0;
+    GLuint sphereVbo_ = 0;
+    GLsizei sphereVertexCount_ = 0;
     GLint locMvp_ = -1;
     GLint locColor_ = -1;
     GLint locTexture_ = -1;
