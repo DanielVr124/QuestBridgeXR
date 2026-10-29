@@ -1055,6 +1055,16 @@ private:
         }
     }
 
+    void traceRenderStage(const char* stage, bool entering) {
+        // Trace the first frames in detail so a device log shows the exact native call
+        // that stopped returning, without flooding logcat during normal use.
+        if (renderFrameCount_ <= 5 || renderFrameCount_ % 300 == 1) {
+            LOGI("XRTRACE frame=%llu %s %s",
+                 static_cast<unsigned long long>(renderFrameCount_),
+                 entering ? "ENTER" : "EXIT", stage);
+        }
+    }
+
     void renderFrame() {
         ++renderFrameCount_;
         if (renderFrameCount_ % 300 == 1) {
@@ -1063,9 +1073,15 @@ private:
         }
         XrFrameWaitInfo waitInfo{XR_TYPE_FRAME_WAIT_INFO};
         XrFrameState frameState{XR_TYPE_FRAME_STATE};
-        if (!xrOk(xrWaitFrame(session_, &waitInfo, &frameState), "xrWaitFrame")) { usleep(10000); return; }
+        traceRenderStage("xrWaitFrame", true);
+        const XrResult waitFrameResult = xrWaitFrame(session_, &waitInfo, &frameState);
+        traceRenderStage("xrWaitFrame", false);
+        if (!xrOk(waitFrameResult, "xrWaitFrame")) { usleep(10000); return; }
         XrFrameBeginInfo beginInfo{XR_TYPE_FRAME_BEGIN_INFO};
-        if (!xrOk(xrBeginFrame(session_, &beginInfo), "xrBeginFrame")) { usleep(10000); return; }
+        traceRenderStage("xrBeginFrame", true);
+        const XrResult beginFrameResult = xrBeginFrame(session_, &beginInfo);
+        traceRenderStage("xrBeginFrame", false);
+        if (!xrOk(beginFrameResult, "xrBeginFrame")) { usleep(10000); return; }
 
         bool layerReady = false;
         if (frameState.shouldRender) {
@@ -1075,8 +1091,10 @@ private:
             locateInfo.displayTime = frameState.predictedDisplayTime;
             locateInfo.space = space_;
             uint32_t viewCount = 0;
+            traceRenderStage("xrLocateViews", true);
             const XrResult located = xrLocateViews(session_, &locateInfo, &viewState,
                                                    static_cast<uint32_t>(views_.size()), &viewCount, views_.data());
+            traceRenderStage("xrLocateViews", false);
             if (XR_SUCCEEDED(located) && viewCount == views_.size()) {
                 sendTracking(frameState.predictedDisplayTime);
                 video_.pumpOutput();
@@ -1085,7 +1103,9 @@ private:
                     auto& sc = swapchains_[eye];
                     if (!sc.imageAcquired) {
                         XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+                        traceRenderStage(eye == 0 ? "xrAcquireSwapchainImage(left)" : "xrAcquireSwapchainImage(right)", true);
                         const XrResult acquireResult = xrAcquireSwapchainImage(sc.handle, &acquireInfo, &sc.acquiredImageIndex);
+                        traceRenderStage(eye == 0 ? "xrAcquireSwapchainImage(left)" : "xrAcquireSwapchainImage(right)", false);
                         if (XR_FAILED(acquireResult)) {
                             LOGE("xrAcquireSwapchainImage failed for eye %u: %d", eye, static_cast<int>(acquireResult));
                             allEyesRendered = false;
@@ -1100,7 +1120,9 @@ private:
                         // Never let a compositor stall block the Android app thread indefinitely.
                         // On timeout, retain the acquired image and retry on a later frame.
                         waitSwapInfo.timeout = 100'000'000; // 100 ms in nanoseconds
+                        traceRenderStage(eye == 0 ? "xrWaitSwapchainImage(left)" : "xrWaitSwapchainImage(right)", true);
                         const XrResult waitImageResult = xrWaitSwapchainImage(sc.handle, &waitSwapInfo);
+                        traceRenderStage(eye == 0 ? "xrWaitSwapchainImage(left)" : "xrWaitSwapchainImage(right)", false);
                         if (waitImageResult == XR_TIMEOUT_EXPIRED) {
                             if (renderFrameCount_ % 60 == 1) {
                                 LOGW("xrWaitSwapchainImage timed out for eye %u; will retry next frame", eye);
@@ -1116,7 +1138,9 @@ private:
                         }
                         sc.imageWaited = true;
                     }
+                    traceRenderStage(eye == 0 ? "renderEyeTexture(left)" : "renderEyeTexture(right)", true);
                     const GLuint desktopTexture = video_.renderEyeTexture(static_cast<int>(eye), 1024, 576);
+                    traceRenderStage(eye == 0 ? "renderEyeTexture(left)" : "renderEyeTexture(right)", false);
                     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
                     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
                                            sc.images[imageIndex].image, 0);
@@ -1131,11 +1155,15 @@ private:
                     const float shade = eye == 0 ? 0.035f : 0.055f;
                     glClearColor(shade, shade, shade + 0.025f, 1.0f);
                     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                    traceRenderStage(eye == 0 ? "room.renderEye(left)" : "room.renderEye(right)", true);
                     room_.renderEye(static_cast<int>(eye), static_cast<int>(sc.width), static_cast<int>(sc.height),
                                     views_[eye], desktopTexture, video_.hasFrame());
+                    traceRenderStage(eye == 0 ? "room.renderEye(left)" : "room.renderEye(right)", false);
                     glBindFramebuffer(GL_FRAMEBUFFER, 0);
                     XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+                    traceRenderStage(eye == 0 ? "xrReleaseSwapchainImage(left)" : "xrReleaseSwapchainImage(right)", true);
                     const XrResult releaseResult = xrReleaseSwapchainImage(sc.handle, &releaseInfo);
+                    traceRenderStage(eye == 0 ? "xrReleaseSwapchainImage(left)" : "xrReleaseSwapchainImage(right)", false);
                     if (XR_FAILED(releaseResult)) {
                         LOGE("xrReleaseSwapchainImage failed for eye %u: %d; retaining image state for retry",
                              eye, static_cast<int>(releaseResult));
@@ -1176,7 +1204,9 @@ private:
             endInfo.layerCount = 1;
             endInfo.layers = layers;
         }
+        traceRenderStage("xrEndFrame", true);
         const XrResult endResult = xrEndFrame(session_, &endInfo);
+        traceRenderStage("xrEndFrame", false);
         if (XR_FAILED(endResult)) {
             LOGE("xrEndFrame failed: %d (layerReady=%s)", static_cast<int>(endResult), layerReady ? "yes" : "no");
         } else if (!layerReady && renderFrameCount_ % 60 == 1) {
