@@ -17,7 +17,8 @@
 
 namespace {
 constexpr float kPi = 3.14159265358979323846f;
-constexpr std::array<const char*, 88> kEnvironmentNames = {
+constexpr std::array<const char*, 208> kEnvironmentNames = {
+
 
     "blossom",
     "night_city",
@@ -107,6 +108,126 @@ constexpr std::array<const char*, 88> kEnvironmentNames = {
     "vaporwave_dream",
     "synthwave_highway",
     "crystal_forest",
+    "dreamcore_meadow",
+    "dreamcore_cloud_room",
+    "endless_hallway",
+    "liminal_poolrooms",
+    "empty_mall_after_hours",
+    "pastel_playground",
+    "quiet_school_hallway",
+    "soft_dreamscape",
+    "cozy_cabin_snowfall",
+    "rainy_cafe_window",
+    "fireplace_reading_nook",
+    "warm_attic",
+    "cottagecore_kitchen",
+    "blanket_fort",
+    "soft_lighting_bedroom",
+    "quiet_bookshop",
+    "cloud_sea_overlook",
+    "quiet_lake_dock",
+    "moonlit_garden",
+    "misty_waterfall",
+    "sunlit_forest_glade",
+    "lavender_cottage",
+    "meadow_stargazing",
+    "rainy_japanese_garden",
+    "fairy_village",
+    "mushroom_forest",
+    "floating_castle",
+    "starlight_garden",
+    "unicorn_valley",
+    "enchanted_library",
+    "fairy_lantern_path",
+    "celestial_temple",
+    "underwater_palace",
+    "sky_island_city",
+    "cloud_kingdom",
+    "crystal_lake",
+    "rainbow_waterfall",
+    "moon_base_garden",
+    "ancient_ruins",
+    "celestial_ocean",
+    "snow_globe_village",
+    "autumn_cabin",
+    "spring_rain_garden",
+    "summer_lakeside",
+    "christmas_market",
+    "lantern_river",
+    "harvest_festival",
+    "snowy_pine_retreat",
+    "gentle_rain_rooftop",
+    "foggy_seaside",
+    "thunderstorm_shelter",
+    "dawn_mountains",
+    "blue_hour_city",
+    "golden_sunrise_forest",
+    "quiet_snowfall",
+    "cloud_shadow_valley",
+    "kyoto_garden",
+    "tokyo_rainy_alley",
+    "japanese_onsen",
+    "bamboo_temple",
+    "seaside_ryokan",
+    "cherry_blossom_river",
+    "lantern_town",
+    "mount_fuji_sunrise",
+    "aquarium_dream",
+    "coral_at_night",
+    "jellyfish_lagoon",
+    "tropical_shoreline",
+    "sea_cave",
+    "underwater_ruins",
+    "moonlit_beach",
+    "coastal_lighthouse",
+    "ringed_planet",
+    "nebula_clouds",
+    "orbital_observatory",
+    "mars_dusk",
+    "alien_ocean",
+    "moonlit_craters",
+    "stellar_nursery",
+    "wormhole_sky",
+    "pastel_rainbow_hills",
+    "candy_clouds",
+    "toyland_sunset",
+    "pastel_city",
+    "bubble_garden",
+    "cotton_candy_sky",
+    "rainbow_valley",
+    "fantasy_boardwalk",
+    "night_rooftop_garden",
+    "minimalist_penthouse",
+    "skyscraper_sunrise",
+    "quiet_cafe_street",
+    "neon_arcade_district",
+    "balcony_rain",
+    "city_park_evening",
+    "riverside_citywalk",
+    "giant_moon_field",
+    "floating_staircase",
+    "infinite_mirror_lake",
+    "hallway_to_clouds",
+    "impossible_staircase_sky",
+    "doorway_in_meadow",
+    "upside_down_garden",
+    "clockwork_dream",
+    "meditation_garden",
+    "zen_sand_garden",
+    "secluded_hot_springs",
+    "pine_forest_retreat",
+    "quiet_riverbank",
+    "mountain_morning_mist",
+    "seaside_meditation",
+    "candlelit_sanctuary",
+    "obsidian_citadel",
+    "moonstone_cavern",
+    "glowing_spore_forest",
+    "starfall_valley",
+    "celestial_garden",
+    "ancient_sky_ruins",
+    "midnight_blossom_grove",
+    "aurora_lagoon",
 };
 
 
@@ -119,7 +240,9 @@ struct EnvironmentPalette {
 
 EnvironmentPalette extraEnvironmentPalette(int extraIndex) {
     EnvironmentPalette p{};
-    switch (extraIndex / 8) {
+    // Keep the original groups and align each new environment pack at 8 scenes.
+    const int paletteGroup = extraIndex < 60 ? extraIndex / 8 : 8 + (extraIndex - 60) / 8;
+    switch (paletteGroup) {
     case 0: p.skyTop={10,13,39}; p.skyHorizon={70,69,136}; p.ground={8,18,39}; p.horizon=0.82f; break;
     case 1: p.skyTop={20,58,49}; p.skyHorizon={105,162,119}; p.ground={18,58,41}; p.horizon=0.70f; break;
     case 2: p.skyTop={8,54,76}; p.skyHorizon={75,175,190}; p.ground={5,75,95}; p.horizon=0.68f; break;
@@ -127,20 +250,36 @@ EnvironmentPalette extraEnvironmentPalette(int extraIndex) {
     case 4: p.skyTop={13,10,49}; p.skyHorizon={78,56,132}; p.ground={22,18,64}; p.horizon=0.84f; break;
     case 5: p.skyTop={66,31,25}; p.skyHorizon={210,119,66}; p.ground={124,72,43}; p.horizon=0.69f; break;
     case 6: p.skyTop={73,68,119}; p.skyHorizon={205,157,166}; p.ground={101,93,120}; p.horizon=0.66f; break;
+    case 8: p.skyTop={91,83,142}; p.skyHorizon={206,177,225}; p.ground={136,124,175}; p.horizon=0.72f; break;
+    case 9: p.skyTop={53,49,71}; p.skyHorizon={198,142,115}; p.ground={84,67,73}; p.horizon=0.74f; break;
+    case 10: p.skyTop={39,88,109}; p.skyHorizon={172,207,176}; p.ground={65,131,102}; p.horizon=0.64f; break;
+    case 11: p.skyTop={28,17,62}; p.skyHorizon={132,102,185}; p.ground={55,61,106}; p.horizon=0.72f; break;
+    case 12: p.skyTop={18,28,82}; p.skyHorizon={84,139,198}; p.ground={28,77,111}; p.horizon=0.68f; break;
+    case 13: p.skyTop={99,80,105}; p.skyHorizon={235,170,139}; p.ground={112,97,87}; p.horizon=0.65f; break;
+    case 14: p.skyTop={42,63,80}; p.skyHorizon={148,165,175}; p.ground={61,84,98}; p.horizon=0.72f; break;
+    case 15: p.skyTop={19,43,75}; p.skyHorizon={159,144,170}; p.ground={67,92,102}; p.horizon=0.68f; break;
+    case 16: p.skyTop={2,38,63}; p.skyHorizon={17,136,163}; p.ground={2,62,83}; p.horizon=0.72f; break;
+    case 17: p.skyTop={3,3,28}; p.skyHorizon={48,25,90}; p.ground={12,14,41}; p.horizon=0.86f; break;
+    case 18: p.skyTop={188,169,235}; p.skyHorizon={255,197,217}; p.ground={149,121,184}; p.horizon=0.65f; break;
+    case 19: p.skyTop={18,26,53}; p.skyHorizon={87,106,152}; p.ground={23,34,56}; p.horizon=0.82f; break;
+    case 20: p.skyTop={51,48,92}; p.skyHorizon={176,168,211}; p.ground={103,121,164}; p.horizon=0.75f; break;
+    case 21: p.skyTop={46,79,78}; p.skyHorizon={176,194,166}; p.ground={84,119,96}; p.horizon=0.64f; break;
+    case 22: p.skyTop={10,20,52}; p.skyHorizon={75,81,147}; p.ground={19,42,78}; p.horizon=0.82f; break;
     default: p.skyTop={19,12,62}; p.skyHorizon={151,73,158}; p.ground={20,26,78}; p.horizon=0.81f; break;
     }
-    const float variant = static_cast<float>(extraIndex % 8);
+    const int variantIndex = extraIndex < 60 ? extraIndex % 8 : (extraIndex - 60) % 8;
+    const float variant = static_cast<float>(variantIndex);
     const float shift = (variant - 3.5f) * 3.5f;
     p.skyTop[0] = std::clamp(p.skyTop[0] + shift, 0.0f, 255.0f);
-    p.skyTop[1] = std::clamp(p.skyTop[1] + (static_cast<int>(variant) % 3 - 1) * 7.0f, 0.0f, 255.0f);
+    p.skyTop[1] = std::clamp(p.skyTop[1] + (variantIndex % 3 - 1) * 7.0f, 0.0f, 255.0f);
     p.skyTop[2] = std::clamp(p.skyTop[2] - shift * 0.35f, 0.0f, 255.0f);
     p.skyHorizon[0] = std::clamp(p.skyHorizon[0] + shift * 1.5f, 0.0f, 255.0f);
-    p.skyHorizon[1] = std::clamp(p.skyHorizon[1] + (static_cast<int>(variant) % 4 - 1) * 5.0f, 0.0f, 255.0f);
+    p.skyHorizon[1] = std::clamp(p.skyHorizon[1] + (variantIndex % 4 - 1) * 5.0f, 0.0f, 255.0f);
     p.skyHorizon[2] = std::clamp(p.skyHorizon[2] - shift * 0.5f, 0.0f, 255.0f);
     p.ground[0] = std::clamp(p.ground[0] + shift * 0.8f, 0.0f, 255.0f);
-    p.ground[1] = std::clamp(p.ground[1] + (static_cast<int>(variant) % 3 - 1) * 5.0f, 0.0f, 255.0f);
+    p.ground[1] = std::clamp(p.ground[1] + (variantIndex % 3 - 1) * 5.0f, 0.0f, 255.0f);
     p.ground[2] = std::clamp(p.ground[2] - shift * 0.25f, 0.0f, 255.0f);
-    p.horizon = std::clamp(p.horizon + (static_cast<int>(variant) % 5 - 2) * 0.008f, 0.58f, 0.92f);
+    p.horizon = std::clamp(p.horizon + (variantIndex % 5 - 2) * 0.008f, 0.58f, 0.92f);
     return p;
 }
 
@@ -319,29 +458,48 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
         horizon = palette.horizon;
     }
 
+    const int addedPack = sceneIndex >= 88 ? (sceneIndex - 88) / 8 : -1;
     const bool city = sceneIndex == 4 || sceneIndex == 17 || sceneIndex == 18 ||
-                      (sceneIndex >= 28 && sceneIndex <= 35);
+                      (sceneIndex >= 28 && sceneIndex <= 35) || addedPack == 11;
     const bool water = sceneIndex == 5 || sceneIndex == 9 || sceneIndex == 13 ||
                        sceneIndex == 15 || sceneIndex == 20 ||
-                       (sceneIndex >= 44 && sceneIndex <= 51) || sceneIndex == 68;
+                       (sceneIndex >= 44 && sceneIndex <= 51) || sceneIndex == 68 ||
+                       sceneIndex == 91 || sceneIndex == 104 || sceneIndex == 105 || sceneIndex == 107 || sceneIndex == 111 ||
+                       (sceneIndex >= 152 && sceneIndex <= 159) || sceneIndex == 133 ||
+                       sceneIndex == 196 || sceneIndex == 198 || sceneIndex == 207;
     const bool forest = sceneIndex == 7 || sceneIndex == 14 || sceneIndex == 15 ||
                         sceneIndex == 19 || sceneIndex == 21 || sceneIndex == 26 ||
                         (sceneIndex >= 36 && sceneIndex <= 38) ||
                         (sceneIndex >= 40 && sceneIndex <= 43) ||
                         sceneIndex == 67 || sceneIndex == 76 || sceneIndex == 78 ||
-                        sceneIndex == 81 || sceneIndex == 87;
+                        sceneIndex == 81 || sceneIndex == 87 ||
+                        sceneIndex == 106 || sceneIndex == 108 || sceneIndex == 109 || sceneIndex == 111 ||
+                        sceneIndex == 112 || sceneIndex == 113 || sceneIndex == 115 || sceneIndex == 116 || sceneIndex == 118 ||
+                        (sceneIndex >= 144 && sceneIndex <= 151) ||
+                        (sceneIndex >= 192 && sceneIndex <= 199) ||
+                        sceneIndex == 202 || sceneIndex == 204 || sceneIndex == 206;
     const bool mountain = sceneIndex == 6 || sceneIndex == 9 || sceneIndex == 11 ||
                           sceneIndex == 20 || sceneIndex == 21 || sceneIndex == 22 || sceneIndex == 27 ||
                           (sceneIndex >= 52 && sceneIndex <= 60) ||
                           (sceneIndex >= 69 && sceneIndex <= 70) ||
-                          (sceneIndex >= 73 && sceneIndex <= 75);
+                          (sceneIndex >= 73 && sceneIndex <= 75) ||
+                          sceneIndex == 120 || sceneIndex == 121 || sceneIndex == 122 ||
+                          sceneIndex == 139 || sceneIndex == 143 || sceneIndex == 151 ||
+                          sceneIndex == 197 || sceneIndex == 203 || sceneIndex == 205;
     const bool extraNight = sceneIndex == 28 || sceneIndex == 30 || sceneIndex == 31 ||
                             sceneIndex == 34 || sceneIndex == 35 || sceneIndex == 46 ||
                             sceneIndex == 51 || sceneIndex == 58 || sceneIndex == 59 ||
                             (sceneIndex >= 61 && sceneIndex <= 67) || sceneIndex == 71 ||
                             sceneIndex == 72 || sceneIndex == 75 || sceneIndex == 79 ||
                             sceneIndex == 80 || sceneIndex == 81 || sceneIndex == 82 ||
-                            (sceneIndex >= 84 && sceneIndex <= 87);
+                            (sceneIndex >= 84 && sceneIndex <= 87) ||
+                            sceneIndex == 90 || sceneIndex == 91 || sceneIndex == 92 || sceneIndex == 94 ||
+                            sceneIndex == 97 || sceneIndex == 98 || sceneIndex == 101 || sceneIndex == 102 ||
+                            sceneIndex == 128 || sceneIndex == 132 || sceneIndex == 133 ||
+                            sceneIndex == 145 || sceneIndex == 150 ||
+                            addedPack == 3 || addedPack == 9 || addedPack == 12 || addedPack == 14 ||
+                            sceneIndex == 176 || sceneIndex == 180 || sceneIndex == 181 ||
+                            sceneIndex == 198 || sceneIndex == 199;
     const bool night = sceneIndex == 3 || sceneIndex == 4 || sceneIndex == 10 ||
                        sceneIndex == 11 || sceneIndex == 18 || sceneIndex == 19 ||
                        sceneIndex == 23 || sceneIndex == 24 || sceneIndex == 26 || sceneIndex == 27 || extraNight;
