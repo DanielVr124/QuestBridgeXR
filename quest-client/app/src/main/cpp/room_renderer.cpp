@@ -1254,20 +1254,11 @@ void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monito
 }
 
 XrPosef RoomRenderer::transformViewPose(const XrPosef& viewPose, const XrVector3f& headCenter) const {
-    // Apply virtual yaw to the complete eye pose, not just its orientation. The
-    // transformed pose is used both to render and in XrCompositionLayerProjectionView,
-    // so the compositor and app agree exactly about the camera for each eye.
-    const float yaw = virtualYaw_;
-    const float c = std::cos(yaw), s = std::sin(yaw);
-    const float dx = viewPose.position.x - headCenter.x;
-    const float dz = viewPose.position.z - headCenter.z;
-    XrPosef rendered = viewPose;
-    rendered.position.x = headCenter.x + c * dx + s * dz + moveX_;
-    rendered.position.y = viewPose.position.y - (sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f);
-    rendered.position.z = headCenter.z - s * dx + c * dz + moveZ_;
-    const XrQuaternionf yawQ{0.0f, std::sin(yaw * 0.5f), 0.0f, std::cos(yaw * 0.5f)};
-    rendered.orientation = quatMul(yawQ, viewPose.orientation);
-    return rendered;
+    // Never synthesize or rotate the real OpenXR eye pose. The compositor relies
+    // on this pose matching the headset's tracked view; virtual locomotion and
+    // turning are applied to the virtual world transform in renderEye instead.
+    (void)headCenter;
+    return viewPose;
 }
 
 void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,
@@ -1280,10 +1271,17 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     (void)eyeIndex; (void)width; (void)height;
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
     Mat4 projection=makeProjection(view.fov);
-    Mat4 camera=makeView(renderedPose);
-    // The camera pose already contains virtual yaw; keep world geometry stationary.
-    // This avoids a second world-space turn and keeps both eyes in one consistent rig.
-    Mat4 pv = mul(projection, camera);
+    Mat4 camera=makeView(view.pose);
+    const float sittingDrop = sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f;
+    // Apply virtual movement/turning to the world, not the tracked eye pose.
+    // Rotating the room opposite the stick turn keeps the player at the pivot and
+    // leaves OpenXR's real stereo views available for compositor reprojection.
+    const Mat4 worldTransform = mul(
+        translation(-moveX_, sittingDrop, -moveZ_),
+        mul(translation(headCenter.x, headCenter.y, headCenter.z),
+            mul(rotateY(-virtualYaw_),
+                translation(-headCenter.x, -headCenter.y, -headCenter.z))));
+    Mat4 pv = mul(mul(projection, camera), worldTransform);
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
     std::array<float,4> floor = rgb(.09f,.12f,.18f);
@@ -1396,15 +1394,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawBox(pv.data(),x,deskTopY+standHeight*0.5f,deskZ,0.05f,standHeight,0.08f,wood);
     }
     if (pointerPoseValid_ && menuOpen_) {
-        XrQuaternionf yawQ{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
-        const XrQuaternionf q=quatMul(yawQ,pointerPose_.orientation);
-        const Mat4 rot=quatMatrix(q);
-        // The controller position is already in reference space: rotate its aim direction,
-        // not its position by its own orientation (which caused the pointer to drift).
-        const float ox=pointerPose_.position.x+moveX_;
-        const float sittingDrop = sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f;
-        const float oy=pointerPose_.position.y-sittingDrop;
-        const float oz=pointerPose_.position.z+moveZ_;
+        const Mat4 rot=quatMatrix(pointerPose_.orientation);
+        // Keep the aim ray in raw tracking space; pv applies the same virtual-world
+        // transform used by the room and controller models.
+        const float ox=pointerPose_.position.x;
+        const float oy=pointerPose_.position.y;
+        const float oz=pointerPose_.position.z;
         const float dx=-rot[8], dy=-rot[9], dz=-rot[10];
         const float directionLength=std::sqrt(dx*dx+dy*dy+dz*dz);
         const float ndx=directionLength>0.0001f?dx/directionLength:0.0f;
@@ -1510,20 +1505,13 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         : (activeEnvironmentIndex_ == 16 || activeEnvironmentIndex_ == 19 || activeEnvironmentIndex_ == 25) ? rgb(1.0f,.53f,.82f)
         : rgb(1.0f,.63f,.30f);
     drawBox(pv.data(),-halfW+0.32f,floorY+2.02f,-1.7f,0.42f,0.28f,0.42f,lampGlow);
-    // Transform controllers through the same virtual rig as the head, so their
-    // positions and orientations stay attached to the user's tracked hands.
+    // Controller poses remain in the same raw OpenXR reference space as the eyes.
+    // The shared pv world transform moves/turns the room and controllers together,
+    // avoiding a second controller-only yaw that caused orientation disagreement.
     for(int hand=0;hand<2;++hand) {
         if(!controllerPoseValid_[hand]) continue;
-        XrPosef controller=controllerPoses_[hand];
-        const float yaw=virtualYaw_, c=std::cos(yaw), s=std::sin(yaw);
-        const float dx=controller.position.x-headCenter.x;
-        const float dz=controller.position.z-headCenter.z;
-        controller.position.x=headCenter.x+c*dx+s*dz+moveX_;
-        controller.position.y-=sitting_ ? std::clamp(settings_.sittingHeadDropM,.10f,.75f) : 0.0f;
-        controller.position.z=headCenter.z-s*dx+c*dz+moveZ_;
-        const XrQuaternionf yawQ{0.0f,std::sin(yaw*.5f),0.0f,std::cos(yaw*.5f)};
-        controller.orientation=quatMul(yawQ,controller.orientation);
-        drawControllerModel(pv.data(),controller,hand==0,controllerTriggers_[hand],controllerGrips_[hand]);
+        drawControllerModel(pv.data(),controllerPoses_[hand],hand==0,
+                            controllerTriggers_[hand],controllerGrips_[hand]);
     }
     if(settings_.comfortVignette && vignetteProgram_){
         glDisable(GL_DEPTH_TEST);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
