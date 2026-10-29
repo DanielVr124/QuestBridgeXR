@@ -550,7 +550,7 @@ bool ActionPoseActive(XrAction_T* action, XrPath subactionPath, int hand) {
 
 // Function prototypes - deliberately named qbxXr* to avoid exporting OpenXR entry points directly.
 XrResult XRAPI_CALL qbxGetInstanceProcAddr(XrInstance, const char*, PFN_xrVoidFunction*);
-XrResult XRAPI_CALL qbxEnumerateInstanceVersion(uint32_t*);
+XrResult XRAPI_CALL qbxEnumerateInstanceVersion(XrVersion*);
 XrResult XRAPI_CALL qbxEnumerateInstanceExtensionProperties(const char*, uint32_t, uint32_t*, XrExtensionProperties*);
 XrResult XRAPI_CALL qbxCreateInstance(const XrInstanceCreateInfo*, XrInstance*);
 XrResult XRAPI_CALL qbxDestroyInstance(XrInstance);
