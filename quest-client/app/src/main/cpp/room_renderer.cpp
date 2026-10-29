@@ -354,6 +354,30 @@ Mat4 makeView(const XrPosef& pose) {
     const Mat4 t=translation(-pose.position.x,-pose.position.y,-pose.position.z);
     return mul(r,t);
 }
+
+// worldTransform is rigid (rotation plus translation), so its inverse is the
+// transpose of the rotation with the inverse translation. Used to intersect a
+// tracked pointer ray with objects in the virtual room's transformed space.
+Mat4 inverseRigid(const Mat4& m) {
+    Mat4 out=identity();
+    for (int c=0;c<3;++c) for (int r=0;r<3;++r)
+        out[c*4+r]=m[r*4+c];
+    const float tx=m[12],ty=m[13],tz=m[14];
+    out[12]=-(out[0]*tx+out[4]*ty+out[8]*tz);
+    out[13]=-(out[1]*tx+out[5]*ty+out[9]*tz);
+    out[14]=-(out[2]*tx+out[6]*ty+out[10]*tz);
+    return out;
+}
+std::array<float,3> transformPoint(const Mat4& m,float x,float y,float z) {
+    return {m[0]*x+m[4]*y+m[8]*z+m[12],
+            m[1]*x+m[5]*y+m[9]*z+m[13],
+            m[2]*x+m[6]*y+m[10]*z+m[14]};
+}
+std::array<float,3> transformDirection(const Mat4& m,float x,float y,float z) {
+    return {m[0]*x+m[4]*y+m[8]*z,
+            m[1]*x+m[5]*y+m[9]*z,
+            m[2]*x+m[6]*y+m[10]*z};
+}
 Mat4 makeProjection(const XrFovf& fov) {
     const float l=std::tan(fov.angleLeft), r=std::tan(fov.angleRight);
     const float d=std::tan(fov.angleDown), u=std::tan(fov.angleUp);
@@ -1410,8 +1434,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     }
     if (pointerPoseValid_ && menuOpen_) {
         const Mat4 rot=quatMatrix(pointerPose_.orientation);
-        // Keep the aim ray in raw tracking space; pv applies the same virtual-world
-        // transform used by the room and controller models.
+        // Keep the visual ray anchored to the tracked aim pose, not to the virtual
+        // room pivot. Transform the ray into room-local coordinates only for hit
+        // testing, so the beam stays on the real controller while the screen moves.
         const float ox=pointerPose_.position.x;
         const float oy=pointerPose_.position.y;
         const float oz=pointerPose_.position.z;
@@ -1420,17 +1445,28 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float ndx=directionLength>0.0001f?dx/directionLength:0.0f;
         const float ndy=directionLength>0.0001f?dy/directionLength:0.0f;
         const float ndz=directionLength>0.0001f?dz/directionLength:-1.0f;
+
+        const Mat4 inverseWorld= inverseRigid(worldTransform);
+        const auto localOrigin=transformPoint(inverseWorld,ox,oy,oz);
+        auto localDirection=transformDirection(inverseWorld,ndx,ndy,ndz);
+        const float localDirectionLength=std::sqrt(localDirection[0]*localDirection[0]
+            +localDirection[1]*localDirection[1]+localDirection[2]*localDirection[2]);
+        if(localDirectionLength>0.0001f) {
+            localDirection[0]/=localDirectionLength;
+            localDirection[1]/=localDirectionLength;
+            localDirection[2]/=localDirectionLength;
+        }
         const float screenZ=deskZ+0.022f;
         float hitT=-1.0f;
-        if (std::fabs(ndz)>0.0001f) {
-            const float t=(screenZ-oz)/ndz;
+        if (std::fabs(localDirection[2])>0.0001f) {
+            const float t=(screenZ-localOrigin[2])/localDirection[2];
             if (t>0.0f && t<5.0f) hitT=t;
         }
         const float rayLength=hitT>0.0f?hitT:2.5f;
         const float cx=ox+ndx*rayLength*0.5f;
         const float cy=oy+ndy*rayLength*0.5f;
         const float cz=oz+ndz*rayLength*0.5f;
-        // A single continuous, oriented beam replaces the old trail of little cubes.
+        // Build the beam in tracking space; don't pass it through worldTransform.
         float rx=ndz, ry=0.0f, rz=-ndx; // cross(world-up, direction)
         if (std::fabs(ndy)>0.98f) { rx=0.0f; ry=0.0f; rz=1.0f; }
         const float rightLength=std::sqrt(rx*rx+ry*ry+rz*rz);
@@ -1443,7 +1479,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         beamRotation[4]=ux; beamRotation[5]=uy; beamRotation[6]=uz;
         beamRotation[8]=ndx; beamRotation[9]=ndy; beamRotation[10]=ndz;
         Mat4 beamModel=mul(translation(cx,cy,cz),mul(beamRotation,scaling(0.004f,0.004f,rayLength)));
-        Mat4 beamMvp=mul(pv,beamModel);
+        Mat4 beamMvp=mul(trackedPv,beamModel);
         glUniformMatrix4fv(locMvp_,1,GL_FALSE,beamMvp.data());
         const auto laserColor=rgb(.18f,.62f,1.0f);
         glUniform4fv(locColor_,1,laserColor.data());
@@ -1451,14 +1487,16 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         glBindVertexArray(vao_);
         glDrawArrays(GL_TRIANGLES,0,36);
         glBindVertexArray(0);
+        const float hitLocalX=localOrigin[0]+localDirection[0]*hitT;
+        const float hitLocalY=localOrigin[1]+localDirection[1]*hitT;
         if (hitT>0.0f) {
-            drawBox(pv.data(),ox+ndx*hitT,oy+ndy*hitT,oz+ndz*hitT,0.018f,0.018f,0.018f,rgb(.42f,.80f,1.0f));
+            drawBox(trackedPv.data(),ox+ndx*hitT,oy+ndy*hitT,oz+ndz*hitT,
+                    0.018f,0.018f,0.018f,rgb(.42f,.80f,1.0f));
         }
         if(menuOpen_ && hitT>0.0f && pointerTrigger_ && !pointerTriggerPrevious_) {
-            const float hx=ox+dx*hitT;
-            const float hy=oy+dy*hitT;
-            if(std::fabs(hx)<monitorW*.5f && std::fabs(hy-monitorCenterY)<monitorH*.5f) {
-                const float nx=hx/monitorW, ny=(hy-monitorCenterY)/monitorH;
+            if(std::fabs(hitLocalX)<monitorW*.5f
+                    && std::fabs(hitLocalY-monitorCenterY)<monitorH*.5f) {
+                const float nx=hitLocalX/monitorW, ny=(hitLocalY-monitorCenterY)/monitorH;
                 if(ny>.12f && ny<.26f) {
                     if(nx<-.26f) menuTab_=0;
                     else if(nx<-.08f) menuTab_=1;
