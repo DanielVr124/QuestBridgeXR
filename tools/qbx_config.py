@@ -226,6 +226,10 @@ ROOM_ENVIRONMENTS = (
     "aurora_lagoon",
 )
 
+# Friendly labels for the large Studio selector; config and Quest INI keep stable slugs.
+ROOM_ENVIRONMENT_LABELS = {name: name.replace("_", " ").title() for name in ROOM_ENVIRONMENTS}
+ROOM_ENVIRONMENT_BY_LABEL = {label: name for name, label in ROOM_ENVIRONMENT_LABELS.items()}
+
 DEFAULT_CONFIG: dict[str, Any] = {
     "schema_version": 1,
     "profile": "Balanced",
