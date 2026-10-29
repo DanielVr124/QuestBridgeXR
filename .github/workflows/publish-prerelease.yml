@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           find dist -maxdepth 4 -type f -print
-          if ! find dist -type f \\( -name '*.zip' -o -name '*.apk' \\) -print -quit | grep -q .; then
+          if ! find dist -maxdepth 4 -type f \( -name '*.zip' -o -name '*.apk' \) -print -quit | grep -q .; then
             echo "No ZIP or APK build outputs were downloaded." >&2
             exit 1
           fi
