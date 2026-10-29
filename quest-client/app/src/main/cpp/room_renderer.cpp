@@ -1303,13 +1303,13 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawBox(pv.data(),x,monitorCenterY,deskZ-0.05f,monitorW+0.05f,monitorH+0.05f,0.08f,rgb(.05f,.06f,.09f));
         if (menuOpen_ && i == monitorCount/2) {
             // Opaque menu replaces the PC image while open; closing it reveals the live stream.
-            drawControlMenu(pv.data(),monitorW,monitorH,monitorCenterY,deskZ+0.065f);
+            drawControlMenu(pv.data(),monitorW,monitorH,monitorCenterY,deskZ+0.012f);
         } else {
             drawPlane(pv.data(),x,monitorCenterY,deskZ+0.001f,monitorW,monitorH,tex,rgb(1,1,1));
         }
         drawBox(pv.data(),x,deskTopY+standHeight*0.5f,deskZ,0.05f,standHeight,0.08f,wood);
     }
-    if (pointerPoseValid_) {
+    if (pointerPoseValid_ && menuOpen_) {
         XrQuaternionf yawQ{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
         XrQuaternionf q=quatMul(yawQ,pointerPose_.orientation);
         const Mat4 rot=quatMatrix(q);
@@ -1317,7 +1317,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float oy=pointerPose_.position.x*rot[1] + pointerPose_.position.y*rot[5] + pointerPose_.position.z*rot[9];
         const float oz=pointerPose_.position.x*rot[2] + pointerPose_.position.y*rot[6] + pointerPose_.position.z*rot[10] + moveZ_;
         const float dx=-rot[8], dy=-rot[9], dz=-rot[10];
-        const float screenZ=deskZ+0.070f;
+        const float screenZ=deskZ+0.022f;
         float hitT=-1.0f;
         if (std::fabs(dz)>0.0001f) {
             const float t=(screenZ-oz)/dz;
