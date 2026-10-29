@@ -17,6 +17,8 @@ AmbientAudio::~AmbientAudio() { shutdown(); }
 bool AmbientAudio::initialize(bool enabled) {
     if (initialized_) { setEnabled(enabled); return true; }
     enabled_.store(enabled);
+    // Do not create an OpenSL engine/player when ambience is disabled.
+    if (!enabled) return true;
     SLresult result = slCreateEngine(&engineObject_, 0, nullptr, 0, nullptr, nullptr);
     if (result != SL_RESULT_SUCCESS || !engineObject_) return false;
     if ((*engineObject_)->Realize(engineObject_, SL_BOOLEAN_FALSE) != SL_RESULT_SUCCESS) { shutdown(); return false; }
@@ -87,7 +89,11 @@ void AmbientAudio::setEnvironment(const std::string& name) {
 
 void AmbientAudio::setEnabled(bool enabled) {
     enabled_.store(enabled);
-    if (play_ && initialized_) (*play_)->SetPlayState(play_, enabled ? SL_PLAYSTATE_PLAYING : SL_PLAYSTATE_PAUSED);
+    if (!initialized_) {
+        if (enabled) initialize(true);
+        return;
+    }
+    if (play_) (*play_)->SetPlayState(play_, enabled ? SL_PLAYSTATE_PLAYING : SL_PLAYSTATE_PAUSED);
 }
 
 void AmbientAudio::queueCallback(SLAndroidSimpleBufferQueueItf, void* context) {
