@@ -17,7 +17,8 @@
 
 namespace {
 constexpr float kPi = 3.14159265358979323846f;
-constexpr std::array<const char*, 88> kEnvironmentNames = {
+constexpr std::array<const char*, 208> kEnvironmentNames = {
+
 
     "blossom",
     "night_city",
@@ -107,6 +108,126 @@ constexpr std::array<const char*, 88> kEnvironmentNames = {
     "vaporwave_dream",
     "synthwave_highway",
     "crystal_forest",
+    "dreamcore_meadow",
+    "dreamcore_cloud_room",
+    "endless_hallway",
+    "liminal_poolrooms",
+    "empty_mall_after_hours",
+    "pastel_playground",
+    "quiet_school_hallway",
+    "soft_dreamscape",
+    "cozy_cabin_snowfall",
+    "rainy_cafe_window",
+    "fireplace_reading_nook",
+    "warm_attic",
+    "cottagecore_kitchen",
+    "blanket_fort",
+    "soft_lighting_bedroom",
+    "quiet_bookshop",
+    "cloud_sea_overlook",
+    "quiet_lake_dock",
+    "moonlit_garden",
+    "misty_waterfall",
+    "sunlit_forest_glade",
+    "lavender_cottage",
+    "meadow_stargazing",
+    "rainy_japanese_garden",
+    "fairy_village",
+    "mushroom_forest",
+    "floating_castle",
+    "starlight_garden",
+    "unicorn_valley",
+    "enchanted_library",
+    "fairy_lantern_path",
+    "celestial_temple",
+    "underwater_palace",
+    "sky_island_city",
+    "cloud_kingdom",
+    "crystal_lake",
+    "rainbow_waterfall",
+    "moon_base_garden",
+    "ancient_ruins",
+    "celestial_ocean",
+    "snow_globe_village",
+    "autumn_cabin",
+    "spring_rain_garden",
+    "summer_lakeside",
+    "christmas_market",
+    "lantern_river",
+    "harvest_festival",
+    "snowy_pine_retreat",
+    "gentle_rain_rooftop",
+    "foggy_seaside",
+    "thunderstorm_shelter",
+    "dawn_mountains",
+    "blue_hour_city",
+    "golden_sunrise_forest",
+    "quiet_snowfall",
+    "cloud_shadow_valley",
+    "kyoto_garden",
+    "tokyo_rainy_alley",
+    "japanese_onsen",
+    "bamboo_temple",
+    "seaside_ryokan",
+    "cherry_blossom_river",
+    "lantern_town",
+    "mount_fuji_sunrise",
+    "aquarium_dream",
+    "coral_at_night",
+    "jellyfish_lagoon",
+    "tropical_shoreline",
+    "sea_cave",
+    "underwater_ruins",
+    "moonlit_beach",
+    "coastal_lighthouse",
+    "ringed_planet",
+    "nebula_clouds",
+    "orbital_observatory",
+    "mars_dusk",
+    "alien_ocean",
+    "moonlit_craters",
+    "stellar_nursery",
+    "wormhole_sky",
+    "pastel_rainbow_hills",
+    "candy_clouds",
+    "toyland_sunset",
+    "pastel_city",
+    "bubble_garden",
+    "cotton_candy_sky",
+    "rainbow_valley",
+    "fantasy_boardwalk",
+    "night_rooftop_garden",
+    "minimalist_penthouse",
+    "skyscraper_sunrise",
+    "quiet_cafe_street",
+    "neon_arcade_district",
+    "balcony_rain",
+    "city_park_evening",
+    "riverside_citywalk",
+    "giant_moon_field",
+    "floating_staircase",
+    "infinite_mirror_lake",
+    "hallway_to_clouds",
+    "impossible_staircase_sky",
+    "doorway_in_meadow",
+    "upside_down_garden",
+    "clockwork_dream",
+    "meditation_garden",
+    "zen_sand_garden",
+    "secluded_hot_springs",
+    "pine_forest_retreat",
+    "quiet_riverbank",
+    "mountain_morning_mist",
+    "seaside_meditation",
+    "candlelit_sanctuary",
+    "obsidian_citadel",
+    "moonstone_cavern",
+    "glowing_spore_forest",
+    "starfall_valley",
+    "celestial_garden",
+    "ancient_sky_ruins",
+    "midnight_blossom_grove",
+    "aurora_lagoon",
 };
 
 
@@ -119,7 +240,9 @@ struct EnvironmentPalette {
 
 EnvironmentPalette extraEnvironmentPalette(int extraIndex) {
     EnvironmentPalette p{};
-    switch (extraIndex / 8) {
+    // Keep the original groups and align each new environment pack at 8 scenes.
+    const int paletteGroup = extraIndex < 60 ? extraIndex / 8 : 8 + (extraIndex - 60) / 8;
+    switch (paletteGroup) {
     case 0: p.skyTop={10,13,39}; p.skyHorizon={70,69,136}; p.ground={8,18,39}; p.horizon=0.82f; break;
     case 1: p.skyTop={20,58,49}; p.skyHorizon={105,162,119}; p.ground={18,58,41}; p.horizon=0.70f; break;
     case 2: p.skyTop={8,54,76}; p.skyHorizon={75,175,190}; p.ground={5,75,95}; p.horizon=0.68f; break;
@@ -127,20 +250,36 @@ EnvironmentPalette extraEnvironmentPalette(int extraIndex) {
     case 4: p.skyTop={13,10,49}; p.skyHorizon={78,56,132}; p.ground={22,18,64}; p.horizon=0.84f; break;
     case 5: p.skyTop={66,31,25}; p.skyHorizon={210,119,66}; p.ground={124,72,43}; p.horizon=0.69f; break;
     case 6: p.skyTop={73,68,119}; p.skyHorizon={205,157,166}; p.ground={101,93,120}; p.horizon=0.66f; break;
+    case 8: p.skyTop={91,83,142}; p.skyHorizon={206,177,225}; p.ground={136,124,175}; p.horizon=0.72f; break;
+    case 9: p.skyTop={53,49,71}; p.skyHorizon={198,142,115}; p.ground={84,67,73}; p.horizon=0.74f; break;
+    case 10: p.skyTop={39,88,109}; p.skyHorizon={172,207,176}; p.ground={65,131,102}; p.horizon=0.64f; break;
+    case 11: p.skyTop={28,17,62}; p.skyHorizon={132,102,185}; p.ground={55,61,106}; p.horizon=0.72f; break;
+    case 12: p.skyTop={18,28,82}; p.skyHorizon={84,139,198}; p.ground={28,77,111}; p.horizon=0.68f; break;
+    case 13: p.skyTop={99,80,105}; p.skyHorizon={235,170,139}; p.ground={112,97,87}; p.horizon=0.65f; break;
+    case 14: p.skyTop={42,63,80}; p.skyHorizon={148,165,175}; p.ground={61,84,98}; p.horizon=0.72f; break;
+    case 15: p.skyTop={19,43,75}; p.skyHorizon={159,144,170}; p.ground={67,92,102}; p.horizon=0.68f; break;
+    case 16: p.skyTop={2,38,63}; p.skyHorizon={17,136,163}; p.ground={2,62,83}; p.horizon=0.72f; break;
+    case 17: p.skyTop={3,3,28}; p.skyHorizon={48,25,90}; p.ground={12,14,41}; p.horizon=0.86f; break;
+    case 18: p.skyTop={188,169,235}; p.skyHorizon={255,197,217}; p.ground={149,121,184}; p.horizon=0.65f; break;
+    case 19: p.skyTop={18,26,53}; p.skyHorizon={87,106,152}; p.ground={23,34,56}; p.horizon=0.82f; break;
+    case 20: p.skyTop={51,48,92}; p.skyHorizon={176,168,211}; p.ground={103,121,164}; p.horizon=0.75f; break;
+    case 21: p.skyTop={46,79,78}; p.skyHorizon={176,194,166}; p.ground={84,119,96}; p.horizon=0.64f; break;
+    case 22: p.skyTop={10,20,52}; p.skyHorizon={75,81,147}; p.ground={19,42,78}; p.horizon=0.82f; break;
     default: p.skyTop={19,12,62}; p.skyHorizon={151,73,158}; p.ground={20,26,78}; p.horizon=0.81f; break;
     }
-    const float variant = static_cast<float>(extraIndex % 8);
+    const int variantIndex = extraIndex < 60 ? extraIndex % 8 : (extraIndex - 60) % 8;
+    const float variant = static_cast<float>(variantIndex);
     const float shift = (variant - 3.5f) * 3.5f;
     p.skyTop[0] = std::clamp(p.skyTop[0] + shift, 0.0f, 255.0f);
-    p.skyTop[1] = std::clamp(p.skyTop[1] + (static_cast<int>(variant) % 3 - 1) * 7.0f, 0.0f, 255.0f);
+    p.skyTop[1] = std::clamp(p.skyTop[1] + (variantIndex % 3 - 1) * 7.0f, 0.0f, 255.0f);
     p.skyTop[2] = std::clamp(p.skyTop[2] - shift * 0.35f, 0.0f, 255.0f);
     p.skyHorizon[0] = std::clamp(p.skyHorizon[0] + shift * 1.5f, 0.0f, 255.0f);
-    p.skyHorizon[1] = std::clamp(p.skyHorizon[1] + (static_cast<int>(variant) % 4 - 1) * 5.0f, 0.0f, 255.0f);
+    p.skyHorizon[1] = std::clamp(p.skyHorizon[1] + (variantIndex % 4 - 1) * 5.0f, 0.0f, 255.0f);
     p.skyHorizon[2] = std::clamp(p.skyHorizon[2] - shift * 0.5f, 0.0f, 255.0f);
     p.ground[0] = std::clamp(p.ground[0] + shift * 0.8f, 0.0f, 255.0f);
-    p.ground[1] = std::clamp(p.ground[1] + (static_cast<int>(variant) % 3 - 1) * 5.0f, 0.0f, 255.0f);
+    p.ground[1] = std::clamp(p.ground[1] + (variantIndex % 3 - 1) * 5.0f, 0.0f, 255.0f);
     p.ground[2] = std::clamp(p.ground[2] - shift * 0.25f, 0.0f, 255.0f);
-    p.horizon = std::clamp(p.horizon + (static_cast<int>(variant) % 5 - 2) * 0.008f, 0.58f, 0.92f);
+    p.horizon = std::clamp(p.horizon + (variantIndex % 5 - 2) * 0.008f, 0.58f, 0.92f);
     return p;
 }
 
@@ -319,29 +458,48 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
         horizon = palette.horizon;
     }
 
+    const int addedPack = sceneIndex >= 88 ? (sceneIndex - 88) / 8 : -1;
     const bool city = sceneIndex == 4 || sceneIndex == 17 || sceneIndex == 18 ||
-                      (sceneIndex >= 28 && sceneIndex <= 35);
+                      (sceneIndex >= 28 && sceneIndex <= 35) || addedPack == 11;
     const bool water = sceneIndex == 5 || sceneIndex == 9 || sceneIndex == 13 ||
                        sceneIndex == 15 || sceneIndex == 20 ||
-                       (sceneIndex >= 44 && sceneIndex <= 51) || sceneIndex == 68;
+                       (sceneIndex >= 44 && sceneIndex <= 51) || sceneIndex == 68 ||
+                       sceneIndex == 91 || sceneIndex == 104 || sceneIndex == 105 || sceneIndex == 107 || sceneIndex == 111 ||
+                       (sceneIndex >= 152 && sceneIndex <= 159) || sceneIndex == 133 ||
+                       sceneIndex == 196 || sceneIndex == 198 || sceneIndex == 207;
     const bool forest = sceneIndex == 7 || sceneIndex == 14 || sceneIndex == 15 ||
                         sceneIndex == 19 || sceneIndex == 21 || sceneIndex == 26 ||
                         (sceneIndex >= 36 && sceneIndex <= 38) ||
                         (sceneIndex >= 40 && sceneIndex <= 43) ||
                         sceneIndex == 67 || sceneIndex == 76 || sceneIndex == 78 ||
-                        sceneIndex == 81 || sceneIndex == 87;
+                        sceneIndex == 81 || sceneIndex == 87 ||
+                        sceneIndex == 106 || sceneIndex == 108 || sceneIndex == 109 || sceneIndex == 111 ||
+                        sceneIndex == 112 || sceneIndex == 113 || sceneIndex == 115 || sceneIndex == 116 || sceneIndex == 118 ||
+                        (sceneIndex >= 144 && sceneIndex <= 151) ||
+                        (sceneIndex >= 192 && sceneIndex <= 199) ||
+                        sceneIndex == 202 || sceneIndex == 204 || sceneIndex == 206;
     const bool mountain = sceneIndex == 6 || sceneIndex == 9 || sceneIndex == 11 ||
                           sceneIndex == 20 || sceneIndex == 21 || sceneIndex == 22 || sceneIndex == 27 ||
                           (sceneIndex >= 52 && sceneIndex <= 60) ||
                           (sceneIndex >= 69 && sceneIndex <= 70) ||
-                          (sceneIndex >= 73 && sceneIndex <= 75);
+                          (sceneIndex >= 73 && sceneIndex <= 75) ||
+                          sceneIndex == 120 || sceneIndex == 121 || sceneIndex == 122 ||
+                          sceneIndex == 139 || sceneIndex == 143 || sceneIndex == 151 ||
+                          sceneIndex == 197 || sceneIndex == 203 || sceneIndex == 205;
     const bool extraNight = sceneIndex == 28 || sceneIndex == 30 || sceneIndex == 31 ||
                             sceneIndex == 34 || sceneIndex == 35 || sceneIndex == 46 ||
                             sceneIndex == 51 || sceneIndex == 58 || sceneIndex == 59 ||
                             (sceneIndex >= 61 && sceneIndex <= 67) || sceneIndex == 71 ||
                             sceneIndex == 72 || sceneIndex == 75 || sceneIndex == 79 ||
                             sceneIndex == 80 || sceneIndex == 81 || sceneIndex == 82 ||
-                            (sceneIndex >= 84 && sceneIndex <= 87);
+                            (sceneIndex >= 84 && sceneIndex <= 87) ||
+                            sceneIndex == 90 || sceneIndex == 91 || sceneIndex == 92 || sceneIndex == 94 ||
+                            sceneIndex == 97 || sceneIndex == 98 || sceneIndex == 101 || sceneIndex == 102 ||
+                            sceneIndex == 128 || sceneIndex == 132 || sceneIndex == 133 ||
+                            sceneIndex == 145 || sceneIndex == 150 ||
+                            addedPack == 3 || addedPack == 9 || addedPack == 12 || addedPack == 14 ||
+                            sceneIndex == 176 || sceneIndex == 180 || sceneIndex == 181 ||
+                            sceneIndex == 198 || sceneIndex == 199;
     const bool night = sceneIndex == 3 || sceneIndex == 4 || sceneIndex == 10 ||
                        sceneIndex == 11 || sceneIndex == 18 || sceneIndex == 19 ||
                        sceneIndex == 23 || sceneIndex == 24 || sceneIndex == 26 || sceneIndex == 27 || extraNight;
@@ -408,7 +566,7 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
             }
             if ((sceneIndex == 5 || sceneIndex == 6 || sceneIndex == 8 || sceneIndex == 10 ||
                  sceneIndex == 11 || sceneIndex == 19 || sceneIndex == 20 ||
-                 sceneIndex == 25 || sceneIndex == 27 || (sceneIndex >= 28 && !night)) && v < horizon) {
+                 sceneIndex == 25 || sceneIndex == 27 || (sceneIndex >= 28 && !night && addedPack != 1 && addedPack != 12)) && v < horizon) {
                 const float dx = (u - sunX) * 1.6f;
                 const float dy = v - sunY;
                 if (dx * dx + dy * dy < sunRadius * sunRadius) {
@@ -573,6 +731,117 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                     (noise % 5U == 0U)) { r = 51.0f; g = 91.0f; b = 137.0f; }
             }
 
+            // Dreamcore: soft cloud haze and oversized pastel moons.
+            if ((addedPack == 0 || addedPack == 10 || addedPack == 12) && v < horizon) {
+                const float cloud = std::max(0.0f,
+                    std::sin(u * 13.0f + std::sin(v * 17.0f)) *
+                    std::sin(v * 26.0f + u * 5.0f));
+                const float strength = cloud * (addedPack == 10 ? 27.0f : 16.0f);
+                r += strength * (addedPack == 10 ? 1.45f : 0.92f);
+                g += strength * (addedPack == 10 ? 0.68f : 0.78f);
+                b += strength * 1.35f;
+            }
+            if (sceneIndex == 88 || sceneIndex == 89 || sceneIndex == 95 || sceneIndex == 184 || sceneIndex == 187) {
+                const float moonX = sceneIndex == 184 ? 0.50f : sceneIndex == 89 ? 0.36f : 0.72f;
+                const float moonY = sceneIndex == 184 ? 0.37f : 0.29f;
+                const float dx = (u - moonX) * 1.45f, dy = v - moonY;
+                const float d2 = dx * dx + dy * dy;
+                const float radius = sceneIndex == 184 ? 0.20f : 0.070f;
+                if (d2 < radius * radius) {
+                    r = sceneIndex == 184 ? 238.0f : 240.0f;
+                    g = sceneIndex == 184 ? 213.0f : 223.0f;
+                    b = sceneIndex == 184 ? 255.0f : 246.0f;
+                    if (d2 > radius * radius * 0.68f) { r -= 28.0f; g -= 20.0f; b -= 8.0f; }
+                } else if (d2 < radius * radius * 2.3f) { r += 24.0f; g += 17.0f; b += 34.0f; }
+            }
+            // Empty halls and impossible dream spaces get stylized perspective lines.
+            if (sceneIndex == 90 || sceneIndex == 92 || sceneIndex == 94 ||
+                sceneIndex == 185 || sceneIndex == 187 || sceneIndex == 188 ||
+                sceneIndex == 189 || sceneIndex == 190 || sceneIndex == 191) {
+                const float depth = std::clamp((v - 0.43f) * 2.2f, 0.0f, 1.0f);
+                const float horizontalPhase = std::fabs(std::fmod((v - 0.43f) * 17.0f, 1.0f) - 0.5f);
+                const float rayPhase = std::fabs(std::fmod(std::fabs(u - 0.5f) * (1.0f + depth * 5.0f), 0.18f) - 0.09f);
+                if (v > 0.48f && (horizontalPhase < 0.035f || rayPhase < 0.009f)) {
+                    r += 40.0f; g += 36.0f; b += 57.0f;
+                }
+            }
+            // Liminal poolrooms use turquoise water and a tiled grid.
+            if (sceneIndex == 91 && v > horizon) {
+                const float depth = (v - horizon) / (1.0f - horizon);
+                const bool tileLine = std::fabs(std::fmod(depth * 19.0f, 1.0f) - 0.5f) < 0.055f ||
+                    std::fabs(std::fmod(u * 30.0f + depth * 8.0f, 1.0f) - 0.5f) < 0.035f;
+                if (tileLine) { r = 87.0f; g = 210.0f; b = 207.0f; }
+                else { r = 13.0f + depth * 6.0f; g = 128.0f + depth * 18.0f; b = 145.0f + depth * 15.0f; }
+            }
+            // Gentle rain, snow, and warm lights make the comfort collection feel lived in.
+            if (sceneIndex == 97 || sceneIndex == 136 || sceneIndex == 137 ||
+                sceneIndex == 138 || sceneIndex == 145 || sceneIndex == 181) {
+                if (v < 0.88f && ((x + static_cast<int>((noise >> 7) % 11U)) % 37) < 2 && noise % 4U != 0U) {
+                    r += 14.0f; g += 23.0f; b += 32.0f;
+                }
+            }
+            if ((sceneIndex == 96 || sceneIndex == 128 || sceneIndex == 135 || sceneIndex == 142) &&
+                v < 0.92f && noise % 283U < 4U) {
+                r = std::min(255.0f, r + 62.0f);
+                g = std::min(255.0f, g + 64.0f);
+                b = std::min(255.0f, b + 70.0f);
+            }
+            if (sceneIndex >= 96 && sceneIndex <= 103 && noise % 191U < 3U && v > 0.34f && v < 0.89f) {
+                r = std::min(255.0f, r + 55.0f);
+                g = std::min(255.0f, g + 32.0f);
+                b = std::min(255.0f, b + 12.0f);
+            }
+            // Fairy lights, fireflies, lanterns, and small magical glows.
+            if ((addedPack == 3 || addedPack == 14) && noise % 470U < 3U && v > 0.16f && v < 0.88f) {
+                r += 95.0f; g += 80.0f; b += 112.0f;
+            }
+            if ((sceneIndex == 132 || sceneIndex == 133 || sceneIndex == 134 || sceneIndex == 150) &&
+                noise % 170U < 3U && v > 0.24f && v < 0.86f) {
+                r += 100.0f; g += 64.0f; b += 24.0f;
+            }
+            if ((sceneIndex == 149 || sceneIndex == 206) && v > 0.25f && v < 0.82f && noise % 97U < 3U) {
+                r = 255.0f; g = 184.0f; b = 221.0f;
+            }
+            // Bioluminescent particles and jellyfish-like specks.
+            if (addedPack == 8 && v > 0.20f && noise % 230U < 4U) {
+                r += 24.0f; g += 82.0f; b += 106.0f;
+            }
+            // Large planetary disks and ring systems for the cosmic pack.
+            if (addedPack == 9 && (sceneIndex == 160 || sceneIndex == 162 || sceneIndex == 164 || sceneIndex == 165)) {
+                const float planetX = sceneIndex == 160 ? 0.53f : 0.72f;
+                const float planetY = sceneIndex == 165 ? 0.35f : 0.40f;
+                const float dx = (u - planetX) * 1.5f, dy = v - planetY;
+                const float d2 = dx * dx + dy * dy;
+                const float radius = sceneIndex == 160 ? 0.16f : 0.105f;
+                if (sceneIndex == 160 && std::fabs(dy + dx * 0.18f) < 0.018f && d2 < radius * radius * 2.1f) {
+                    r = 227.0f; g = 186.0f; b = 151.0f;
+                }
+                if (d2 < radius * radius) {
+                    r = 88.0f + 60.0f * (1.0f - d2 / (radius * radius));
+                    g = sceneIndex == 165 ? 146.0f : 76.0f;
+                    b = sceneIndex == 164 ? 181.0f : 214.0f;
+                }
+            }
+            // Pastel hills, rainbow reflections, and cotton-candy bands.
+            if (addedPack == 10 && v > horizon) {
+                const int stripe = (static_cast<int>(u * 19.0f) + static_cast<int>(v * 9.0f)) % 6;
+                static constexpr float hues[6][3] = {{249,153,195},{255,207,154},{255,241,167},{158,231,208},{156,195,255},{202,165,245}};
+                if (sceneIndex != 171 || stripe < 4) {
+                    r = hues[stripe][0] * 0.64f + ground[0] * 0.36f;
+                    g = hues[stripe][1] * 0.64f + ground[1] * 0.36f;
+                    b = hues[stripe][2] * 0.64f + ground[2] * 0.36f;
+                }
+            }
+            if (addedPack == 13 && (sceneIndex == 193 || sceneIndex == 196 || sceneIndex == 198) && v > horizon) {
+                const float reflection = 0.5f + 0.5f * std::sin(v * 88.0f + u * 9.0f);
+                r += reflection * 13.0f; g += reflection * 20.0f; b += reflection * 19.0f;
+            }
+            if (addedPack == 14 && v < horizon) {
+                const float band = 0.36f + 0.055f * std::sin(u * 8.0f) + 0.018f * std::sin(u * 21.0f);
+                const float glow = std::exp(-std::pow((v - band) / 0.08f, 2.0f));
+                r += 24.0f * glow; g += 100.0f * glow; b += 116.0f * glow;
+            }
+
             if ((sceneIndex == 80 || sceneIndex == 81) && v < 0.72f && noise % 130U < 3U) {
                 if (sceneIndex == 80) { r += 142.0f; g += 84.0f; b += 28.0f; }
                 else { r += 132.0f; g += 70.0f; b += 121.0f; }
@@ -690,7 +959,15 @@ void RoomRenderer::createGeometry() {
 
 void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; chooseEnvironment(); }
 void RoomRenderer::chooseEnvironment() {
-    activeEnvironmentIndex_ = environmentIndex(settings_.environment);
+    const int previousIndex = activeEnvironmentIndex_;
+    const int selectedIndex = environmentIndex(settings_.environment);
+    // Keep the 3 bundled images and the currently selected procedural image resident.
+    if (initialized_ && previousIndex != selectedIndex && previousIndex >= 3 &&
+        previousIndex < static_cast<int>(environmentTextures_.size()) && environmentTextures_[previousIndex]) {
+        glDeleteTextures(1, &environmentTextures_[previousIndex]);
+        environmentTextures_[previousIndex] = 0;
+    }
+    activeEnvironmentIndex_ = selectedIndex;
     if (activeEnvironmentIndex_ >= 3 && initialized_ && !environmentTextures_[activeEnvironmentIndex_]) {
         environmentTextures_[activeEnvironmentIndex_] = createProceduralEnvironment(activeEnvironmentIndex_);
         if (!environmentTextures_[activeEnvironmentIndex_]) {
@@ -707,8 +984,8 @@ void RoomRenderer::cycleScreenDestination() {
 }
 void RoomRenderer::cycleEnvironment() {
     if (!settings_.roomControlsEnabled) return;
-    activeEnvironmentIndex_ = (activeEnvironmentIndex_ + 1) % static_cast<int>(kEnvironmentNames.size());
-    settings_.environment = kEnvironmentNames[activeEnvironmentIndex_];
+    const int nextIndex = (activeEnvironmentIndex_ + 1) % static_cast<int>(kEnvironmentNames.size());
+    settings_.environment = kEnvironmentNames[nextIndex];
     chooseEnvironment();
     LOGI("Room scenery changed to %s", settings_.environment.c_str());
 }
@@ -860,6 +1137,13 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         case 6: wall=rgb(.24f,.18f,.25f); floor=rgb(.16f,.12f,.21f); wood=rgb(.28f,.19f,.22f); sofa=rgb(.42f,.24f,.34f); break;
         default: wall=rgb(.11f,.08f,.25f); floor=rgb(.045f,.04f,.15f); wood=rgb(.15f,.09f,.28f); sofa=rgb(.23f,.12f,.37f); break;
         }
+    }
+    if (activeEnvironmentIndex_ >= 88) {
+        const auto palette = extraEnvironmentPalette(activeEnvironmentIndex_ - 28);
+        wall = rgb(palette.skyHorizon[0] / 460.0f, palette.skyHorizon[1] / 460.0f, palette.skyHorizon[2] / 460.0f);
+        floor = rgb(palette.ground[0] / 510.0f, palette.ground[1] / 510.0f, palette.ground[2] / 510.0f);
+        wood = rgb(palette.skyTop[0] / 420.0f, palette.skyTop[1] / 420.0f, palette.skyTop[2] / 420.0f);
+        sofa = rgb(palette.skyHorizon[0] / 400.0f, palette.skyHorizon[1] / 400.0f, palette.skyHorizon[2] / 400.0f);
     }
     glUseProgram(program_);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDisable(GL_CULL_FACE);
     glUniform1i(locTexture_,0);
