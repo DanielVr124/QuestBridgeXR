@@ -783,7 +783,6 @@ private:
         // The left menu button is reserved by the system on many Quest runtimes.
         // Do not suggest it as an application binding.
         // OpenXR Touch profiles expose squeeze as a value, not a portable squeeze/click path.
-        bind(hands_[0].triggerClick, "/user/hand/left/input/trigger/click");
         bind(hands_[1].pose, std::string("/user/hand/right/input/") + config_.controllerPose + "/pose");
         bind(hands_[1].trigger, "/user/hand/right/input/trigger/value");
         bind(hands_[1].squeeze, "/user/hand/right/input/squeeze/value");
@@ -791,7 +790,6 @@ private:
         bind(hands_[1].primary, "/user/hand/right/input/a/click");
         bind(hands_[1].secondary, "/user/hand/right/input/b/click");
         bind(hands_[1].thumbstickClick, "/user/hand/right/input/thumbstick/click");
-        bind(hands_[1].triggerClick, "/user/hand/right/input/trigger/click");
         XrInteractionProfileSuggestedBinding suggested{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
         suggested.interactionProfile = profile;
         suggested.countSuggestedBindings = static_cast<uint32_t>(bindings.size());
@@ -833,7 +831,7 @@ private:
                create(XR_ACTION_TYPE_BOOLEAN_INPUT, "thumbstick_click", &hand.thumbstickClick) &&
                create(XR_ACTION_TYPE_BOOLEAN_INPUT, "menu", &hand.menu) &&
                create(XR_ACTION_TYPE_BOOLEAN_INPUT, "squeeze_click", &hand.squeezeClick) &&
-               create(XR_ACTION_TYPE_BOOLEAN_INPUT, "trigger_click", &hand.triggerClick);
+               true; // Trigger click is derived from the analog trigger value; Quest Touch does not expose a portable trigger/click binding.
     }
 
     bool boolAction(XrAction action, XrPath handPath) {
@@ -1014,7 +1012,7 @@ private:
             if (boolAction(hand.thumbstickClick, hand.handPath)) out.buttons |= 1u << 2;
             if (handIndex == 0 && boolAction(hand.menu, hand.handPath)) out.buttons |= 1u << 3;
             if (boolAction(hand.squeezeClick, hand.handPath)) out.buttons |= 1u << 4;
-            if (boolAction(hand.triggerClick, hand.handPath)) out.buttons |= 1u << 5;
+            if (floatAction(hand.trigger, hand.handPath) >= 0.75f) out.buttons |= 1u << 5;
             network_.sendController(out);
         }
     }
