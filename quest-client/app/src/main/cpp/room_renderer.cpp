@@ -1137,7 +1137,8 @@ void RoomRenderer::drawText(const float* pv, const char* text, float x, float y,
     vertices.reserve(std::strlen(text) * 30u * 6u);
     auto addVertex = [&](float px, float py) { vertices.push_back({px, py, z, 0.0f, 0.0f}); };
     for (int index = 0; text[index] != '\0'; ++index) {
-        const auto rows = glyph(static_cast<char>(std::toupper(static_cast<unsigned char>(text[index]))));
+        const char character = text[index] == '_' ? ' ' : static_cast<char>(std::toupper(static_cast<unsigned char>(text[index])));
+        const auto rows = glyph(character);
         for (int row = 0; row < 7; ++row) for (int col = 0; col < 5; ++col) {
             if ((rows[row] & (1u << (4 - col))) == 0) continue;
             const float x0 = x + static_cast<float>(index) * pixelSize * 6.0f + col * pixelSize;
@@ -1503,6 +1504,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawBox(pv.data(), monitorX, monitorY + 0.278f, menuZ + 0.006f, 0.96f, 0.012f, 0.006f, blue);
         drawBox(pv.data(), monitorX - 0.43f, monitorY + 0.225f, menuZ + 0.008f, 0.035f, 0.035f, 0.006f, violet);
         drawText(pv.data(), "QUESTBRIDGE", monitorX - 0.37f, monitorY + 0.218f, menuZ + 0.012f, 0.0060f, text);
+        drawText(pv.data(), kEnvironmentNames[activeEnvironmentIndex_], monitorX + 0.08f, monitorY + 0.218f,
+                 menuZ + 0.012f, 0.0035f, blue);
         const char* labels[5] = {"ENVIRONMENT", "DISPLAY MODE", "TV VISIBILITY", "COUCH VISIBILITY", "CLOSE MENU"};
         for (int i = 0; i < 5; ++i) {
             const float y = monitorY + 0.135f - static_cast<float>(i) * 0.091f;
