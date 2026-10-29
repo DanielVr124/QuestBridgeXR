@@ -995,6 +995,19 @@ private:
         const bool pointerValid = locatePose(hands_[1].aimPoseSpace, predictedTime, pointerPose, pointerFlags) &&
                                   (pointerFlags & 3u) == 3u;
         room_.setPointerState(pointerPose, rightTrigger, menuToggle, pointerValid);
+        XrPosef leftModelPose{}; leftModelPose.orientation.w = 1.0f;
+        XrPosef rightModelPose{}; rightModelPose.orientation.w = 1.0f;
+        uint32_t leftModelFlags = 0, rightModelFlags = 0;
+        const bool leftModelLocated = locatePose(hands_[0].poseSpace, predictedTime, leftModelPose, leftModelFlags);
+        const bool rightModelLocated = locatePose(hands_[1].poseSpace, predictedTime, rightModelPose, rightModelFlags);
+        const bool leftModelValid = leftModelLocated && (leftModelFlags & 3u) == 3u;
+        const bool rightModelValid = rightModelLocated && (rightModelFlags & 3u) == 3u;
+        room_.setControllerState(leftModelPose, leftModelValid,
+            floatAction(hands_[0].trigger, hands_[0].handPath),
+            floatAction(hands_[0].squeeze, hands_[0].handPath),
+            rightModelPose, rightModelValid,
+            floatAction(hands_[1].trigger, hands_[1].handPath),
+            floatAction(hands_[1].squeeze, hands_[1].handPath));
         const bool leftPrimary = boolAction(hands_[0].primary, hands_[0].handPath);
         if (leftPrimary && !previousLeftPrimary_) room_.toggleSitting(headPose);
         previousLeftPrimary_ = leftPrimary;
