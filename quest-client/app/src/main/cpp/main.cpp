@@ -966,6 +966,13 @@ private:
         const XrVector2f turn = vector2Action(hands_[1].thumbstick, hands_[1].handPath);
         const bool leftStickClick = boolAction(hands_[0].thumbstickClick, hands_[0].handPath);
         const bool rightStickClick = boolAction(hands_[1].thumbstickClick, hands_[1].handPath);
+        const bool rightSecondary = boolAction(hands_[1].secondary, hands_[1].handPath);
+        const bool rightTrigger = floatAction(hands_[1].trigger, hands_[1].handPath) >= 0.75f;
+        XrPosef pointerPose{}; pointerPose.orientation.w = 1.0f;
+        uint32_t pointerFlags = 0;
+        const bool pointerValid = locatePose(hands_[1].poseSpace, predictedTime, pointerPose, pointerFlags) &&
+                                  (pointerFlags & 3u) == 3u;
+        if (pointerValid) room_.setPointerState(pointerPose, rightTrigger, rightSecondary);
         const bool leftPrimary = boolAction(hands_[0].primary, hands_[0].handPath);
         if (leftStickClick && !previousLeftStickClick_) room_.cycleScreenDestination();
         if (rightStickClick && !previousRightStickClick_) room_.cycleEnvironment();
