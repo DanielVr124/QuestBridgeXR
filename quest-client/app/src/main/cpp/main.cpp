@@ -986,8 +986,6 @@ private:
         if (XR_FAILED(xrSyncActions(session_, &syncInfo))) return;
         const XrVector2f move = vector2Action(hands_[0].thumbstick, hands_[0].handPath);
         const XrVector2f turn = vector2Action(hands_[1].thumbstick, hands_[1].handPath);
-        const bool leftStickClick = boolAction(hands_[0].thumbstickClick, hands_[0].handPath);
-        const bool rightStickClick = boolAction(hands_[1].thumbstickClick, hands_[1].handPath);
         const bool rightSecondary = boolAction(hands_[1].secondary, hands_[1].handPath);
         const bool leftMenu = boolAction(hands_[0].menu, hands_[0].handPath);
         const bool menuToggle = leftMenu || rightSecondary;
@@ -998,11 +996,7 @@ private:
                                   (pointerFlags & 3u) == 3u;
         room_.setPointerState(pointerPose, rightTrigger, menuToggle, pointerValid);
         const bool leftPrimary = boolAction(hands_[0].primary, hands_[0].handPath);
-        if (leftStickClick && !previousLeftStickClick_) room_.cycleScreenDestination();
-        if (rightStickClick && !previousRightStickClick_) room_.cycleEnvironment();
         if (leftPrimary && !previousLeftPrimary_) room_.toggleSitting(headPose);
-        previousLeftStickClick_ = leftStickClick;
-        previousRightStickClick_ = rightStickClick;
         previousLeftPrimary_ = leftPrimary;
         const float moveX = applyDeadzone(std::clamp(config_.invertThumbstickX ? -move.x : move.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
         const float moveY = applyDeadzone(std::clamp(config_.invertThumbstickY ? -move.y : move.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
@@ -1208,8 +1202,6 @@ private:
     std::vector<XrCompositionLayerProjectionView> projectionViews_;
     GLuint framebuffer_ = 0;
     Clock::time_point lastTrackingSend_{};
-    bool previousLeftStickClick_ = false;
-    bool previousRightStickClick_ = false;
     bool previousLeftPrimary_ = false;
 };
 
