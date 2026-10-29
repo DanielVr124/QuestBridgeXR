@@ -223,7 +223,127 @@ ROOM_ENVIRONMENTS = (
     "celestial_garden",
     "ancient_sky_ruins",
     "midnight_blossom_grove",
-    "aurora_lagoon",
+    "aurora_lagoon",    "liminal_supermarket",
+    "liminal_airport_terminal",
+    "liminal_departures_hall",
+    "liminal_hotel_lobby",
+    "liminal_convention_center",
+    "liminal_food_court",
+    "liminal_office_floor",
+    "liminal_subway_platform",
+    "liminal_train_station",
+    "liminal_bus_terminal",
+    "liminal_parking_garage",
+    "liminal_hospital_wing",
+    "liminal_library_after_hours",
+    "liminal_indoor_playground",
+    "liminal_movie_theater",
+    "liminal_arcade_after_hours",
+    "liminal_escalator_hall",
+    "liminal_stairwell",
+    "liminal_underground_corridor",
+    "liminal_fountain_mall",
+    "backrooms_level_zero",
+    "backrooms_yellow_maze",
+    "backrooms_service_corridors",
+    "backrooms_damp_basement",
+    "backrooms_warehouse_rows",
+    "backrooms_cubicle_labyrinth",
+    "backrooms_vacant_hotel",
+    "backrooms_loading_dock",
+    "backrooms_carpeted_stairs",
+    "backrooms_yellow_reception",
+    "backrooms_pipe_network",
+    "backrooms_flooded_annex",
+    "backrooms_painted_columns",
+    "backrooms_red_exit_hall",
+    "backrooms_blue_utility_rooms",
+    "backrooms_endless_office",
+    "backrooms_concrete_maze",
+    "backrooms_archive_storage",
+    "backrooms_broken_elevator",
+    "backrooms_infinite_corridors",
+    "dreamcore_telephone_field",
+    "dreamcore_wrong_house",
+    "dreamcore_silent_carnival",
+    "dreamcore_floating_classroom",
+    "dreamcore_empty_station",
+    "dreamcore_moonlit_road",
+    "dreamcore_oversized_bedroom",
+    "dreamcore_giant_doorfield",
+    "dreamcore_distant_playground",
+    "dreamcore_checkerboard_plaza",
+    "dreamcore_pink_corridor",
+    "dreamcore_lost_arcade",
+    "dreamcore_sunset_void",
+    "dreamcore_infinite_bathroom",
+    "dreamcore_hallway_eyes",
+    "dreamcore_orphaned_elevator",
+    "weirdcore_static_garden",
+    "weirdcore_wrong_turn",
+    "weirdcore_telephone_tower",
+    "weirdcore_mirror_classroom",
+    "poolrooms_sunlit_atrium",
+    "poolrooms_deep_end",
+    "poolrooms_tiled_tunnels",
+    "poolrooms_violet_depths",
+    "poolrooms_empty_locker_room",
+    "poolrooms_circular_pools",
+    "poolrooms_waterfall_chamber",
+    "poolrooms_neon_tiles",
+    "poolrooms_submerged_corridor",
+    "poolrooms_endless_lap_pool",
+    "poolrooms_black_water",
+    "poolrooms_sky_ceiling",
+    "poolrooms_diving_board",
+    "poolrooms_blue_maze",
+    "poolrooms_echo_gallery",
+    "threshold_hotel_lobby",
+    "threshold_hotel_guest_wing",
+    "threshold_room_001",
+    "threshold_room_099",
+    "threshold_room_404",
+    "threshold_hall_of_doors",
+    "threshold_rusted_elevator",
+    "threshold_banquet_hall",
+    "threshold_library_wing",
+    "threshold_red_carpet_corridor",
+    "threshold_blackout_hall",
+    "threshold_brass_key_gallery",
+    "threshold_clockwork_lobby",
+    "threshold_service_tunnels",
+    "threshold_maintenance_room",
+    "threshold_forgotten_infirmary",
+    "threshold_grand_staircase",
+    "threshold_windowless_guestroom",
+    "threshold_security_office",
+    "threshold_attic_of_keys",
+    "threshold_bellhop_hall",
+    "threshold_locked_archive",
+    "threshold_doorway_maze",
+    "threshold_emergency_lighting",
+    "threshold_last_elevator",
+    "empty_meadow_at_dusk",
+    "endless_courtyard",
+    "fogged_glass_corridor",
+    "abandoned_waterpark",
+    "empty_wedding_hall",
+    "closed_department_store",
+    "old_hotel_pool",
+    "school_gym_after_hours",
+    "unlit_recreation_center",
+    "rainy_parking_roof",
+    "office_after_midnight",
+    "empty_gallery_museum",
+    "hospital_waiting_room",
+    "elevator_to_nowhere",
+    "corridor_of_identical_doors",
+    "endless_rooftop",
+    "underground_cafeteria",
+    "glassy_white_hall",
+    "liminal_sky_bridge",
+    "sunset_tunnel",
+
 )
 
 # Friendly labels for the large Studio selector; config and Quest INI keep stable slugs.
@@ -295,6 +415,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     },
     "room": {
         "environment": "blossom",
+        "mode": "explore",
+        "monitor_behavior": "world",
+        "monitors_visible": True,
+        "ambience_enabled": True,
         "room_size": "medium",
         "screen_destination": "monitor",
         "monitor_count": 1,
@@ -368,7 +492,7 @@ def validate_config(cfg: dict[str, Any]) -> dict[str, Any]:
         "tracking": ("enabled", "controllers_enabled", "rate_hz", "position_scale", "thumbstick_deadzone", "invert_thumbstick_x", "invert_thumbstick_y", "swap_face_buttons", "swap_hands", "controller_pose", "reference_space", "trigger_deadzone", "trigger_curve", "offset_x", "offset_y", "offset_z"),
         "display": ("brightness", "contrast", "saturation", "gamma", "aspect_mode", "flip_horizontal", "flip_vertical", "swap_eyes"),
         "transport": ("max_frame_mib", "incomplete_frame_timeout_ms", "quest_receive_buffer_kib"),
-        "room": ("environment", "room_size", "screen_destination", "monitor_count", "show_tv", "show_couch", "show_chair", "room_controls_enabled", "sitting_toggle_enabled", "sitting_head_drop_m", "movement_enabled", "movement_speed", "smooth_turn", "turn_speed", "snap_turn_degrees", "comfort_vignette", "floor_offset_y"),
+        "room": ("environment", "mode", "monitor_behavior", "monitors_visible", "ambience_enabled", "room_size", "screen_destination", "monitor_count", "show_tv", "show_couch", "show_chair", "room_controls_enabled", "sitting_toggle_enabled", "sitting_head_drop_m", "movement_enabled", "movement_speed", "smooth_turn", "turn_speed", "snap_turn_degrees", "comfort_vignette", "floor_offset_y"),
         "fake_vr": ("enabled", "allowed_processes", "yaw_enabled", "pitch_enabled", "invert_pitch", "sensitivity_px_per_radian", "pitch_sensitivity", "deadzone_radians", "max_delta_pixels"),
     }
     for section, fields in required_fields.items():
@@ -456,12 +580,16 @@ def validate_config(cfg: dict[str, Any]) -> dict[str, Any]:
     room = cfg["room"]
     if room["environment"] not in ROOM_ENVIRONMENTS:
         raise ValueError("room.environment must be one of: " + ", ".join(ROOM_ENVIRONMENTS))
+    if room["mode"] not in ("workspace", "explore"):
+        raise ValueError("room.mode must be 'workspace' or 'explore'")
+    if room["monitor_behavior"] not in ("world", "follow", "summon"):
+        raise ValueError("room.monitor_behavior must be 'world', 'follow', or 'summon'")
     if room["room_size"] not in ("small", "medium", "large"):
         raise ValueError("room.room_size must be small, medium, or large")
     if room["screen_destination"] not in ("monitor", "tv", "both"):
         raise ValueError("room.screen_destination must be monitor, tv, or both")
     _integer(room["monitor_count"], "room.monitor_count", 1, 3)
-    for key in ("show_tv", "show_couch", "show_chair", "room_controls_enabled", "sitting_toggle_enabled", "movement_enabled", "smooth_turn", "comfort_vignette"):
+    for key in ("show_tv", "show_couch", "show_chair", "room_controls_enabled", "sitting_toggle_enabled", "movement_enabled", "smooth_turn", "comfort_vignette", "monitors_visible", "ambience_enabled"):
         if not isinstance(room[key], bool):
             raise ValueError(f"room.{key} must be true or false")
     _number(room["sitting_head_drop_m"], "room.sitting_head_drop_m", 0.1, 0.75)
@@ -621,6 +749,10 @@ def save_quest_ini(cfg: dict[str, Any], path: str | pathlib.Path) -> pathlib.Pat
         f"incomplete_frame_timeout_ms={transport['incomplete_frame_timeout_ms']}\n"
         f"quest_receive_buffer_kib={transport['quest_receive_buffer_kib']}\n"
         f"environment={room['environment']}\n"
+        f"room_mode={room['mode']}\n"
+        f"monitor_behavior={room['monitor_behavior']}\n"
+        f"monitors_visible={str(room['monitors_visible']).lower()}\n"
+        f"ambience_enabled={str(room['ambience_enabled']).lower()}\n"
         f"room_size={room['room_size']}\n"
         f"screen_destination={room['screen_destination']}\n"
         f"monitor_count={room['monitor_count']}\n"
