@@ -1022,6 +1022,10 @@ void RoomRenderer::cycleEnvironment() {
     LOGI("Room scenery changed to %s", settings_.environment.c_str());
 }
 
+void RoomRenderer::toggleMenu() {
+    menuVisible_ = !menuVisible_;
+}
+
 void RoomRenderer::toggleSitting(const XrPosef& headPose) {
     if (!settings_.roomControlsEnabled || !settings_.sittingToggleEnabled) return;
     if (sitting_) {
@@ -1400,6 +1404,29 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         glDisable(GL_DEPTH_TEST);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(vignetteProgram_);glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);
         glUseProgram(0);glDisable(GL_BLEND);glEnable(GL_DEPTH_TEST);
+    }
+    // Screen-space menu overlay: it must be visibly drawn in the headset, not merely bound as an action.
+    if (menuVisible_) {
+        const Mat4 overlay = identity();
+        const auto panel = rgb(0.025f, 0.035f, 0.075f, 1.0f);
+        const auto row = rgb(0.075f, 0.095f, 0.17f, 1.0f);
+        const auto blue = rgb(0.16f, 0.58f, 1.0f, 1.0f);
+        const auto violet = rgb(0.48f, 0.25f, 1.0f, 1.0f);
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glUseProgram(program_);
+        drawBox(overlay.data(), 0.0f, 0.0f, 0.0f, 1.02f, 1.38f, 0.01f, panel);
+        drawBox(overlay.data(), 0.0f, 0.60f, -0.01f, 0.90f, 0.045f, 0.01f, blue);
+        drawBox(overlay.data(), 0.0f, 0.53f, -0.01f, 0.42f, 0.018f, 0.01f, violet);
+        for (int i = 0; i < 4; ++i) {
+            const float y = 0.32f - static_cast<float>(i) * 0.23f;
+            drawBox(overlay.data(), 0.0f, y, -0.02f, 0.82f, 0.16f, 0.01f, row);
+            drawBox(overlay.data(), -0.32f, y, -0.03f, 0.075f, 0.075f, 0.01f, i % 2 == 0 ? blue : violet);
+            drawBox(overlay.data(), 0.08f, y + 0.018f, -0.03f, 0.42f, 0.014f, 0.01f, rgb(0.72f, 0.79f, 0.94f));
+            drawBox(overlay.data(), -0.01f, y - 0.018f, -0.03f, 0.28f, 0.010f, 0.01f, rgb(0.30f, 0.38f, 0.55f));
+        }
+        drawBox(overlay.data(), 0.0f, -0.58f, -0.02f, 0.55f, 0.035f, 0.01f, violet);
+        glDisable(GL_BLEND);
     }
     glBindTexture(GL_TEXTURE_2D,0);glBindVertexArray(0);glUseProgram(0);glDisable(GL_DEPTH_TEST);
 }
