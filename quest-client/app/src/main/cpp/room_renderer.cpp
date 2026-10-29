@@ -1098,8 +1098,9 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     if(settings_.smoothTurn){virtualYaw_+=std::clamp(rightStickX,-1.0f,1.0f)*std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;}
     else {
         const bool right=rightStickX>0.7f,left=rightStickX < -0.7f;
-        if(snapCooldown_<=0.0f && right && !previousTurnRight_){virtualYaw_-=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
-        else if(snapCooldown_<=0.0f && left && !previousTurnLeft_){virtualYaw_+=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
+        // Keep snap-turn direction consistent with smooth turning and locomotion yaw.
+        if(snapCooldown_<=0.0f && right && !previousTurnRight_){virtualYaw_+=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
+        else if(snapCooldown_<=0.0f && left && !previousTurnLeft_){virtualYaw_-=settings_.snapTurnDegrees*kPi/180.0f;snapCooldown_=0.24f;}
         previousTurnRight_=right;previousTurnLeft_=left;
     }
 }
