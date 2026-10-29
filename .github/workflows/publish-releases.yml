@@ -1,0 +1,149 @@
+name: Publish every successful QuestBridge XR build to Releases
+
+on:
+  # One-time bootstrap: when this workflow is first added, publish the last
+  # successful build that predates this commit.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-releases.yml"
+  # From then on, publish every successful non-PR build automatically.
+  workflow_run:
+    workflows: ["QuestBridge XR Build"]
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    name: Attach all build deliverables to a GitHub Release
+    if: github.event_name == 'push' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'pull_request')
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Resolve build to publish
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
+            run_id="${{ github.event.workflow_run.id }}"
+            head_sha="${{ github.event.workflow_run.head_sha }}"
+            event_type="${{ github.event.workflow_run.event }}"
+            if [[ "$event_type" == "pull_request" ]]; then
+              echo "Refusing to publish pull-request builds."
+              exit 1
+            fi
+          else
+            # On initial setup, publish the successful build whose commit is
+            # the parent of the workflow-install commit (normally the build
+            # the user just saw succeed).
+            head_sha="${{ github.event.before }}"
+            if [[ -z "$head_sha" || "$head_sha" =~ ^0+$ ]]; then
+              echo "No parent commit is available to identify the previous successful build."
+              exit 1
+            fi
+            run_id="$(gh run list --repo "$GH_REPO" --workflow "QuestBridge XR Build" --json databaseId,headSha,status,conclusion,event --limit 100 |
+              jq -r --arg sha "$head_sha" '[.[] | select(.headSha == $sha and .status == "completed" and .conclusion == "success" and .event != "pull_request")][0].databaseId // empty')"
+            if [[ -z "$run_id" ]]; then
+              echo "No successful QuestBridge XR Build run found for commit $head_sha."
+              exit 1
+            fi
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "release_tag=questbridge-build-$run_id" >> "$GITHUB_OUTPUT"
+          echo "Publishing build run $run_id for commit $head_sha"
+
+      - name: Download Windows build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-portable
+          path: downloads/windows-portable
+          run-id: ${{ steps.source.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download Quest APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: quest-apk
+          path: downloads/quest-apk
+          run-id: ${{ steps.source.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download combined installer package
+        uses: actions/download-artifact@v4
+        with:
+          name: QuestBridgeXR-Portable
+          path: downloads/combined
+          run-id: ${{ steps.source.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare release assets
+        env:
+          BUILD_RUN_ID: ${{ steps.source.outputs.run_id }}
+          BUILD_SHA: ${{ steps.source.outputs.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          test -s downloads/quest-apk/app-debug.apk
+          test -d downloads/windows-portable
+          find downloads/combined -maxdepth 1 -type f -print
+          find downloads/combined -maxdepth 1 -type f \( -name '*.zip' -o -name '*.sha256' -o -name '*-Setup.exe' \) -exec cp {} release-assets/ \;
+          cp downloads/quest-apk/app-debug.apk release-assets/QuestBridgeXR-Quest-debug.apk
+
+          # The raw Windows artifact is a directory in Actions; make a regular
+          # archive so it can be downloaded as a single file from Releases.
+          (cd downloads/windows-portable && zip -qr "$GITHUB_WORKSPACE/release-assets/QuestBridgeXR-Windows-Portable.zip" .)
+          sha256sum release-assets/QuestBridgeXR-Windows-Portable.zip > release-assets/QuestBridgeXR-Windows-Portable.zip.sha256
+          (
+            cd release-assets
+            sha256sum QuestBridgeXR-Quest-debug.apk > QuestBridgeXR-Quest-debug.apk.sha256
+          )
+
+          cat > release-assets/BUILD-INFO.txt <<EOF
+          QuestBridge XR automated build
+          Source commit: $BUILD_SHA
+          GitHub Actions run: $BUILD_RUN_ID
+          
+          Contents:
+          - Windows portable folder archived as QuestBridgeXR-Windows-Portable.zip
+          - Quest Android debug application (arm64-v8a)
+          - Combined portable ZIP including the Quest APK
+          - Windows installer and SHA-256 checksums
+          
+          IMPORTANT: The OpenXR runtime is experimental. Successful compilation and packaging
+          do not prove real-headset tracking, compositor timing, game compatibility, or
+          Khronos conformance. Do not register it as your system-wide active OpenXR runtime.
+          EOF
+
+          test -n "$(find release-assets -maxdepth 1 -type f -name '*.zip' -print -quit)"
+          test -n "$(find release-assets -maxdepth 1 -type f -name '*-Setup.exe' -print -quit)"
+          test -s release-assets/QuestBridgeXR-Quest-debug.apk
+          ls -lh release-assets
+
+      - name: Publish build assets to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.source.outputs.release_tag }}
+          target_commitish: ${{ steps.source.outputs.head_sha }}
+          name: QuestBridge XR build ${{ steps.source.outputs.run_id }}
+          body: |
+            Automatically generated from successful GitHub Actions run ${{ steps.source.outputs.run_id }}.
+
+            Source commit: ${{ steps.source.outputs.head_sha }}
+
+            Assets include the Windows portable package, experimental OpenXR runtime DLL, Quest debug APK, combined portable ZIP, Windows setup installer, and SHA-256 checksums.
+
+            **Experimental software:** CI success proves compilation and packaging, not physical Quest validation, OpenXR conformance, or compatibility with all VR games. Do not set this runtime as the system-wide default.
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/*
