@@ -6,9 +6,14 @@
 #include <GLES3/gl3.h>
 #include <android/asset_manager.h>
 #include <openxr/openxr.h>
+#include "ambient_audio.h"
 
 struct RoomSettings {
-    std::string environment = "blossom";       // 208 scenes; see Studio Virtual Room settings
+    std::string environment = "blossom";       // 328 scenes; see Studio Virtual Room settings
+    std::string mode = "explore";               // explore | workspace
+    std::string monitorBehavior = "world";      // world | follow | summon
+    bool monitorsVisible = true;
+    bool ambienceEnabled = true;
     std::string roomSize = "medium";           // small | medium | large
     std::string screenDestination = "monitor"; // monitor | tv | both
     int monitorCount = 1;                       // 1..3, replicated stream
@@ -57,8 +62,14 @@ private:
                    float yaw = 0.0f);
     void drawEnvironmentWindow(const float* projectionView, float halfW, float floorY, float backZ,
                                GLuint environmentTexture, float windowW, float windowH);
+    void renderExploreWorld(const float* projectionView, const float* projection, float floorY,
+                            GLuint videoTexture, bool hasVideo);
+    void drawMonitors(const float* projectionView, const float* projection, float floorY,
+                      GLuint videoTexture, bool hasVideo, bool followView);
+    void toggleMonitors();
+    void toggleWorldMode();
 
-    RoomSettings settings_{};
+    RoomSettings settings_{};\n    AmbientAudio ambience_{};
     GLuint program_ = 0;
     GLuint vignetteProgram_ = 0;
     GLuint vao_ = 0;
@@ -70,7 +81,7 @@ private:
     GLint locUvScale_ = -1;
     GLuint cubeTexture_ = 0;
     GLuint planeTexture_ = 0;
-    std::array<GLuint, 208> environmentTextures_{};
+    std::array<GLuint, 328> environmentTextures_{};
     int activeEnvironmentIndex_ = 0;
     GLuint videoFallbackTexture_ = 0;
     bool initialized_ = false;
