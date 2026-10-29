@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <cctype>
 #include <fstream>
 #include <iterator>
 #include <vector>
@@ -1024,6 +1025,26 @@ void RoomRenderer::cycleEnvironment() {
 
 void RoomRenderer::toggleMenu() {
     menuVisible_ = !menuVisible_;
+    previousMenuNavigation_ = false;
+    if (menuVisible_) menuSelection_ = 0;
+}
+
+void RoomRenderer::handleMenuInput(float vertical, bool selectPressed) {
+    if (!menuVisible_) return;
+    const bool navigating = std::fabs(vertical) > 0.55f;
+    if (navigating && !previousMenuNavigation_) {
+        menuSelection_ = (menuSelection_ + (vertical > 0.0f ? 4 : 1)) % 5;
+    }
+    previousMenuNavigation_ = navigating;
+    if (!selectPressed) return;
+    switch (menuSelection_) {
+    case 0: cycleEnvironment(); break;
+    case 1: cycleScreenDestination(); break;
+    case 2: settings_.showTv = !settings_.showTv; break;
+    case 3: settings_.showCouch = !settings_.showCouch; break;
+    case 4: menuVisible_ = false; break;
+    default: break;
+    }
 }
 
 void RoomRenderer::toggleSitting(const XrPosef& headPose) {
@@ -1076,6 +1097,52 @@ void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,floa
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniform4fv(locColor_,1,color.data());glUniform1i(locTextured_,0);
     glBindVertexArray(vao_);glDrawArrays(GL_TRIANGLES,0,36);glBindVertexArray(0);
 }
+void RoomRenderer::drawText(const float* pv, const char* text, float x, float y, float z,
+                            float pixelSize, const std::array<float,4>& color) {
+    if (!text) return;
+    auto glyph = [](char c) {
+        switch (c) {
+        case 'A': return std::array<uint8_t,7>{14,17,17,31,17,17,17};
+        case 'B': return std::array<uint8_t,7>{30,17,17,30,17,17,30};
+        case 'C': return std::array<uint8_t,7>{14,17,16,16,16,17,14};
+        case 'D': return std::array<uint8_t,7>{30,17,17,17,17,17,30};
+        case 'E': return std::array<uint8_t,7>{31,16,16,30,16,16,31};
+        case 'F': return std::array<uint8_t,7>{31,16,16,30,16,16,16};
+        case 'G': return std::array<uint8_t,7>{14,17,16,23,17,17,15};
+        case 'H': return std::array<uint8_t,7>{17,17,17,31,17,17,17};
+        case 'I': return std::array<uint8_t,7>{14,4,4,4,4,4,14};
+        case 'J': return std::array<uint8_t,7>{7,2,2,2,18,18,12};
+        case 'K': return std::array<uint8_t,7>{17,18,20,24,20,18,17};
+        case 'L': return std::array<uint8_t,7>{16,16,16,16,16,16,31};
+        case 'M': return std::array<uint8_t,7>{17,27,21,21,17,17,17};
+        case 'N': return std::array<uint8_t,7>{17,25,21,19,17,17,17};
+        case 'O': return std::array<uint8_t,7>{14,17,17,17,17,17,14};
+        case 'P': return std::array<uint8_t,7>{30,17,17,30,16,16,16};
+        case 'Q': return std::array<uint8_t,7>{14,17,17,17,21,18,13};
+        case 'R': return std::array<uint8_t,7>{30,17,17,30,20,18,17};
+        case 'S': return std::array<uint8_t,7>{15,16,16,14,1,1,30};
+        case 'T': return std::array<uint8_t,7>{31,4,4,4,4,4,4};
+        case 'U': return std::array<uint8_t,7>{17,17,17,17,17,17,14};
+        case 'V': return std::array<uint8_t,7>{17,17,17,17,17,10,4};
+        case 'W': return std::array<uint8_t,7>{17,17,17,21,21,21,10};
+        case 'X': return std::array<uint8_t,7>{17,17,10,4,10,17,17};
+        case 'Y': return std::array<uint8_t,7>{17,17,10,4,4,4,4};
+        case 'Z': return std::array<uint8_t,7>{31,1,2,4,8,16,31};
+        case ':': return std::array<uint8_t,7>{0,4,4,0,4,4,0};
+        case '-': return std::array<uint8_t,7>{0,0,0,31,0,0,0};
+        default: return std::array<uint8_t,7>{0,0,0,0,0,0,0};
+        }
+    };
+    for (int index = 0; text[index] != '\0'; ++index) {
+        const auto rows = glyph(static_cast<char>(std::toupper(static_cast<unsigned char>(text[index]))));
+        for (int row = 0; row < 7; ++row) for (int col = 0; col < 5; ++col) {
+            if ((rows[row] & (1u << (4 - col))) == 0) continue;
+            drawBox(pv, x + static_cast<float>(index) * pixelSize * 6.0f + col * pixelSize,
+                    y - row * pixelSize, z, pixelSize * 0.78f, pixelSize * 0.78f, 0.002f, color);
+        }
+    }
+}
+
 void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color) {
     Mat4 projectionView{}; std::copy(pv,pv+projectionView.size(),projectionView.begin());
     const Mat4 model=mul(translation(x,y,z),scaling(sx,sy,sz));
@@ -1111,12 +1178,7 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floor
 
 void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
     if(dt<0.0f||dt>0.1f)dt=0.0f;
-    if (!yawPivotInitialized_) {
-        yawPivotX_ = headPose.position.x;
-        yawPivotY_ = headPose.position.y;
-        yawPivotZ_ = headPose.position.z;
-        yawPivotInitialized_ = true;
-    }
+    if (!yawPivotInitialized_) rebaseYawPivot(headPose);
     // Pushing the left stick stands up automatically; the virtual seat is not a locked animation state.
     if(sitting_ && (std::fabs(leftX)>0.22f || std::fabs(leftY)>0.22f)) sitting_=false;
     const float yaw=headYaw(headPose)+virtualYaw_;
@@ -1167,25 +1229,11 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
 
 
 void RoomRenderer::rebaseYawPivot(const XrPosef& headPose) {
-    if (!yawPivotInitialized_) {
-        yawPivotX_ = headPose.position.x;
-        yawPivotY_ = headPose.position.y;
-        yawPivotZ_ = headPose.position.z;
-        yawPivotInitialized_ = true;
-        return;
-    }
-    // Preserve the virtual head position when changing the yaw pivot.
-    const float dx = headPose.position.x - yawPivotX_;
-    const float dz = headPose.position.z - yawPivotZ_;
-    const float c = std::cos(virtualYaw_);
-    const float s = std::sin(virtualYaw_);
-    const float mappedX = yawPivotX_ + c * dx + s * dz;
-    const float mappedZ = yawPivotZ_ - s * dx + c * dz;
-    worldOffsetX_ += mappedX - headPose.position.x;
-    worldOffsetZ_ += mappedZ - headPose.position.z;
-    yawPivotX_ = headPose.position.x;
+    // Pivot around the user's current virtual position, including joystick locomotion.
+    yawPivotX_ = headPose.position.x + moveX_ + worldOffsetX_;
     yawPivotY_ = headPose.position.y;
-    yawPivotZ_ = headPose.position.z;
+    yawPivotZ_ = headPose.position.z + moveZ_ + worldOffsetZ_;
+    yawPivotInitialized_ = true;
 }
 
 void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,GLuint videoTexture,bool hasVideo) {
@@ -1405,27 +1453,43 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         glUseProgram(vignetteProgram_);glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);
         glUseProgram(0);glDisable(GL_BLEND);glEnable(GL_DEPTH_TEST);
     }
-    // Screen-space menu overlay: it must be visibly drawn in the headset, not merely bound as an action.
+    // Monitor-anchored menu: world coordinates place it on the virtual display, not in the user's face.
     if (menuVisible_) {
-        const Mat4 overlay = identity();
-        const auto panel = rgb(0.025f, 0.035f, 0.075f, 1.0f);
-        const auto row = rgb(0.075f, 0.095f, 0.17f, 1.0f);
+        const float deskZ = -halfD + 1.35f;
+        const float deskX = halfW - 1.48f;
+        const float monitorX = deskX - 0.36f;
+        const float monitorY = floorY + 1.43f;
+        const float monitorZ = deskZ - 0.34f;
+        const float menuZ = monitorZ + 0.105f;
+        const auto panel = rgb(0.025f, 0.032f, 0.065f, 0.98f);
+        const auto row = rgb(0.075f, 0.090f, 0.145f, 0.98f);
+        const auto selected = rgb(0.10f, 0.22f, 0.39f, 1.0f);
         const auto blue = rgb(0.16f, 0.58f, 1.0f, 1.0f);
         const auto violet = rgb(0.48f, 0.25f, 1.0f, 1.0f);
+        const auto text = rgb(0.88f, 0.92f, 1.0f, 1.0f);
         glDisable(GL_DEPTH_TEST);
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(program_);
-        drawBox(overlay.data(), 0.0f, 0.0f, 0.0f, 1.02f, 1.38f, 0.01f, panel);
-        drawBox(overlay.data(), 0.0f, 0.60f, -0.01f, 0.90f, 0.045f, 0.01f, blue);
-        drawBox(overlay.data(), 0.0f, 0.53f, -0.01f, 0.42f, 0.018f, 0.01f, violet);
-        for (int i = 0; i < 4; ++i) {
-            const float y = 0.32f - static_cast<float>(i) * 0.23f;
-            drawBox(overlay.data(), 0.0f, y, -0.02f, 0.82f, 0.16f, 0.01f, row);
-            drawBox(overlay.data(), -0.32f, y, -0.03f, 0.075f, 0.075f, 0.01f, i % 2 == 0 ? blue : violet);
-            drawBox(overlay.data(), 0.08f, y + 0.018f, -0.03f, 0.42f, 0.014f, 0.01f, rgb(0.72f, 0.79f, 0.94f));
-            drawBox(overlay.data(), -0.01f, y - 0.018f, -0.03f, 0.28f, 0.010f, 0.01f, rgb(0.30f, 0.38f, 0.55f));
+        drawBox(pv.data(), monitorX, monitorY, menuZ, 1.02f, 0.60f, 0.008f, panel);
+        drawBox(pv.data(), monitorX, monitorY + 0.278f, menuZ - 0.006f, 0.96f, 0.012f, 0.006f, blue);
+        drawBox(pv.data(), monitorX - 0.43f, monitorY + 0.225f, menuZ - 0.008f, 0.035f, 0.035f, 0.006f, violet);
+        drawText(pv.data(), "QUESTBRIDGE", monitorX - 0.37f, monitorY + 0.218f, menuZ - 0.012f, 0.0060f, text);
+        const char* labels[5] = {"ENVIRONMENT", "DISPLAY MODE", "TV VISIBILITY", "COUCH VISIBILITY", "CLOSE MENU"};
+        for (int i = 0; i < 5; ++i) {
+            const float y = monitorY + 0.135f - static_cast<float>(i) * 0.091f;
+            drawBox(pv.data(), monitorX, y - 0.015f, menuZ - 0.006f, 0.94f, 0.073f, 0.006f,
+                    i == menuSelection_ ? selected : row);
+            drawBox(pv.data(), monitorX - 0.415f, y - 0.015f, menuZ - 0.012f, 0.018f, 0.043f, 0.004f,
+                    i == menuSelection_ ? blue : violet);
+            drawText(pv.data(), labels[i], monitorX - 0.37f, y + 0.015f, menuZ - 0.014f, 0.0052f, text);
+            if (i == 0) drawText(pv.data(), "NEXT", monitorX + 0.24f, y + 0.015f, menuZ - 0.014f, 0.0043f, blue);
+            else if (i == 1) {
+                const char* mode = settings_.screenDestination == "monitor" ? "MONITOR" :
+                    (settings_.screenDestination == "tv" ? "TV" : "BOTH");
+                drawText(pv.data(), mode, monitorX + 0.20f, y + 0.015f, menuZ - 0.014f, 0.0043f, blue);
+            } else if (i == 2) drawText(pv.data(), settings_.showTv ? "ON" : "OFF", monitorX + 0.32f, y + 0.015f, menuZ - 0.014f, 0.0043f, blue);
+            else if (i == 3) drawText(pv.data(), settings_.showCouch ? "ON" : "OFF", monitorX + 0.32f, y + 0.015f, menuZ - 0.014f, 0.0043f, blue);
         }
-        drawBox(overlay.data(), 0.0f, -0.58f, -0.02f, 0.55f, 0.035f, 0.01f, violet);
         glDisable(GL_BLEND);
     }
     glBindTexture(GL_TEXTURE_2D,0);glBindVertexArray(0);glUseProgram(0);glDisable(GL_DEPTH_TEST);
