@@ -354,15 +354,13 @@ Mat4 makeView(const XrPosef& pose, float locomotionX, float locomotionZ, float v
     XrQuaternionf inv{-q.x,-q.y,-q.z,q.w};
     Mat4 r=quatMatrix(inv);
 
-    // Apply the same virtual-room rotation to the camera position as to its
-    // orientation. Rotating only the view orientation makes the whole room
-    // appear to shear/slide when the player turns with the right stick.
-    const float c=std::cos(virtualYaw), s=std::sin(virtualYaw);
-    const float localX=pose.position.x+locomotionX;
-    const float localZ=pose.position.z+locomotionZ;
-    const float worldX=c*localX+s*localZ;
-    const float worldZ=-s*localX+c*localZ;
-    Mat4 t=translation(-worldX,-(pose.position.y-sittingDrop),-worldZ);
+    // Snap/smooth turning changes the view direction around the player's
+    // current position. Do not rotate the camera's world position around the
+    // room origin: that makes the entire room drift farther as yaw accumulates.
+    // Locomotion offsets already live in the room's world coordinates.
+    Mat4 t=translation(-(pose.position.x+locomotionX),
+                       -(pose.position.y-sittingDrop),
+                       -(pose.position.z+locomotionZ));
     return mul(r,t);
 }
 Mat4 makeProjection(const XrFovf& fov) {
