@@ -1097,13 +1097,17 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
 }
 
 
-void RoomRenderer::setPointerState(const XrPosef& pose, bool triggerPressed, bool menuTogglePressed) {
+void RoomRenderer::setPointerState(const XrPosef& pose, bool triggerPressed, bool menuTogglePressed, bool poseValid) {
     if (menuTogglePressed && !menuTogglePrevious_) menuOpen_ = !menuOpen_;
     menuTogglePrevious_ = menuTogglePressed;
     pointerTriggerPrevious_ = pointerTrigger_;
     pointerTrigger_ = triggerPressed;
-    pointerPose_ = pose;
-    pointerPoseValid_ = true;
+    if (poseValid) {
+        pointerPose_ = pose;
+        pointerPoseValid_ = true;
+    } else {
+        pointerPoseValid_ = false;
+    }
 }
 
 void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monitorH,
@@ -1170,7 +1174,7 @@ void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monito
         text(tabs[i],tabX[i]*w-w*.055f,centerY+h*.17f,.48f,white);
     }
     const char* titles[]={"WELCOME BACK","ENVIRONMENTS","DISPLAY OUTPUT","COMFORT SETTINGS","QUICK HELP"};
-    const char* subtitles[]={"Choose an action","Explore 208 scenes","Choose where PC video appears","Adjust your play position","Right B opens this menu"};
+    const char* subtitles[]={"Choose an action","Explore 208 scenes","Choose where PC video appears","Adjust your play position","Left Menu button opens this menu"};
     text(titles[menuTab_],-w*.02f,centerY+h*.04f,.68f,white);
     text(subtitles[menuTab_],-w*.02f,centerY-h*.025f,.38f,rgb(.56f,.66f,.82f));
     const char* labels[3][3]={{"CLOSE MENU","NEXT ENV","DISPLAY"},
@@ -1311,23 +1315,51 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     }
     if (pointerPoseValid_ && menuOpen_) {
         XrQuaternionf yawQ{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
-        XrQuaternionf q=quatMul(yawQ,pointerPose_.orientation);
+        const XrQuaternionf q=quatMul(yawQ,pointerPose_.orientation);
         const Mat4 rot=quatMatrix(q);
-        const float ox=pointerPose_.position.x*rot[0] + pointerPose_.position.y*rot[4] + pointerPose_.position.z*rot[8] + moveX_;
-        const float oy=pointerPose_.position.x*rot[1] + pointerPose_.position.y*rot[5] + pointerPose_.position.z*rot[9];
-        const float oz=pointerPose_.position.x*rot[2] + pointerPose_.position.y*rot[6] + pointerPose_.position.z*rot[10] + moveZ_;
+        // The controller position is already in reference space: rotate its aim direction,
+        // not its position by its own orientation (which caused the pointer to drift).
+        const float ox=pointerPose_.position.x+moveX_;
+        const float oy=pointerPose_.position.y-sittingDrop;
+        const float oz=pointerPose_.position.z+moveZ_;
         const float dx=-rot[8], dy=-rot[9], dz=-rot[10];
+        const float directionLength=std::sqrt(dx*dx+dy*dy+dz*dz);
+        const float ndx=directionLength>0.0001f?dx/directionLength:0.0f;
+        const float ndy=directionLength>0.0001f?dy/directionLength:0.0f;
+        const float ndz=directionLength>0.0001f?dz/directionLength:-1.0f;
         const float screenZ=deskZ+0.022f;
         float hitT=-1.0f;
-        if (std::fabs(dz)>0.0001f) {
-            const float t=(screenZ-oz)/dz;
+        if (std::fabs(ndz)>0.0001f) {
+            const float t=(screenZ-oz)/ndz;
             if (t>0.0f && t<5.0f) hitT=t;
         }
         const float rayLength=hitT>0.0f?hitT:2.5f;
-        for(int i=1;i<=28;++i) {
-            const float t=rayLength*static_cast<float>(i)/28.0f;
-            drawBox(pv.data(),ox+dx*t,oy+dy*t,oz+dz*t,.009f,.009f,.009f,
-                    menuOpen_?rgb(.22f,.62f,1.0f):rgb(.10f,.42f,.85f));
+        const float cx=ox+ndx*rayLength*0.5f;
+        const float cy=oy+ndy*rayLength*0.5f;
+        const float cz=oz+ndz*rayLength*0.5f;
+        // A single continuous, oriented beam replaces the old trail of little cubes.
+        float rx=ndz, ry=0.0f, rz=-ndx; // cross(world-up, direction)
+        if (std::fabs(ndy)>0.98f) { rx=0.0f; ry=0.0f; rz=1.0f; }
+        const float rightLength=std::sqrt(rx*rx+ry*ry+rz*rz);
+        if (rightLength>0.0001f) { rx/=rightLength; ry/=rightLength; rz/=rightLength; }
+        const float ux=ndy*rz-ndz*ry;
+        const float uy=ndz*rx-ndx*rz;
+        const float uz=ndx*ry-ndy*rx;
+        Mat4 beamRotation=identity();
+        beamRotation[0]=rx; beamRotation[1]=ry; beamRotation[2]=rz;
+        beamRotation[4]=ux; beamRotation[5]=uy; beamRotation[6]=uz;
+        beamRotation[8]=ndx; beamRotation[9]=ndy; beamRotation[10]=ndz;
+        Mat4 beamModel=mul(translation(cx,cy,cz),mul(beamRotation,scaling(0.004f,0.004f,rayLength)));
+        Mat4 beamMvp=mul(pv,beamModel);
+        glUniformMatrix4fv(locMvp_,1,GL_FALSE,beamMvp.data());
+        const auto laserColor=rgb(.18f,.62f,1.0f);
+        glUniform4fv(locColor_,1,laserColor.data());
+        glUniform1i(locTextured_,0);
+        glBindVertexArray(vao_);
+        glDrawArrays(GL_TRIANGLES,0,36);
+        glBindVertexArray(0);
+        if (hitT>0.0f) {
+            drawBox(pv.data(),ox+ndx*hitT,oy+ndy*hitT,oz+ndz*hitT,0.018f,0.018f,0.018f,rgb(.42f,.80f,1.0f));
         }
         if(menuOpen_ && hitT>0.0f && pointerTrigger_ && !pointerTriggerPrevious_) {
             const float hx=ox+dx*hitT;
