@@ -1162,6 +1162,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(),0,ceilingY-1.05f,frontZ+0.02f,1.4f,2.1f,0.10f,wall);
     drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,std::min(halfW*1.35f,settings_.roomSize=="small"?3.4f:6.2f),activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f);
 
+    const float deskZ=-1.75f;
+
     // QuestBridge ambience pass: layered architectural details in a restrained blue/violet palette.
     // Geometry is deliberately low-cost and uses the existing box shader (no extra draw pipeline).
     const auto accentBlue = rgb(.20f,.62f,1.0f);
@@ -1187,7 +1189,6 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(),0,floorY+1.055f,deskZ+.48f,2.45f,.012f,.018f,accentViolet);
 
     // Desk and monitor mount.
-    const float deskZ=-1.75f;
     drawBox(pv.data(),0,floorY+0.78f,deskZ,3.25f,0.10f,0.82f,wood);
     drawBox(pv.data(),-1.38f,floorY+0.37f,deskZ,0.10f,0.75f,0.72f,wood);
     drawBox(pv.data(),1.38f,floorY+0.37f,deskZ,0.10f,0.75f,0.72f,wood);
