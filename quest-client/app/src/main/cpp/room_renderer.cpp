@@ -1195,11 +1195,15 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Keep the actual per-eye OpenXR pose untouched. Virtual yaw and locomotion are
     // represented as a shared transform of the virtual world, not a fake compositor pose.
     const Mat4 physicalView = makeView(view.pose, 0.0f, 0.0f, 0.0f, 0.0f);
-    const Mat4 inverseVirtualWorld = mul(
+    // Apply virtual room rotation about its pivot first, then apply locomotion in
+    // room/world space. Translation stays outside the rotation so turning cannot
+    // rotate or reverse the direction vector used for joystick movement.
+    const Mat4 inverseVirtualRotation = mul(
         translation(yawPivotX_, yawPivotY_, yawPivotZ_),
-        mul(rotateY(-virtualYaw_),
-            mul(translation(-yawPivotX_, -yawPivotY_, -yawPivotZ_),
-                translation(-(moveX_ + worldOffsetX_), sittingDrop, -(moveZ_ + worldOffsetZ_)))));
+        mul(rotateY(-virtualYaw_), translation(-yawPivotX_, -yawPivotY_, -yawPivotZ_)));
+    const Mat4 inverseVirtualTranslation =
+        translation(-(moveX_ + worldOffsetX_), sittingDrop, -(moveZ_ + worldOffsetZ_));
+    const Mat4 inverseVirtualWorld = mul(inverseVirtualTranslation, inverseVirtualRotation);
     Mat4 camera = mul(physicalView, inverseVirtualWorld);
     Mat4 pv=mul(projection,camera);
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
