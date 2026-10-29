@@ -1177,7 +1177,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(),0,floorY+0.12f,backZ+0.06f,halfW*2-0.1f,0.22f,0.055f,trim);
     // A clean ceiling light fixture adds a focal point overhead without costly dynamic lights.
     drawBox(pv.data(),0,ceilingY-0.10f,0.0f,1.25f,0.07f,0.62f,trim);
-    drawBox(pv.data(),0,ceilingY-0.145f,0.0f,1.08f,0.025f,0.46f,lampGlow);
+    drawBox(pv.data(),0,ceilingY-0.145f,0.0f,1.08f,0.025f,0.46f,rgb(.95f,.78f,.52f));
     drawBox(pv.data(),-halfW-0.05f,(floorY+ceilingY)*.5f,0,0.1f,ceilingY-floorY,halfD*2,wall);
     drawBox(pv.data(),halfW+0.05f,(floorY+ceilingY)*.5f,0,0.1f,ceilingY-floorY,halfD*2,wall);
     drawBox(pv.data(),0,(floorY+ceilingY)*.5f,backZ-0.05f,halfW*2,ceilingY-floorY,0.1f,wall);
