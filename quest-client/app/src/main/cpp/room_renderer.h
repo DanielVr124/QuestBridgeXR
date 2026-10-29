@@ -63,6 +63,9 @@ private:
     void drawPlane(const float* projectionView, float x, float y, float z,
                    float sx, float sy, GLuint texture, const std::array<float, 4>& color,
                    float yaw = 0.0f);
+    void drawCurvedPanel(const float* projectionView, float x, float y, float z,
+                         float width, float height, float curveDepth, GLuint texture,
+                         const std::array<float, 4>& color, int segments = 24);
     void drawEnvironmentWindow(const float* projectionView, float halfW, float floorY, float backZ,
                                GLuint environmentTexture, float windowW, float windowH);
 
@@ -86,6 +89,8 @@ private:
     GLuint videoFallbackTexture_ = 0;
     GLuint textVao_ = 0;
     GLuint textVbo_ = 0;
+    GLuint curvedVao_ = 0;
+    GLuint curvedVbo_ = 0;
     bool initialized_ = false;
     float moveX_ = 0.0f;
     float moveZ_ = 0.0f;
