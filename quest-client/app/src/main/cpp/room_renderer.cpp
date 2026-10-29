@@ -1060,8 +1060,8 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     // Forward follows the direction the user is looking, including the virtual room turn.
     // This is the expected head-relative locomotion used by most standalone VR apps.
     const float yaw=headYaw(headPose)+virtualYaw_;
-    const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
-    const float inputAlpha=1.0f-std::exp(-dt*14.0f);
+    const float speed=std::clamp(settings_.movementSpeed*1.20f,0.1f,4.0f);
+    const float inputAlpha=1.0f-std::exp(-dt*9.0f);
     smoothedMoveX_ += (leftX-smoothedMoveX_)*inputAlpha;
     smoothedMoveY_ += (leftY-smoothedMoveY_)*inputAlpha;
     leftX=smoothedMoveX_;
@@ -1200,18 +1200,13 @@ void RoomRenderer::drawControlMenu(const float* pv, float monitorW, float monito
 }
 
 XrPosef RoomRenderer::transformViewPose(const XrPosef& viewPose, const XrVector3f& headCenter) const {
+    // Keep the OpenXR view orientation physically tracked. Artificial turning is
+    // applied to the room geometry below, not to the compositor's head pose.
     XrPosef rendered=viewPose;
-    const XrQuaternionf yawQ{0.0f,std::sin(virtualYaw_*0.5f),0.0f,std::cos(virtualYaw_*0.5f)};
-    rendered.orientation=quatMul(yawQ,viewPose.orientation);
-
-    // Rotate each eye's IPD offset around the head center, not around the room
-    // origin. The compositor pose must match the virtual pose used to render.
-    const float c=std::cos(virtualYaw_), s=std::sin(virtualYaw_);
-    const float dx=viewPose.position.x-headCenter.x;
-    const float dz=viewPose.position.z-headCenter.z;
-    rendered.position.x=headCenter.x+c*dx+s*dz+moveX_;
+    rendered.position.x=viewPose.position.x+moveX_;
     rendered.position.y=viewPose.position.y-(sitting_?std::clamp(settings_.sittingHeadDropM,0.10f,0.75f):0.0f);
-    rendered.position.z=headCenter.z-s*dx+c*dz+moveZ_;
+    rendered.position.z=viewPose.position.z+moveZ_;
+    (void)headCenter;
     return rendered;
 }
 
@@ -1226,7 +1221,15 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
     Mat4 projection=makeProjection(view.fov);
     Mat4 camera=makeView(renderedPose);
-    Mat4 pv=mul(projection,camera);
+    // Turn the virtual room around the user's current position. Rotating the
+    // submitted head pose made the compositor treat stick-turn as real head
+    // motion, which can drag the scene like a floating window and expose black.
+    const float pivotX=renderedPose.position.x;
+    const float pivotY=renderedPose.position.y;
+    const float pivotZ=renderedPose.position.z;
+    const Mat4 roomTurn=mul(translation(pivotX,pivotY,pivotZ),
+                            mul(rotateY(-virtualYaw_),translation(-pivotX,-pivotY,-pivotZ)));
+    Mat4 pv=mul(projection,mul(camera,roomTurn));
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
     std::array<float,4> floor = rgb(.09f,.12f,.18f);
