@@ -158,6 +158,10 @@ ClientConfig loadConfig(android_app* app) {
             << "incomplete_frame_timeout_ms=120\n"
             << "quest_receive_buffer_kib=4096\n"
             << "environment=blossom\n"
+            << "room_mode=explore\n"
+            << "monitor_behavior=world\n"
+            << "monitors_visible=true\n"
+            << "ambience_enabled=true\n"
             << "room_size=medium\n"
             << "screen_destination=monitor\n"
             << "monitor_count=1\n"
@@ -227,7 +231,12 @@ ClientConfig loadConfig(android_app* app) {
         } else if (key == "quest_receive_buffer_kib") {
             const int v = std::atoi(value.c_str());
             if (v >= 256 && v <= 16384) cfg.receiveBufferKiB = static_cast<uint32_t>(v);
-        } else if (key == "environment" && (value == "blossom" || value == "night_city" || value == "golden_city" || value == "aurora" || value == "cyberpunk" || value == "sunset_beach" || value == "snowy_mountains" || value == "enchanted_forest" || value == "desert_dunes" || value == "ocean_cliffs" || value == "space_nebula" || value == "lunar_base" || value == "volcanic" || value == "underwater" || value == "autumn_forest" || value == "tropical_island" || value == "candy_land" || value == "steampunk_city" || value == "rainy_tokyo" || value == "sakura_night" || value == "alpine_lake" || value == "emerald_valley" || value == "wasteland" || value == "midnight_clouds" || value == "crystal_cavern" || value == "lavender_fields" || value == "firefly_swamp" || value == "polar_station")) cfg.room.environment = value;
+        } else if (key == "environment" && !value.empty() &&
+                   value.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789_") == std::string::npos) cfg.room.environment = value;
+        else if (key == "room_mode" && (value == "explore" || value == "workspace")) cfg.room.mode = value;
+        else if (key == "monitor_behavior" && (value == "world" || value == "follow" || value == "summon")) cfg.room.monitorBehavior = value;
+        else if (key == "monitors_visible") cfg.room.monitorsVisible = parseBool(value, cfg.room.monitorsVisible);
+        else if (key == "ambience_enabled") cfg.room.ambienceEnabled = parseBool(value, cfg.room.ambienceEnabled);
         else if (key == "room_size" && (value == "small" || value == "medium" || value == "large")) cfg.room.roomSize = value;
         else if (key == "screen_destination" && (value == "monitor" || value == "tv" || value == "both")) cfg.room.screenDestination = value;
         else if (key == "monitor_count") { const int v = std::atoi(value.c_str()); if (v >= 1 && v <= 3) cfg.room.monitorCount = v; }
@@ -969,12 +978,18 @@ private:
         const bool leftStickClick = boolAction(hands_[0].thumbstickClick, hands_[0].handPath);
         const bool rightStickClick = boolAction(hands_[1].thumbstickClick, hands_[1].handPath);
         const bool leftPrimary = boolAction(hands_[0].primary, hands_[0].handPath);
+        const bool leftSecondary = boolAction(hands_[0].secondary, hands_[0].handPath);
+        const bool rightSecondary = boolAction(hands_[1].secondary, hands_[1].handPath);
         if (leftStickClick && !previousLeftStickClick_) room_.cycleScreenDestination();
         if (rightStickClick && !previousRightStickClick_) room_.cycleEnvironment();
         if (leftPrimary && !previousLeftPrimary_) room_.toggleSitting(headPose);
+        if (leftSecondary && !previousLeftSecondary_) room_.toggleWorldMode();
+        if (rightSecondary && !previousRightSecondary_) room_.toggleMonitors();
         previousLeftStickClick_ = leftStickClick;
         previousRightStickClick_ = rightStickClick;
         previousLeftPrimary_ = leftPrimary;
+        previousLeftSecondary_ = leftSecondary;
+        previousRightSecondary_ = rightSecondary;
         const float moveX = applyDeadzone(std::clamp(config_.invertThumbstickX ? -move.x : move.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
         const float moveY = applyDeadzone(std::clamp(config_.invertThumbstickY ? -move.y : move.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
         const float turnX = applyDeadzone(std::clamp(turn.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
@@ -1180,6 +1195,8 @@ private:
     bool previousLeftStickClick_ = false;
     bool previousRightStickClick_ = false;
     bool previousLeftPrimary_ = false;
+    bool previousLeftSecondary_ = false;
+    bool previousRightSecondary_ = false;
 };
 
 } // namespace
