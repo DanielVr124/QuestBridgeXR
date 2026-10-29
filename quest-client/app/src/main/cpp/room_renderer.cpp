@@ -1134,7 +1134,13 @@ void RoomRenderer::setControllerState(const XrPosef& leftPose, bool leftValid, f
 void RoomRenderer::drawControllerModel(const float* pv, const XrPosef& pose, bool leftHand, float trigger, float grip) {
     Mat4 viewProjection{};
     std::copy(pv, pv + viewProjection.size(), viewProjection.begin());
-    const Mat4 orientation = quatMatrix(pose.orientation);
+    // OpenXR grip-pose axes are not the same as this procedural model's axes:
+    // the grip +X axis is normal to the palm, while this model's button face is -Z.
+    // Apply a hand-specific local quarter-turn so the face points away from the palm.
+    const float modelYaw = leftHand ? -kPi * 0.5f : kPi * 0.5f;
+    const XrQuaternionf modelOffset{0.0f, std::sin(modelYaw * 0.5f), 0.0f,
+                                    std::cos(modelYaw * 0.5f)};
+    const Mat4 orientation = quatMatrix(quatMul(pose.orientation, modelOffset));
     const auto shell = rgb(.075f,.090f,.125f);
     const auto highlight = rgb(.20f,.24f,.31f);
     const auto rubber = rgb(.035f,.042f,.060f);
