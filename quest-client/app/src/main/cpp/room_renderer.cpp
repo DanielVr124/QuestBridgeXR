@@ -1054,14 +1054,15 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floor
 }
 
 void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
-    if(dt<0.0f||dt>0.1f)dt=0.0f;
+    // Cap long frame spikes instead of freezing locomotion for a whole frame.
+    dt=std::clamp(dt,0.0f,0.05f);
     // Pushing the left stick stands up automatically; the virtual seat is not a locked animation state.
     if(sitting_ && (std::fabs(leftX)>0.22f || std::fabs(leftY)>0.22f)) sitting_=false;
     // Forward follows the direction the user is looking, including the virtual room turn.
     // This is the expected head-relative locomotion used by most standalone VR apps.
     const float yaw=headYaw(headPose)+virtualYaw_;
     const float speed=std::clamp(settings_.movementSpeed*1.20f,0.1f,4.0f);
-    const float inputAlpha=1.0f-std::exp(-dt*9.0f);
+    const float inputAlpha=1.0f-std::exp(-dt*7.0f);
     smoothedMoveX_ += (leftX-smoothedMoveX_)*inputAlpha;
     smoothedMoveY_ += (leftY-smoothedMoveY_)*inputAlpha;
     leftX=smoothedMoveX_;
@@ -1224,9 +1225,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Turn the virtual room around the user's current position. Rotating the
     // submitted head pose made the compositor treat stick-turn as real head
     // motion, which can drag the scene like a floating window and expose black.
-    const float pivotX=renderedPose.position.x;
-    const float pivotY=renderedPose.position.y;
-    const float pivotZ=renderedPose.position.z;
+    // Both eyes must use the exact same world-space turn pivot. Using each
+    // eye's pose separately rotates the scene around two different points and
+    // creates stereo divergence that looks like the room is warping.
+    const float pivotX=headCenter.x+moveX_;
+    const float pivotY=headCenter.y-(sitting_?std::clamp(settings_.sittingHeadDropM,0.10f,0.75f):0.0f);
+    const float pivotZ=headCenter.z+moveZ_;
     const Mat4 roomTurn=mul(translation(pivotX,pivotY,pivotZ),
                             mul(rotateY(-virtualYaw_),translation(-pivotX,-pivotY,-pivotZ)));
     Mat4 pv=mul(projection,mul(camera,roomTurn));
