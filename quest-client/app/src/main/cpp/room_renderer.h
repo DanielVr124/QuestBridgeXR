@@ -38,7 +38,7 @@ public:
     void toggleSitting(const XrPosef& headPose);
     bool sitting() const { return sitting_; }
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
-                   const XrPosef& headCenterPose, GLuint videoTexture, bool hasVideo);
+                   GLuint videoTexture, bool hasVideo);
     void rebaseYawPivot(const XrPosef& headPose);
     float locomotionX() const { return moveX_; }
     float locomotionZ() const { return moveZ_; }
