@@ -152,12 +152,14 @@ try:
     from qbx_config import (
         DEFAULT_CONFIG, DEFAULT_CONFIG_PATH, PROFILE_DIR, apply_profile, load_config, profile_filename, profile_names,
         save_config, save_quest_ini, save_fake_vr_ini, validate_config, ROOM_ENVIRONMENTS,
+        ROOM_ENVIRONMENT_LABELS, ROOM_ENVIRONMENT_BY_LABEL,
     )
 except ModuleNotFoundError:
     sys.path.insert(0, str(TOOLS))
     from qbx_config import (
         DEFAULT_CONFIG, DEFAULT_CONFIG_PATH, PROFILE_DIR, apply_profile, load_config, profile_filename, profile_names,
         save_config, save_quest_ini, save_fake_vr_ini, validate_config, ROOM_ENVIRONMENTS,
+        ROOM_ENVIRONMENT_LABELS, ROOM_ENVIRONMENT_BY_LABEL,
     )
 
 
@@ -440,7 +442,9 @@ class QuestBridgeStudio(tk.Tk):
     def _add_room_tab(self, notebook: ttk.Notebook) -> None:
         f = self._tab(notebook, "Virtual Room")
         cfg = self.config_data["room"]
-        self._combo(f, "room.environment", "Window scenery", cfg["environment"], ROOM_ENVIRONMENTS, 0)
+        self._combo(f, "room.environment", "Window scenery",
+                    ROOM_ENVIRONMENT_LABELS.get(cfg["environment"], cfg["environment"]),
+                    tuple(ROOM_ENVIRONMENT_LABELS.values()), 0)
         self._combo(f, "room.room_size", "Room size", cfg["room_size"], ("small", "medium", "large"), 1)
         self._combo(f, "room.screen_destination", "PC stream appears on", cfg["screen_destination"], ("monitor", "tv", "both"), 2)
         self._entry(f, "room.monitor_count", "Desk monitor count (1–3)", cfg["monitor_count"], 3)
@@ -698,7 +702,7 @@ class QuestBridgeStudio(tk.Tk):
             "transport.max_frame_mib": cfg["transport"]["max_frame_mib"],
             "transport.incomplete_frame_timeout_ms": cfg["transport"]["incomplete_frame_timeout_ms"],
             "transport.quest_receive_buffer_kib": cfg["transport"]["quest_receive_buffer_kib"],
-            "room.environment": cfg["room"]["environment"],
+            "room.environment": ROOM_ENVIRONMENT_LABELS.get(cfg["room"]["environment"], cfg["room"]["environment"]),
             "room.room_size": cfg["room"]["room_size"],
             "room.screen_destination": cfg["room"]["screen_destination"],
             "room.monitor_count": cfg["room"]["monitor_count"],
@@ -785,7 +789,7 @@ class QuestBridgeStudio(tk.Tk):
         cfg["transport"]["max_frame_mib"] = int(val("transport.max_frame_mib"))
         cfg["transport"]["incomplete_frame_timeout_ms"] = int(val("transport.incomplete_frame_timeout_ms"))
         cfg["transport"]["quest_receive_buffer_kib"] = int(val("transport.quest_receive_buffer_kib"))
-        cfg["room"]["environment"] = val("room.environment")
+        cfg["room"]["environment"] = ROOM_ENVIRONMENT_BY_LABEL.get(val("room.environment"), val("room.environment"))
         cfg["room"]["room_size"] = val("room.room_size")
         cfg["room"]["screen_destination"] = val("room.screen_destination")
         cfg["room"]["monitor_count"] = int(val("room.monitor_count"))
