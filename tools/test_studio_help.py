@@ -9,8 +9,8 @@ from questbridge_studio import SETTING_HELP
 
 class StudioHelpTests(unittest.TestCase):
     def test_every_studio_setting_has_a_detailed_hover_explanation(self):
-        self.assertEqual(len(SETTING_HELP), 75)
-        self.assertEqual(len(set(SETTING_HELP)), 75)
+        self.assertEqual(len(SETTING_HELP), 79)
+        self.assertEqual(len(set(SETTING_HELP)), 79)
         for key, explanation in SETTING_HELP.items():
             with self.subTest(setting=key):
                 self.assertIn(".", explanation)
