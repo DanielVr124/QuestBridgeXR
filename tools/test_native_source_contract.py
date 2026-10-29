@@ -22,7 +22,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("cyberpunk", source)
         self.assertIn("createProceduralEnvironment(activeEnvironmentIndex_)", source)
         self.assertIn("std::array<const char*, 28> kEnvironmentNames", source)
-        self.assertIn("environmentTextures_[activeEnvironmentIndex_]", source)
+        self.assertIn("environmentTextures_.fill(0)", source)
         catalog_start = source.index("kEnvironmentNames")
         catalog_end = source.index("};", catalog_start)
         native_catalog = source[catalog_start:catalog_end]
