@@ -43,6 +43,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertNotIn("room_.cycleEnvironment()", source)
         self.assertNotIn("room_.toggleSitting(headPose)", source)
         self.assertIn('bind(hands_[0].menu, "/user/hand/left/input/menu/click")', source)
+        self.assertIn("left Y is a deliberate in-app fallback", source)
         self.assertIn("if (menuPressed && !previousMenuPressed_) room_.toggleMenu()", source)
         self.assertIn("config_.invertThumbstickY ? -move.y : move.y", source)
         self.assertIn("room_.handleMenuInput(move.y, menuSelectEdge)", source)
@@ -52,6 +53,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("Monitor-anchored menu", renderer)
         self.assertIn("void RoomRenderer::handleMenuInput", renderer)
         self.assertIn("drawText(pv.data(), labels[i]", renderer)
+        self.assertIn("kEnvironmentNames[activeEnvironmentIndex_]", renderer)
         self.assertIn("yawPivotX_ = headPose.position.x + moveX_ + worldOffsetX_", renderer)
 
     def test_fake_vr_bridge_is_connected_and_default_off(self):
