@@ -38,8 +38,13 @@ class NativeSourceContractTests(unittest.TestCase):
 
     def test_room_controls_use_real_controller_actions(self):
         source = (ROOT / "quest-client/app/src/main/cpp/main.cpp").read_text(encoding="utf-8")
-        self.assertIn("room_.cycleScreenDestination()", source)
-        self.assertIn("room_.cycleEnvironment()", source)
+        # Environment and display switching are intentionally menu-only; thumbstick clicks
+        # must not invoke these actions because they conflict with movement/turning.
+        room = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
+        self.assertIn("cycleScreenDestination()", room)
+        self.assertIn("cycleEnvironment()", room)
+        self.assertNotIn("leftStickClick &&", source)
+        self.assertNotIn("rightStickClick &&", source)
         self.assertIn("room_.toggleSitting(headPose)", source)
         self.assertIn("room_.updateLocomotion(moveX, moveY, turnX, dt, headPose)", source)
 
