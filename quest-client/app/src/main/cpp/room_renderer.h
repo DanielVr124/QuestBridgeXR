@@ -40,6 +40,8 @@ public:
                           const XrPosef& headPose);
     void cycleScreenDestination();
     void cycleEnvironment();
+    void toggleMonitors();
+    void toggleWorldMode();
     void toggleSitting(const XrPosef& headPose);
     bool sitting() const { return sitting_; }
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
@@ -66,8 +68,6 @@ private:
                             GLuint videoTexture, bool hasVideo);
     void drawMonitors(const float* projectionView, const float* projection, float floorY,
                       GLuint videoTexture, bool hasVideo, bool followView);
-    void toggleMonitors();
-    void toggleWorldMode();
 
     RoomSettings settings_{};\n    AmbientAudio ambience_{};
     GLuint program_ = 0;
