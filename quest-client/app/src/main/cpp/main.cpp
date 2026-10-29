@@ -534,6 +534,8 @@ struct EyeSwapchain {
 struct HandActions {
     XrPath handPath = XR_NULL_PATH;
     XrAction pose = XR_NULL_HANDLE;
+    XrAction aimPose = XR_NULL_HANDLE;
+    XrSpace aimPoseSpace = XR_NULL_HANDLE;
     XrAction trigger = XR_NULL_HANDLE;
     XrAction squeeze = XR_NULL_HANDLE;
     XrAction thumbstick = XR_NULL_HANDLE;
@@ -774,6 +776,8 @@ private:
             else LOGW("Could not resolve input path %s", pathString.c_str());
         };
         bind(hands_[0].pose, std::string("/user/hand/left/input/") + config_.controllerPose + "/pose");
+        bind(hands_[0].aimPose, "/user/hand/left/input/aim/pose");
+        bind(hands_[0].menu, "/user/hand/left/input/menu/click");
         bind(hands_[0].trigger, "/user/hand/left/input/trigger/value");
         bind(hands_[0].squeeze, "/user/hand/left/input/squeeze/value");
         bind(hands_[0].thumbstick, "/user/hand/left/input/thumbstick");
@@ -784,6 +788,7 @@ private:
         // Do not suggest it as an application binding.
         // OpenXR Touch profiles expose squeeze as a value, not a portable squeeze/click path.
         bind(hands_[1].pose, std::string("/user/hand/right/input/") + config_.controllerPose + "/pose");
+        bind(hands_[1].aimPose, "/user/hand/right/input/aim/pose");
         bind(hands_[1].trigger, "/user/hand/right/input/trigger/value");
         bind(hands_[1].squeeze, "/user/hand/right/input/squeeze/value");
         bind(hands_[1].thumbstick, "/user/hand/right/input/thumbstick");
@@ -794,7 +799,18 @@ private:
         suggested.interactionProfile = profile;
         suggested.countSuggestedBindings = static_cast<uint32_t>(bindings.size());
         suggested.suggestedBindings = bindings.data();
-        if (!xrOk(xrSuggestInteractionProfileBindings(instance_, &suggested), "xrSuggestInteractionProfileBindings")) return false;
+        XrResult bindingResult = xrSuggestInteractionProfileBindings(instance_, &suggested);
+        if (XR_FAILED(bindingResult)) {
+            // Some Quest runtimes reserve the left Menu button for the system overlay.
+            // Retry without that optional binding; right B remains a compatibility fallback.
+            LOGW("Menu-button binding rejected (%d); retrying without the reserved system button", static_cast<int>(bindingResult));
+            bindings.erase(std::remove_if(bindings.begin(), bindings.end(), [&](const XrActionSuggestedBinding& b) {
+                return b.action == hands_[0].menu;
+            }), bindings.end());
+            suggested.countSuggestedBindings = static_cast<uint32_t>(bindings.size());
+            suggested.suggestedBindings = bindings.data();
+            if (!xrOk(xrSuggestInteractionProfileBindings(instance_, &suggested), "xrSuggestInteractionProfileBindings(fallback)")) return false;
+        }
 
         XrSessionActionSetsAttachInfo attach{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
         attach.countActionSets = 1;
@@ -806,6 +822,11 @@ private:
             spaceInfo.subactionPath = hand.handPath;
             spaceInfo.poseInActionSpace.orientation.w = 1.0f;
             if (!xrOk(xrCreateActionSpace(session_, &spaceInfo, &hand.poseSpace), "xrCreateActionSpace(controller)")) return false;
+            XrActionSpaceCreateInfo aimSpaceInfo{XR_TYPE_ACTION_SPACE_CREATE_INFO};
+            aimSpaceInfo.action = hand.aimPose;
+            aimSpaceInfo.subactionPath = hand.handPath;
+            aimSpaceInfo.poseInActionSpace.orientation.w = 1.0f;
+            if (!xrOk(xrCreateActionSpace(session_, &aimSpaceInfo, &hand.aimPoseSpace), "xrCreateActionSpace(controller aim)")) return false;
         }
         return true;
     }
@@ -823,6 +844,7 @@ private:
             return xrOk(xrCreateAction(actionSet_, &info, action), info.actionName);
         };
         return create(XR_ACTION_TYPE_POSE_INPUT, "pose", &hand.pose) &&
+               create(XR_ACTION_TYPE_POSE_INPUT, "aim_pose", &hand.aimPose) &&
                create(XR_ACTION_TYPE_FLOAT_INPUT, "trigger", &hand.trigger) &&
                create(XR_ACTION_TYPE_FLOAT_INPUT, "squeeze", &hand.squeeze) &&
                create(XR_ACTION_TYPE_VECTOR2F_INPUT, "thumbstick", &hand.thumbstick) &&
@@ -967,12 +989,14 @@ private:
         const bool leftStickClick = boolAction(hands_[0].thumbstickClick, hands_[0].handPath);
         const bool rightStickClick = boolAction(hands_[1].thumbstickClick, hands_[1].handPath);
         const bool rightSecondary = boolAction(hands_[1].secondary, hands_[1].handPath);
-        const bool rightTrigger = floatAction(hands_[1].trigger, hands_[1].handPath) >= 0.75f;
+        const bool leftMenu = boolAction(hands_[0].menu, hands_[0].handPath);
+        const bool menuToggle = leftMenu || rightSecondary;
+        const bool rightTrigger = floatAction(hands_[1].trigger, hands_[1].handPath) >= 0.55f;
         XrPosef pointerPose{}; pointerPose.orientation.w = 1.0f;
         uint32_t pointerFlags = 0;
-        const bool pointerValid = locatePose(hands_[1].poseSpace, predictedTime, pointerPose, pointerFlags) &&
+        const bool pointerValid = locatePose(hands_[1].aimPoseSpace, predictedTime, pointerPose, pointerFlags) &&
                                   (pointerFlags & 3u) == 3u;
-        if (pointerValid) room_.setPointerState(pointerPose, rightTrigger, rightSecondary);
+        room_.setPointerState(pointerPose, rightTrigger, menuToggle, pointerValid);
         const bool leftPrimary = boolAction(hands_[0].primary, hands_[0].handPath);
         if (leftStickClick && !previousLeftStickClick_) room_.cycleScreenDestination();
         if (rightStickClick && !previousRightStickClick_) room_.cycleEnvironment();
@@ -1127,7 +1151,9 @@ private:
         }
         for (auto& hand : hands_) {
             if (hand.poseSpace) xrDestroySpace(hand.poseSpace);
+            if (hand.aimPoseSpace) xrDestroySpace(hand.aimPoseSpace);
             hand.poseSpace = XR_NULL_HANDLE;
+            hand.aimPoseSpace = XR_NULL_HANDLE;
         }
         for (auto& sc : swapchains_) {
             if (sc.handle) xrDestroySwapchain(sc.handle);
