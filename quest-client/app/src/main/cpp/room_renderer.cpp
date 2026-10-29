@@ -1448,22 +1448,51 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float x=monitorX+(i-(monitorCount-1)*.5f)*(monitorW+monitorGap);
         const bool streamOn=settings_.screenDestination=="monitor"||settings_.screenDestination=="both";
         const GLuint tex=(streamOn&&hasVideo)?videoTexture:videoFallbackTexture_;
-        // Rear shell and separate metallic rim follow the same arc as the display glass.
-        drawCurvedPanel(pv.data(),x,monitorY,monitorZ+.018f,monitorW+.090f,monitorH+.090f,curve+.008f,0,trimDark,32);
+        // A real layered housing: rear cover, deep sidewalls, metallic front lip, then the glass.
+        const float shellW=monitorW+.090f;
+        const float shellH=monitorH+.090f;
+        const float shellCurve=curve+.008f;
+        drawCurvedPanel(pv.data(),x,monitorY,monitorZ-.020f,shellW,shellH,shellCurve,0,trimDark,32);
+        drawCurvedPanel(pv.data(),x,monitorY,monitorZ+.018f,shellW,shellH,shellCurve,0,trimDark,32);
         drawCurvedPanel(pv.data(),x,monitorY,monitorZ+.032f,monitorW+.040f,monitorH+.040f,curve*.88f,0,silver,32);
         drawCurvedPanel(pv.data(),x,monitorY,monitorZ+.044f,monitorW,monitorH,curve*.76f,tex,rgb(1,1,1),32);
-        // Small dark chin with a restrained illuminated status line.
-        drawBox(pv.data(),x,monitorY-monitorH*.5f-.012f,monitorZ+.070f,monitorW*.42f,.012f,.012f,trimDark);
-        drawBox(pv.data(),x,monitorY-monitorH*.5f-.014f,monitorZ+.078f,.055f,.006f,.006f,accentBlue);
-        // Twin metal uprights instead of a bulky center pedestal.
+        // Segmented edge rails follow the curvature and bridge the front and rear covers,
+        // giving the panel visible thickness instead of the appearance of three floating sheets.
+        constexpr int edgeSegments=32;
+        for(int segment=0;segment<edgeSegments;++segment) {
+            const float u=(static_cast<float>(segment)+.5f)/static_cast<float>(edgeSegments);
+            const float nx=2.0f*u-1.0f;
+            const float px=x+nx*shellW*.5f;
+            const float arc=shellCurve*(1.0f-nx*nx);
+            const float frontZ=monitorZ+.018f+arc;
+            const float railZ=frontZ-.020f;
+            const float railW=shellW/static_cast<float>(edgeSegments)+.003f;
+            const float yaw=std::atan(4.0f*shellCurve*nx/shellW);
+            drawBox(pv.data(),px,monitorY+shellH*.5f-.004f,railZ,railW,.028f,.042f,trimDark,yaw);
+            drawBox(pv.data(),px,monitorY-shellH*.5f+.004f,railZ,railW,.028f,.042f,trimDark,yaw);
+            // Fine satin highlights on the upper edge catch the room's ambient colors.
+            drawBox(pv.data(),px,monitorY+shellH*.5f-.003f,frontZ+.001f,railW,.004f,.004f,silver,yaw);
+        }
+        for(int side : {-1,1}) {
+            const float edgeX=x+side*shellW*.5f;
+            drawBox(pv.data(),edgeX,monitorY,monitorZ+.018f-.020f,.028f,shellH-.035f,.042f,trimDark);
+            drawBox(pv.data(),edgeX-side*.002f,monitorY,monitorZ+.018f,.006f,shellH-.055f,.006f,silver);
+        }
+        // A restrained lower chin and tiny centered status light sit beneath the active image.
+        drawBox(pv.data(),x,monitorY-monitorH*.5f-.014f,monitorZ+.070f,monitorW*.42f,.014f,.014f,trimDark);
+        drawBox(pv.data(),x,monitorY-monitorH*.5f-.016f,monitorZ+.079f,.055f,.005f,.006f,accentBlue);
+        // Centered VESA-style mounting plate joins the panel to two separate metal uprights.
+        drawBox(pv.data(),x,monitorY-monitorH*.5f+.055f,monitorZ-.047f,.25f,.13f,.028f,trimDark);
+        drawBox(pv.data(),x,monitorY-monitorH*.5f+.055f,monitorZ-.031f,.19f,.075f,.008f,silver);
         const float legOffset=monitorW*.205f;
         for(int side=-1;side<=1;side+=2) {
             const float legX=x+side*legOffset;
-            drawBox(pv.data(),legX,deskSurface+standHeight*.5f,monitorZ+.005f,.027f,standHeight,.035f,silver);
-            drawBox(pv.data(),legX,deskSurface+.018f,monitorZ+.105f,.075f,.030f,.34f,trimDark,side*.10f);
-            drawBox(pv.data(),legX,deskSurface+.035f,monitorZ+.105f,.042f,.008f,.29f,silver,side*.10f);
-            // Tiny blue status accents on the feet give the stand a deliberate premium finish.
-            drawBox(pv.data(),legX,deskSurface+.040f,monitorZ+.055f,.026f,.004f,.045f,accentBlue,side*.10f);
+            // Slightly inset uprights read as structural supports, not bars glued to the screen.
+            drawBox(pv.data(),legX,deskSurface+standHeight*.5f,monitorZ-.026f,.029f,standHeight,.036f,silver);
+            drawBox(pv.data(),legX,deskSurface+.018f,monitorZ+.075f,.078f,.030f,.34f,trimDark,side*.10f);
+            drawBox(pv.data(),legX,deskSurface+.035f,monitorZ+.075f,.044f,.008f,.29f,silver,side*.10f);
+            // Small blue inlays are recessed into the two low-profile feet.
+            drawBox(pv.data(),legX,deskSurface+.040f,monitorZ+.025f,.026f,.004f,.045f,accentBlue,side*.10f);
         }
     }
 
