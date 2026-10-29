@@ -731,6 +731,117 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                     (noise % 5U == 0U)) { r = 51.0f; g = 91.0f; b = 137.0f; }
             }
 
+            // Dreamcore: soft cloud haze and oversized pastel moons.
+            if ((addedPack == 0 || addedPack == 10 || addedPack == 12) && v < horizon) {
+                const float cloud = std::max(0.0f,
+                    std::sin(u * 13.0f + std::sin(v * 17.0f)) *
+                    std::sin(v * 26.0f + u * 5.0f));
+                const float strength = cloud * (addedPack == 10 ? 27.0f : 16.0f);
+                r += strength * (addedPack == 10 ? 1.45f : 0.92f);
+                g += strength * (addedPack == 10 ? 0.68f : 0.78f);
+                b += strength * 1.35f;
+            }
+            if (sceneIndex == 88 || sceneIndex == 89 || sceneIndex == 95 || sceneIndex == 184 || sceneIndex == 187) {
+                const float moonX = sceneIndex == 184 ? 0.50f : sceneIndex == 89 ? 0.36f : 0.72f;
+                const float moonY = sceneIndex == 184 ? 0.37f : 0.29f;
+                const float dx = (u - moonX) * 1.45f, dy = v - moonY;
+                const float d2 = dx * dx + dy * dy;
+                const float radius = sceneIndex == 184 ? 0.20f : 0.070f;
+                if (d2 < radius * radius) {
+                    r = sceneIndex == 184 ? 238.0f : 240.0f;
+                    g = sceneIndex == 184 ? 213.0f : 223.0f;
+                    b = sceneIndex == 184 ? 255.0f : 246.0f;
+                    if (d2 > radius * radius * 0.68f) { r -= 28.0f; g -= 20.0f; b -= 8.0f; }
+                } else if (d2 < radius * radius * 2.3f) { r += 24.0f; g += 17.0f; b += 34.0f; }
+            }
+            // Empty halls and impossible dream spaces get stylized perspective lines.
+            if (sceneIndex == 90 || sceneIndex == 92 || sceneIndex == 94 ||
+                sceneIndex == 185 || sceneIndex == 187 || sceneIndex == 188 ||
+                sceneIndex == 189 || sceneIndex == 190 || sceneIndex == 191) {
+                const float depth = std::clamp((v - 0.43f) * 2.2f, 0.0f, 1.0f);
+                const float horizontalPhase = std::fabs(std::fmod((v - 0.43f) * 17.0f, 1.0f) - 0.5f);
+                const float rayPhase = std::fabs(std::fmod(std::fabs(u - 0.5f) * (1.0f + depth * 5.0f), 0.18f) - 0.09f);
+                if (v > 0.48f && (horizontalPhase < 0.035f || rayPhase < 0.009f)) {
+                    r += 40.0f; g += 36.0f; b += 57.0f;
+                }
+            }
+            // Liminal poolrooms use turquoise water and a tiled grid.
+            if (sceneIndex == 91 && v > horizon) {
+                const float depth = (v - horizon) / (1.0f - horizon);
+                const bool tileLine = std::fabs(std::fmod(depth * 19.0f, 1.0f) - 0.5f) < 0.055f ||
+                    std::fabs(std::fmod(u * 30.0f + depth * 8.0f, 1.0f) - 0.5f) < 0.035f;
+                if (tileLine) { r = 87.0f; g = 210.0f; b = 207.0f; }
+                else { r = 13.0f + depth * 6.0f; g = 128.0f + depth * 18.0f; b = 145.0f + depth * 15.0f; }
+            }
+            // Gentle rain, snow, and warm lights make the comfort collection feel lived in.
+            if (sceneIndex == 97 || sceneIndex == 136 || sceneIndex == 137 ||
+                sceneIndex == 138 || sceneIndex == 145 || sceneIndex == 181) {
+                if (v < 0.88f && ((x + static_cast<int>((noise >> 7) % 11U)) % 37) < 2 && noise % 4U != 0U) {
+                    r += 14.0f; g += 23.0f; b += 32.0f;
+                }
+            }
+            if ((sceneIndex == 96 || sceneIndex == 128 || sceneIndex == 135 || sceneIndex == 142) &&
+                v < 0.92f && noise % 283U < 4U) {
+                r = std::min(255.0f, r + 62.0f);
+                g = std::min(255.0f, g + 64.0f);
+                b = std::min(255.0f, b + 70.0f);
+            }
+            if (sceneIndex >= 96 && sceneIndex <= 103 && noise % 191U < 3U && v > 0.34f && v < 0.89f) {
+                r = std::min(255.0f, r + 55.0f);
+                g = std::min(255.0f, g + 32.0f);
+                b = std::min(255.0f, b + 12.0f);
+            }
+            // Fairy lights, fireflies, lanterns, and small magical glows.
+            if ((addedPack == 3 || addedPack == 14) && noise % 470U < 3U && v > 0.16f && v < 0.88f) {
+                r += 95.0f; g += 80.0f; b += 112.0f;
+            }
+            if ((sceneIndex == 132 || sceneIndex == 133 || sceneIndex == 134 || sceneIndex == 150) &&
+                noise % 170U < 3U && v > 0.24f && v < 0.86f) {
+                r += 100.0f; g += 64.0f; b += 24.0f;
+            }
+            if ((sceneIndex == 149 || sceneIndex == 206) && v > 0.25f && v < 0.82f && noise % 97U < 3U) {
+                r = 255.0f; g = 184.0f; b = 221.0f;
+            }
+            // Bioluminescent particles and jellyfish-like specks.
+            if (addedPack == 8 && v > 0.20f && noise % 230U < 4U) {
+                r += 24.0f; g += 82.0f; b += 106.0f;
+            }
+            // Large planetary disks and ring systems for the cosmic pack.
+            if (addedPack == 9 && (sceneIndex == 160 || sceneIndex == 162 || sceneIndex == 164 || sceneIndex == 165)) {
+                const float planetX = sceneIndex == 160 ? 0.53f : 0.72f;
+                const float planetY = sceneIndex == 165 ? 0.35f : 0.40f;
+                const float dx = (u - planetX) * 1.5f, dy = v - planetY;
+                const float d2 = dx * dx + dy * dy;
+                const float radius = sceneIndex == 160 ? 0.16f : 0.105f;
+                if (sceneIndex == 160 && std::fabs(dy + dx * 0.18f) < 0.018f && d2 < radius * radius * 2.1f) {
+                    r = 227.0f; g = 186.0f; b = 151.0f;
+                }
+                if (d2 < radius * radius) {
+                    r = 88.0f + 60.0f * (1.0f - d2 / (radius * radius));
+                    g = sceneIndex == 165 ? 146.0f : 76.0f;
+                    b = sceneIndex == 164 ? 181.0f : 214.0f;
+                }
+            }
+            // Pastel hills, rainbow reflections, and cotton-candy bands.
+            if (addedPack == 10 && v > horizon) {
+                const int stripe = (static_cast<int>(u * 19.0f) + static_cast<int>(v * 9.0f)) % 6;
+                const float hues[6][3] = {{249,153,195},{255,207,154},{255,241,167},{158,231,208},{156,195,255},{202,165,245}};
+                if (sceneIndex != 171 || stripe < 4) {
+                    r = hues[stripe][0] * 0.64f + ground[0] * 0.36f;
+                    g = hues[stripe][1] * 0.64f + ground[1] * 0.36f;
+                    b = hues[stripe][2] * 0.64f + ground[2] * 0.36f;
+                }
+            }
+            if (addedPack == 13 && (sceneIndex == 193 || sceneIndex == 196 || sceneIndex == 198) && v > horizon) {
+                const float reflection = 0.5f + 0.5f * std::sin(v * 88.0f + u * 9.0f);
+                r += reflection * 13.0f; g += reflection * 20.0f; b += reflection * 19.0f;
+            }
+            if (addedPack == 14 && v < horizon) {
+                const float band = 0.36f + 0.055f * std::sin(u * 8.0f) + 0.018f * std::sin(u * 21.0f);
+                const float glow = std::exp(-std::pow((v - band) / 0.08f, 2.0f));
+                r += 24.0f * glow; g += 100.0f * glow; b += 116.0f * glow;
+            }
+
             if ((sceneIndex == 80 || sceneIndex == 81) && v < 0.72f && noise % 130U < 3U) {
                 if (sceneIndex == 80) { r += 142.0f; g += 84.0f; b += 28.0f; }
                 else { r += 132.0f; g += 70.0f; b += 121.0f; }
@@ -848,7 +959,15 @@ void RoomRenderer::createGeometry() {
 
 void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; chooseEnvironment(); }
 void RoomRenderer::chooseEnvironment() {
-    activeEnvironmentIndex_ = environmentIndex(settings_.environment);
+    const int previousIndex = activeEnvironmentIndex_;
+    const int selectedIndex = environmentIndex(settings_.environment);
+    // Keep the 3 bundled images and the currently selected procedural image resident.
+    if (initialized_ && previousIndex != selectedIndex && previousIndex >= 3 &&
+        previousIndex < static_cast<int>(environmentTextures_.size()) && environmentTextures_[previousIndex]) {
+        glDeleteTextures(1, &environmentTextures_[previousIndex]);
+        environmentTextures_[previousIndex] = 0;
+    }
+    activeEnvironmentIndex_ = selectedIndex;
     if (activeEnvironmentIndex_ >= 3 && initialized_ && !environmentTextures_[activeEnvironmentIndex_]) {
         environmentTextures_[activeEnvironmentIndex_] = createProceduralEnvironment(activeEnvironmentIndex_);
         if (!environmentTextures_[activeEnvironmentIndex_]) {
@@ -865,8 +984,8 @@ void RoomRenderer::cycleScreenDestination() {
 }
 void RoomRenderer::cycleEnvironment() {
     if (!settings_.roomControlsEnabled) return;
-    activeEnvironmentIndex_ = (activeEnvironmentIndex_ + 1) % static_cast<int>(kEnvironmentNames.size());
-    settings_.environment = kEnvironmentNames[activeEnvironmentIndex_];
+    const int nextIndex = (activeEnvironmentIndex_ + 1) % static_cast<int>(kEnvironmentNames.size());
+    settings_.environment = kEnvironmentNames[nextIndex];
     chooseEnvironment();
     LOGI("Room scenery changed to %s", settings_.environment.c_str());
 }
