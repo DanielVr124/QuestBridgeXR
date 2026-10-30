@@ -3215,8 +3215,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             if (!roomLightsOn_) {
                 buttonColor[0]*=.30f; buttonColor[1]*=.30f; buttonColor[2]*=.30f;
             }
-            drawSphere(pv.data(),-.92f,floorY+1.005f,buttonZ,
-                       radius,.010f,radius,buttonColor,7);
+            drawSphere(pv.data(),-.92f,floorY+1.002f,buttonZ,
+                       radius,.006f,radius,buttonColor,7);
         }
 
         const bool monitorStream = settings_.screenDestination == "monitor" ||
