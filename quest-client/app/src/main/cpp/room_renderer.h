@@ -125,6 +125,15 @@ private:
     GLint locPracticalLightPosition_ = -1;
     GLint locPracticalLightColor_ = -1;
     GLint locPracticalLightIntensity_ = -1;
+    GLint locNeonBluePosition_ = -1;
+    GLint locNeonBlueColor_ = -1;
+    GLint locNeonBlueIntensity_ = -1;
+    GLint locNeonVioletPosition_ = -1;
+    GLint locNeonVioletColor_ = -1;
+    GLint locNeonVioletIntensity_ = -1;
+    GLint locNeonPinkPosition_ = -1;
+    GLint locNeonPinkColor_ = -1;
+    GLint locNeonPinkIntensity_ = -1;
     GLuint cubeTexture_ = 0;
     GLuint planeTexture_ = 0;
     std::array<GLuint, 208> environmentTextures_{};
