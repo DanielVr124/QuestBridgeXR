@@ -987,6 +987,21 @@ private:
         if (!config_.roomMovementEnabled) { moveX = 0.0f; moveY = 0.0f; }
         room_.updateLocomotion(moveX, moveY, turnX, dt, headPose);
 
+        // Room-mounted lighting controls are independent of host controller
+        // forwarding. Aim the right Touch controller at the switch/remote and
+        // use its trigger to activate the targeted control.
+        const HandActions& roomControlHand = hands_[1];
+        XrPosef roomControlPose{};
+        roomControlPose.orientation.w = 1.0f;
+        uint32_t roomControlPoseFlags = 0;
+        locatePose(roomControlHand.poseSpace, predictedTime, roomControlPose, roomControlPoseFlags);
+        const bool roomControlTrigger = floatAction(roomControlHand.trigger, roomControlHand.handPath) >= 0.72f;
+        const bool roomControlTriggerEdge = roomControlTrigger && !previousRoomControlTrigger_;
+        previousRoomControlTrigger_ = roomControlTrigger;
+        if (!room_.menuVisible() && roomControlTriggerEdge) {
+            room_.handleRoomControlInput(roomControlPose, roomControlPoseFlags, true);
+        }
+
         if (!config_.controllersEnabled) return;
         for (int handIndex = 0; handIndex < 2; ++handIndex) {
             const HandActions& hand = hands_[handIndex];
@@ -1186,6 +1201,7 @@ private:
     Clock::time_point lastTrackingSend_{};
     bool previousMenuPressed_ = false;
     bool previousMenuSelectPressed_ = false;
+    bool previousRoomControlTrigger_ = false;
 };
 
 } // namespace
