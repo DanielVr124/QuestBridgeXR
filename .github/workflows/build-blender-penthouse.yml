@@ -26,21 +26,30 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Cache Blender 4.5 LTS
+        uses: actions/cache@v4
+        with:
+          path: .cache/blender-4.5.15
+          key: ${{ runner.os }}-blender-4.5.15-v1
+
       - name: Install Blender 4.5 LTS
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /opt/blender
-          curl --fail --location --retry 3 \
-            https://download.blender.org/release/Blender4.5/blender-4.5.15-linux-x64.tar.xz \
-            --output /tmp/blender.tar.xz
-          curl --fail --location --retry 3 \
-            https://download.blender.org/release/Blender4.5/blender-4.5.15.sha256 \
-            --output /tmp/blender.sha256
-          grep 'blender-4.5.15-linux-x64.tar.xz' /tmp/blender.sha256 | \
-            sed 's#  .*#  /tmp/blender.tar.xz#' | sha256sum --check
-          tar -xJf /tmp/blender.tar.xz --strip-components=1 -C /opt/blender
-          /opt/blender/blender --version
+          BLENDER_DIR="$GITHUB_WORKSPACE/.cache/blender-4.5.15"
+          if [[ ! -x "$BLENDER_DIR/blender" ]]; then
+            mkdir -p "$BLENDER_DIR"
+            curl --fail --location --retry 3 \
+              https://download.blender.org/release/Blender4.5/blender-4.5.15-linux-x64.tar.xz \
+              --output /tmp/blender.tar.xz
+            curl --fail --location --retry 3 \
+              https://download.blender.org/release/Blender4.5/blender-4.5.15.sha256 \
+              --output /tmp/blender.sha256
+            grep 'blender-4.5.15-linux-x64.tar.xz' /tmp/blender.sha256 | \
+              sed 's#  .*#  /tmp/blender.tar.xz#' | sha256sum --check
+            tar -xJf /tmp/blender.tar.xz --strip-components=1 -C "$BLENDER_DIR"
+          fi
+          "$BLENDER_DIR/blender" --version
 
       - name: Build Blender scene, exports and renders
         shell: bash

@@ -1915,7 +1915,7 @@ void RoomRenderer::drawPlane(const float* pv,float x,float y,float z,float sx,fl
 
 void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
                                     float width, float height, float curveDepth, GLuint texture,
-                                    const std::array<float,4>& color, int segments) {
+                                    const std::array<float,4>& color, int segments, float yaw) {
     if (skipProceduralDraws_) return;
     segments = std::clamp(segments, 8, 48);
     std::vector<Vertex> vertices;
@@ -1945,7 +1945,7 @@ void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
                               reinterpret_cast<void*>(3 * sizeof(float)));
         glBindVertexArray(0);
     }
-    const Mat4 model = translation(x, y, z);
+    const Mat4 model = mul(translation(x, y, z), rotateY(yaw));
     Mat4 projectionView{};
     std::copy(pv, pv + projectionView.size(), projectionView.begin());
     const Mat4 mvp = mul(projectionView, model);
@@ -3099,9 +3099,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                                    settings_.screenDestination == "both";
         if (monitorStream && hasVideo) {
             for (int i = 0; i < std::clamp(settings_.monitorCount, 1, 3); ++i) {
-                drawPlane(pv.data(), -3.844f, floorY + 1.73f,
-                          0.42f + (i - (std::clamp(settings_.monitorCount, 1, 3) - 1) * 0.5f) * 2.04f,
-                          1.94f, 0.95f, videoTexture, rgb(1,1,1), kPi * 0.5f);
+                drawCurvedPanel(pv.data(), -3.850f, floorY + 1.73f,
+                                0.42f + (i - (std::clamp(settings_.monitorCount, 1, 3) - 1) * 0.5f) * 2.04f,
+                                1.94f, 0.95f, 0.086f, videoTexture, rgb(1,1,1), 40, kPi * 0.5f);
             }
         }
         if (settings_.showTv && hasVideo &&
@@ -3121,7 +3121,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         glUseProgram(vignetteProgram_);glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);
         glUseProgram(0);glDisable(GL_BLEND);glEnable(GL_DEPTH_TEST);
     }
-    // The complete menu is one flat 2D texture on the active monitor glass.
+    // The menu remains a single flat 2D texture, mapped onto the active curved monitor glass.
     // Closing the menu removes this overlay and leaves the live PC stream visible.
     if (menuVisible_) {
         updateMenuTexture();
@@ -3133,17 +3133,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(program_);
         if (importedPenthouse) {
-            // Match the 27-inch curved monitor: 16:9 active area, facing into the room (+X).
-            drawPlane(pv.data(), -3.838f, floorY + 1.73f, 0.42f,
-                      0.584f, 0.329f, menuTexture_, rgb(1,1,1), kPi * 0.5f);
+            // Match the generated ultrawide's curved active area and face it into the room (+X).
+            // The texture itself stays 2D; only the display surface carries the monitor's 86 mm sag.
+            drawCurvedPanel(pv.data(), -3.850f, floorY + 1.73f, 0.42f,
+                            1.94f, 0.95f, 0.086f, menuTexture_, rgb(1,1,1), 40, kPi * 0.5f);
         } else {
             const float deskZ = -halfD + 1.35f;
             const float deskX = halfW - 1.48f;
             const float monitorX = deskX - 0.36f;
             const float monitorY = floorY + 1.43f;
             const float monitorZ = deskZ - 0.34f;
-            drawPlane(pv.data(), monitorX, monitorY, monitorZ + 0.133f,
-                      1.30f, 0.73f, menuTexture_, rgb(1,1,1));
+            drawCurvedPanel(pv.data(), monitorX, monitorY, monitorZ + 0.133f,
+                            1.30f, 0.73f, 0.082f, menuTexture_, rgb(1,1,1), 32);
         }
         glDisable(GL_BLEND);
     }

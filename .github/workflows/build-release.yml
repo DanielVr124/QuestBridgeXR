@@ -3,7 +3,7 @@ name: QuestBridge XR Build
 on:
   workflow_dispatch:
   push:
-    branches: [main, master]
+    branches: [main, master, "feature/blender-penthouse-base"]
     tags: ["v*"]
   pull_request:
     branches: [main, master]
