@@ -58,7 +58,7 @@ class NativeSourceContractTests(unittest.TestCase):
         header = (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8")
         self.assertIn("void RoomRenderer::toggleMenu()", renderer)
         self.assertIn("if (menuVisible_)", renderer)
-        self.assertIn("complete menu is one flat 2D texture", renderer)
+        self.assertIn("menu remains a single flat 2D texture", renderer)
         self.assertIn("void RoomRenderer::updateMenuTexture()", renderer)
         self.assertIn("menuTexture_", renderer)
         self.assertIn("void RoomRenderer::drawCurvedPanel", renderer)
