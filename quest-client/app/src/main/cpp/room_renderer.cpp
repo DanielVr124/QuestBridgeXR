@@ -295,12 +295,14 @@ precision highp float;
 layout(location=0) in vec3 aPosition;
 layout(location=1) in vec2 aUv;
 uniform mat4 uMvp;
+uniform mat4 uModel;
 out vec2 vUv;
-out vec3 vSurfacePosition;
+out vec3 vWorldPosition;
 void main(){
+  vec4 world=uModel*vec4(aPosition,1.0);
   gl_Position = uMvp * vec4(aPosition,1.0);
   vUv=aUv;
-  vSurfacePosition=aPosition;
+  vWorldPosition=world.xyz;
 }
 )GLSL";
 const char* kVignetteVertex = R"GLSL(#version 300 es
@@ -319,10 +321,12 @@ void main(){ vec2 p=(vUv-vec2(0.5))*vec2(1.5,1.0); float a=smoothstep(0.22,0.82,
 const char* kFragmentShader = R"GLSL(#version 300 es
 precision highp float;
 in vec2 vUv;
-in vec3 vSurfacePosition;
+in vec3 vWorldPosition;
 uniform vec4 uColor;
 uniform sampler2D uTexture;
 uniform int uTextured;
+uniform int uMaterial;
+uniform vec2 uUvScale;
 out vec4 outColor;
 
 float hash21(vec2 p) {
@@ -330,31 +334,78 @@ float hash21(vec2 p) {
   p+=dot(p,p+45.32);
   return fract(p.x*p.y);
 }
+float noise2(vec2 p) {
+  vec2 i=floor(p), f=fract(p);
+  f=f*f*(3.0-2.0*f);
+  return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),
+             mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x),f.y);
+}
+float fbm(vec2 p) {
+  float value=0.0, amplitude=0.5;
+  for(int i=0;i<4;++i){value+=noise2(p)*amplitude;p*=2.03;amplitude*=0.5;}
+  return value;
+}
 void main(){
   vec4 tex = uTextured != 0 ? texture(uTexture, vUv) : vec4(1.0);
   vec4 base = tex * uColor;
-  if (uTextured == 0) {
-    // Derivative normals add per-fragment form shading without changing
-    // the established procedural mesh layouts or OpenXR view transforms.
-    vec3 dpdx=dFdx(vSurfacePosition);
-    vec3 dpdy=dFdy(vSurfacePosition);
-    vec3 normal=normalize(cross(dpdx,dpdy));
-    if (!gl_FrontFacing) normal=-normal;
-    vec3 lightDir=normalize(vec3(-0.42,0.78,0.46));
-    float diffuse=max(dot(normal,lightDir),0.0);
-    vec3 viewDir=normalize(vec3(0.0,0.15,1.0));
-    vec3 halfDir=normalize(lightDir+viewDir);
-    float facing=max(dot(normal,halfDir),0.0);
-    float specular=pow(facing,28.0);
-    float broadSpec=pow(facing,7.0);
-    float grain=hash21(floor(vSurfacePosition.xy*185.0))*0.035-0.0175;
-    float weave=sin(vUv.x*620.0)*sin(vUv.y*620.0)*0.006;
-    float lighting=0.48+diffuse*0.48;
-    vec3 lit=base.rgb*(lighting+grain+weave)+vec3(0.16,0.19,0.23)*(specular*0.20+broadSpec*0.035);
-    outColor=vec4(max(lit,vec3(0.0)),base.a);
+  if (uTextured != 0 || uMaterial < 0) { outColor=base; return; }
+
+  vec2 uv=vUv*uUvScale;
+  float roughness=0.72;
+  float metallic=0.04;
+  float surface=0.0;
+  if(uMaterial==1 || uMaterial==6) {
+    // Directional grain, soft pores, and staggered plank joints.
+    float warp=fbm(uv*vec2(2.2,0.42))*0.20;
+    float grain=sin((uv.y+warp)*145.0 + fbm(uv*vec2(4.0,0.8))*5.0);
+    float fine=sin((uv.y+warp)*510.0)*0.18;
+    surface += grain*0.075 + fine*0.018 + (fbm(uv*vec2(18.0,3.0))-0.5)*0.11;
+    roughness=0.58;
+    if(uMaterial==6) {
+      vec2 plank=fract(vec2(uv.x+mod(floor(uv.y),2.0)*0.5,uv.y));
+      float seam=min(min(plank.x,1.0-plank.x),min(plank.y,1.0-plank.y));
+      surface -= (1.0-smoothstep(0.008,0.035,seam))*0.20;
+    }
+  } else if(uMaterial==2) {
+    // Fine mineral variation keeps painted plaster from looking like flat plastic.
+    surface += (fbm(uv*vec2(13.0,11.0))-0.5)*0.075;
+    surface += (noise2(uv*vec2(96.0,84.0))-0.5)*0.025;
+    roughness=0.92;
+  } else if(uMaterial==3) {
+    // Tight woven fibres with low-contrast yarn variation for upholstery.
+    vec2 weave=fract(uv*vec2(190.0,160.0));
+    float thread=max(smoothstep(0.02,0.18,weave.x)*(1.0-smoothstep(0.76,0.98,weave.x)),
+                     smoothstep(0.02,0.18,weave.y)*(1.0-smoothstep(0.76,0.98,weave.y)));
+    surface += (thread-0.42)*0.045+(fbm(uv*vec2(22.0,22.0))-0.5)*0.05;
+    roughness=0.94;
+  } else if(uMaterial==4) {
+    // Satin/brushed metal grain runs along one axis and catches narrow highlights.
+    surface += (noise2(vec2(uv.x*7.0,uv.y*260.0))-0.5)*0.035;
+    roughness=0.27;
+    metallic=0.78;
+  } else if(uMaterial==5) {
+    // Moulded polymer: subdued mottling and a soft, broad clear-coat response.
+    surface += (fbm(uv*vec2(27.0,27.0))-0.5)*0.035;
+    roughness=0.39;
+    metallic=0.02;
   } else {
-    outColor=base;
+    surface += (noise2(uv*140.0)-0.5)*0.025;
   }
+  base.rgb=max(base.rgb*(1.0+surface),vec3(0.0));
+
+  vec3 normal=normalize(cross(dFdx(vWorldPosition),dFdy(vWorldPosition)));
+  if (!gl_FrontFacing) normal=-normal;
+  vec3 lightDir=normalize(vec3(-0.42,0.78,0.46));
+  vec3 viewDir=normalize(-vWorldPosition+vec3(0.0,0.12,0.0));
+  vec3 halfDir=normalize(lightDir+viewDir);
+  float diffuse=max(dot(normal,lightDir),0.0);
+  float nDotH=max(dot(normal,halfDir),0.0);
+  float specular=pow(nDotH,mix(12.0,110.0,1.0-roughness));
+  float ambient=0.30+max(normal.y,0.0)*0.10;
+  vec3 f0=mix(vec3(0.04),base.rgb,metallic);
+  vec3 highlights=f0*(specular*(1.0-roughness)*0.75);
+  vec3 lit=base.rgb*(ambient+diffuse*0.62)+highlights;
+  outColor=vec4(max(lit,vec3(0.0)),base.a);
 }
 )GLSL";
 
@@ -938,6 +989,8 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     if(linked!=GL_TRUE){char log[1024]{};glGetProgramInfoLog(program_,sizeof(log),nullptr,log);LOGE("room link: %s",log);glDeleteProgram(program_);program_=0;return false;}
     locMvp_=glGetUniformLocation(program_,"uMvp");locColor_=glGetUniformLocation(program_,"uColor");
     locTexture_=glGetUniformLocation(program_,"uTexture");locTextured_=glGetUniformLocation(program_,"uTextured");
+    locUvScale_=glGetUniformLocation(program_,"uUvScale");locMaterial_=glGetUniformLocation(program_,"uMaterial");
+    locModel_=glGetUniformLocation(program_,"uModel");
     GLuint vvs=compileShader(GL_VERTEX_SHADER,kVignetteVertex), vfs=compileShader(GL_FRAGMENT_SHADER,kVignetteFragment);
     if(vvs&&vfs){vignetteProgram_=glCreateProgram();glAttachShader(vignetteProgram_,vvs);glAttachShader(vignetteProgram_,vfs);glLinkProgram(vignetteProgram_);GLint vok=GL_FALSE;glGetProgramiv(vignetteProgram_,GL_LINK_STATUS,&vok);if(vok!=GL_TRUE){glDeleteProgram(vignetteProgram_);vignetteProgram_=0;}}
     if(vvs)glDeleteShader(vvs);if(vfs)glDeleteShader(vfs);
@@ -1125,10 +1178,14 @@ void RoomRenderer::toggleSitting(const XrPosef& headPose) {
     LOGI("Sat on the virtual %s",nearest->name);
 }
 
-void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,float yaw) {
+void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,float yaw,int material) {
     Mat4 projectionView{}; std::copy(pv, pv + projectionView.size(), projectionView.begin());
     Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,sz))); Mat4 mvp=mul(projectionView,model);
-    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniform4fv(locColor_,1,color.data());glUniform1i(locTextured_,0);
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
+    glUniform4fv(locColor_,1,color.data());glUniform1i(locTextured_,0);glUniform1i(locMaterial_,material);
+    const float scaleX=material==6?std::max(1.0f,sx*.60f):std::max(1.0f,std::max(sx,sz)*2.6f);
+    const float scaleY=material==6?std::max(1.0f,sz*.92f):std::max(1.0f,std::max(sy,sz)*2.6f);
+    glUniform2f(locUvScale_,scaleX,scaleY);
     glBindVertexArray(vao_);glDrawArrays(GL_TRIANGLES,0,36);glBindVertexArray(0);
 }
 void RoomRenderer::drawText(const float* pv, const char* text, float x, float y, float z,
@@ -1197,8 +1254,11 @@ void RoomRenderer::drawText(const float* pv, const char* text, float x, float y,
         glBindVertexArray(0);
     }
     glUniformMatrix4fv(locMvp_, 1, GL_FALSE, pv);
+    const Mat4 textModel=identity();
+    glUniformMatrix4fv(locModel_,1,GL_FALSE,textModel.data());
     glUniform4fv(locColor_, 1, color.data());
     glUniform1i(locTextured_, 0);
+    glUniform1i(locMaterial_,-1);
     glBindVertexArray(textVao_);
     glBindBuffer(GL_ARRAY_BUFFER, textVbo_);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_DYNAMIC_DRAW);
@@ -1207,13 +1267,13 @@ void RoomRenderer::drawText(const float* pv, const char* text, float x, float y,
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color) {
+void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,int material) {
     Mat4 projectionView{}; std::copy(pv,pv+projectionView.size(),projectionView.begin());
     const Mat4 model=mul(translation(x,y,z),scaling(sx,sy,sz));
     const Mat4 mvp=mul(projectionView,model);
-    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
     glUniform4fv(locColor_,1,color.data());
-    glUniform1i(locTextured_,0);
+    glUniform1i(locTextured_,0);glUniform1i(locMaterial_,material);glUniform2f(locUvScale_,1.0f,1.0f);
     glBindVertexArray(sphereVao_);
     glDrawArrays(GL_TRIANGLES,0,sphereVertexCount_);
     glBindVertexArray(0);
@@ -1221,7 +1281,8 @@ void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,f
 void RoomRenderer::drawPlane(const float* pv,float x,float y,float z,float sx,float sy,GLuint texture,const std::array<float,4>& color,float yaw) {
     Mat4 projectionView{}; std::copy(pv, pv + projectionView.size(), projectionView.begin());
     Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,1)));Mat4 mvp=mul(projectionView,model);
-    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniform4fv(locColor_,1,color.data());glUniform1i(locTextured_,texture?1:0);
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
+    glUniform4fv(locColor_,1,color.data());glUniform1i(locTextured_,texture?1:0);glUniform1i(locMaterial_,-1);
     glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,texture?texture:videoFallbackTexture_);glUniform1i(locTexture_,0);
     glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);glBindTexture(GL_TEXTURE_2D,0);
 }
@@ -1262,8 +1323,11 @@ void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
     std::copy(pv, pv + projectionView.size(), projectionView.begin());
     const Mat4 mvp = mul(projectionView, model);
     glUniformMatrix4fv(locMvp_, 1, GL_FALSE, mvp.data());
+    glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
     glUniform4fv(locColor_, 1, color.data());
     glUniform1i(locTextured_, texture ? 1 : 0);
+    glUniform1i(locMaterial_,texture ? -1 : 4);
+    glUniform2f(locUvScale_,1.0f,1.0f);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture ? texture : videoFallbackTexture_);
     glUniform1i(locTexture_, 0);
@@ -1420,18 +1484,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUseProgram(program_);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDisable(GL_CULL_FACE);
     glUniform1i(locTexture_,0);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
-    drawBox(pv.data(),0,floorY-0.08f,0,halfW*2+0.1f,0.16f,halfD*2+0.1f,floor);
-    drawBox(pv.data(),0,ceilingY+0.05f,0,halfW*2+0.1f,0.1f,halfD*2+0.1f,wall);
-    drawBox(pv.data(),-halfW-0.05f,(floorY+ceilingY)*.5f,0,0.1f,ceilingY-floorY,halfD*2,wall);
-    drawBox(pv.data(),halfW+0.05f,(floorY+ceilingY)*.5f,0,0.1f,ceilingY-floorY,halfD*2,wall);
-    drawBox(pv.data(),0,(floorY+ceilingY)*.5f,backZ-0.05f,halfW*2,ceilingY-floorY,0.1f,wall);
+    drawBox(pv.data(),0,floorY-0.08f,0,halfW*2+0.1f,0.16f,halfD*2+0.1f,floor,0.0f,6);
+    drawBox(pv.data(),0,ceilingY+0.05f,0,halfW*2+0.1f,0.1f,halfD*2+0.1f,wall,0.0f,2);
+    drawBox(pv.data(),-halfW-0.05f,(floorY+ceilingY)*.5f,0,0.1f,ceilingY-floorY,halfD*2,wall,0.0f,2);
+    drawBox(pv.data(),halfW+0.05f,(floorY+ceilingY)*.5f,0,0.1f,ceilingY-floorY,halfD*2,wall,0.0f,2);
+    drawBox(pv.data(),0,(floorY+ceilingY)*.5f,backZ-0.05f,halfW*2,ceilingY-floorY,0.1f,wall,0.0f,2);
     // Front wall has a centered doorway, so looking around still feels like being inside a room.
     const float sidePanelWidth = std::max(0.25f, (halfW * 2.0f - 1.4f) * 0.5f);
     drawBox(pv.data(),-(halfW+0.7f)*0.5f,(floorY+ceilingY)*0.5f,frontZ+0.02f,
-            sidePanelWidth,ceilingY-floorY,0.10f,wall);
+            sidePanelWidth,ceilingY-floorY,0.10f,wall,0.0f,2);
     drawBox(pv.data(), (halfW+0.7f)*0.5f,(floorY+ceilingY)*0.5f,frontZ+0.02f,
-            sidePanelWidth,ceilingY-floorY,0.10f,wall);
-    drawBox(pv.data(),0,ceilingY-1.05f,frontZ+0.02f,1.4f,2.1f,0.10f,wall);
+            sidePanelWidth,ceilingY-floorY,0.10f,wall,0.0f,2);
+    drawBox(pv.data(),0,ceilingY-1.05f,frontZ+0.02f,1.4f,2.1f,0.10f,wall,0.0f,2);
     drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,std::min(halfW*1.35f,settings_.roomSize=="small"?3.4f:6.2f),activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f);
 
     const float deskZ=-halfD+1.35f;
@@ -1510,7 +1574,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float deskWidth=std::min(2.65f,halfW*1.02f);
     const float deskFrontZ=deskZ+.45f;
     const float deskTopY=floorY+.78f;
-    drawBox(pv.data(),deskX,deskTopY,deskZ,deskWidth,.085f,.88f,wood);
+    drawBox(pv.data(),deskX,deskTopY,deskZ,deskWidth,.085f,.88f,wood,0.0f,1);
     drawBox(pv.data(),deskX-deskWidth*.42f,floorY+.39f,deskZ,.075f,.70f,.78f,trimDark);
     drawBox(pv.data(),deskX+deskWidth*.42f,floorY+.39f,deskZ,.075f,.70f,.78f,trimDark);
     drawBox(pv.data(),deskX,deskTopY+.055f,deskZ,deskWidth-.08f,.018f,.80f,rgb(.10f,.12f,.17f));
@@ -1518,7 +1582,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(),deskX,deskTopY-.105f,deskZ-.365f,deskWidth*.82f,.12f,.035f,trimDark);
     for(int drawer=0;drawer<3;++drawer) {
         const float dx=deskX+(drawer-1)*.31f;
-        drawBox(pv.data(),dx,deskTopY-.105f,deskZ-.386f,.285f,.082f,.010f,wood);
+        drawBox(pv.data(),dx,deskTopY-.105f,deskZ-.386f,.285f,.082f,.010f,wood,0.0f,1);
         drawBox(pv.data(),dx,deskTopY-.105f,deskZ-.394f,.065f,.006f,.008f,silver);
     }
     drawBox(pv.data(),deskX,deskTopY-.19f,deskZ+.34f,deskWidth*.72f,.035f,.12f,trimDark);
@@ -1665,7 +1729,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float pcZ=deskZ+.12f;
     const auto pcWhite=rgb(.88f,.91f,.96f);
     const auto pcEdge=rgb(.66f,.72f,.80f);
-    drawBox(pv.data(),pcX,pcY,pcZ,.43f,.66f,.57f,pcWhite);
+    drawBox(pv.data(),pcX,pcY,pcZ,.43f,.66f,.57f,pcWhite,0.0f,5);
     drawBox(pv.data(),pcX,pcY,pcZ+.292f,.37f,.60f,.012f,rgb(.10f,.13f,.20f));
     drawBox(pv.data(),pcX-.16f,pcY,pcZ+.302f,.045f,.55f,.008f,rgb(.20f,.24f,.33f));
     drawBox(pv.data(),pcX+.16f,pcY,pcZ+.302f,.045f,.55f,.008f,rgb(.20f,.24f,.33f));
@@ -1707,15 +1771,15 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float couchX=halfW-1.25f, couchZ=.05f, couchYaw=-kPi*.5f;
         const float cx=couchX;
         drawBox(pv.data(),cx,floorY+.38f,couchZ, .86f,.24f,1.92f,trimDark,couchYaw);
-        drawSphere(pv.data(),cx,floorY+.53f,couchZ,.48f,.24f,.82f,sofa);
+        drawSphere(pv.data(),cx,floorY+.53f,couchZ,.48f,.24f,.82f,sofa,3);
         // Raised back is on the +X side, so the sitting position faces the TV on the -X wall.
-        drawSphere(pv.data(),cx+.22f,floorY+.68f,couchZ-.48f,.25f,.28f,.39f,sofa);
-        drawSphere(pv.data(),cx+.22f,floorY+.68f,couchZ+.48f,.25f,.28f,.39f,sofa);
+        drawSphere(pv.data(),cx+.22f,floorY+.68f,couchZ-.48f,.25f,.28f,.39f,sofa,3);
+        drawSphere(pv.data(),cx+.22f,floorY+.68f,couchZ+.48f,.25f,.28f,.39f,sofa,3);
         drawSphere(pv.data(),cx-.12f,floorY+.75f,couchZ-.23f,.22f,.15f,.35f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
         drawSphere(pv.data(),cx-.12f,floorY+.75f,couchZ+.23f,.22f,.15f,.35f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
         // Separate seat and back cushions with stitched piping and panel seams.
-        drawSphere(pv.data(),cx-.13f,floorY+.49f,couchZ-.28f,.30f,.10f,.34f,rgb(sofa[0]*1.12f,sofa[1]*1.12f,sofa[2]*1.12f));
-        drawSphere(pv.data(),cx-.13f,floorY+.49f,couchZ+.28f,.30f,.10f,.34f,rgb(sofa[0]*1.12f,sofa[1]*1.12f,sofa[2]*1.12f));
+        drawSphere(pv.data(),cx-.13f,floorY+.49f,couchZ-.28f,.30f,.10f,.34f,rgb(sofa[0]*1.12f,sofa[1]*1.12f,sofa[2]*1.12f),3);
+        drawSphere(pv.data(),cx-.13f,floorY+.49f,couchZ+.28f,.30f,.10f,.34f,rgb(sofa[0]*1.12f,sofa[1]*1.12f,sofa[2]*1.12f),3);
         drawBox(pv.data(),cx-.18f,floorY+.51f,couchZ,.012f,.006f,.78f,wallHighlight,couchYaw);
         // Rounded arm pads and short dark feet.
         drawSphere(pv.data(),cx,floorY+.61f,couchZ-.88f,.48f,.27f,.16f,sofa);
@@ -1727,9 +1791,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Ergonomic gaming chair with rounded headrest, cushioned seat and five-star base.
     if(settings_.showChair) {
         const float chairX=deskX-.25f, chairZ=deskZ+1.20f;
-        drawSphere(pv.data(),chairX,floorY+.62f,chairZ,.36f,.13f,.34f,sofa);
-        drawSphere(pv.data(),chairX,floorY+1.00f,chairZ-.22f,.34f,.44f,.13f,sofa);
-        drawSphere(pv.data(),chairX,floorY+1.34f,chairZ-.24f,.20f,.18f,.12f,sofa);
+        drawSphere(pv.data(),chairX,floorY+.62f,chairZ,.36f,.13f,.34f,sofa,3);
+        drawSphere(pv.data(),chairX,floorY+1.00f,chairZ-.22f,.34f,.44f,.13f,sofa,3);
+        drawSphere(pv.data(),chairX,floorY+1.34f,chairZ-.24f,.20f,.18f,.12f,sofa,3);
         drawBox(pv.data(),chairX,floorY+.27f,chairZ,.07f,.38f,.07f,silver);
         for(int i=0;i<5;++i) {
             const float a=2*kPi*i/5;
