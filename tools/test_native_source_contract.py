@@ -90,7 +90,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("RGB coves sit inside a dark ceiling reveal", renderer)
         self.assertIn("Individual sculpted keycaps", renderer)
         self.assertIn("Desk-mounted broadcast mic", renderer)
-        self.assertIn("Recessed blue, violet and magenta fixtures", renderer)
+        self.assertIn("All RGB emitters share one selected preset", renderer)
         self.assertIn("void RoomRenderer::drawGroundShadow", renderer)
         self.assertIn("uCeilingLightPosition", renderer)
         self.assertIn("uMaterialAtlas", renderer)
