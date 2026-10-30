@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <array>
+#include <vector>
 #include <GLES3/gl3.h>
 #include <android/asset_manager.h>
 #include <openxr/openxr.h>
@@ -48,8 +49,21 @@ public:
 
 private:
     struct Vertex { float x, y, z, u, v; };
+    struct ModelMesh {
+        GLuint vao = 0;
+        GLuint vbo = 0;
+        GLuint ebo = 0;
+        GLsizei indexCount = 0;
+        GLint material = 5;
+        GLint textureMode = 0; // 0 = material, 1 = desk albedo, 2 = live monitor stream
+        std::array<float, 4> color{1.0f, 1.0f, 1.0f, 1.0f};
+    };
     GLuint compileShader(GLenum type, const char* source);
     GLuint loadRgbAsset(AAssetManager* assets, const char* filename);
+    bool loadModelAsset(AAssetManager* assets, const char* filename, std::vector<ModelMesh>& meshes);
+    void drawModel(const float* projectionView, const std::vector<ModelMesh>& meshes,
+                   float x, float y, float z, float scale, float yaw,
+                   GLuint videoTexture, bool hasVideo);
     GLuint createProceduralEnvironment(int sceneIndex);
     void createGeometry();
     void chooseEnvironment();
@@ -112,6 +126,7 @@ private:
     GLint locModel_ = -1;
     GLint locCameraPosition_ = -1;
     GLint locRounded_ = -1;
+    GLint locUseVertexNormal_ = -1;
     GLint locBevel_ = -1;
     GLint locMaterialAtlas_ = -1;
     GLint locHasMaterialAtlas_ = -1;
@@ -143,6 +158,9 @@ private:
     GLuint materialAtlasTexture_ = 0;
     GLuint normalAtlasTexture_ = 0;
     GLuint roughnessAtlasTexture_ = 0;
+    GLuint deskSurfaceTexture_ = 0;
+    std::vector<ModelMesh> deskModel_;
+    std::vector<ModelMesh> monitorModel_;
     GLuint textVao_ = 0;
     GLuint textVbo_ = 0;
     GLuint curvedVao_ = 0;
