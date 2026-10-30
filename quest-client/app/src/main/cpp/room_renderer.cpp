@@ -2136,6 +2136,13 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawSphere(pv.data(),plantX+.12f,floorY+1.26f,plantZ-.08f,.18f,.14f,.08f,leafColor);
     drawSphere(pv.data(),plantX-.12f,floorY+1.28f,plantZ+.06f,.17f,.16f,.08f,leafColor);
 
+    const auto accentBlue = rgb(.08f,.34f,1.0f);
+    const auto accentViolet = rgb(.50f,.12f,1.0f);
+    const auto neonCyan = rgb(.08f,.78f,1.0f);
+    const auto neonMagenta = rgb(1.0f,.08f,.42f);
+    const auto trimDark = rgb(.012f,.018f,.034f);
+    const auto silver = rgb(.22f,.27f,.39f);
+
     // -------------------------------------------------------------------------
     // Penthouse bedroom: low upholstered platform, layered mattress, soft duvet,
     // separate pillows, tailored headboard, bedside storage and practical lamps.
@@ -2229,12 +2236,6 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawGroundShadow(pv.data(),1.12f,floorY+0.004f,.08f,1.55f,1.78f,.30f);
     drawGroundShadow(pv.data(),halfW-.62f,floorY+0.004f,backZ+.44f,.62f,.64f,.24f);
 
-    const auto accentBlue = rgb(.08f,.34f,1.0f);
-    const auto accentViolet = rgb(.50f,.12f,1.0f);
-    const auto neonCyan = rgb(.08f,.78f,1.0f);
-    const auto neonMagenta = rgb(1.0f,.08f,.42f);
-    const auto trimDark = rgb(.012f,.018f,.034f);
-    const auto silver = rgb(.22f,.27f,.39f);
     const float trimY = floorY + 3.72f;
     // Recessed RGB coves sit inside a dark ceiling reveal; the cores are truly emissive.
     drawRoundedBox(pv.data(),0,trimY,0,halfW*1.66f,.050f,.075f,trimDark,0.0f,5);
