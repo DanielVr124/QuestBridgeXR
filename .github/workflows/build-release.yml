@@ -1,4 +1,5 @@
 name: QuestBridge XR Build
+# Rebuild from the generated Blender penthouse asset commit when it lands.
 
 on:
   workflow_dispatch:
