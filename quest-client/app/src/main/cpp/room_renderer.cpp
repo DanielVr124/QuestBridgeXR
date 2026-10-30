@@ -1841,7 +1841,7 @@ void RoomRenderer::drawGroundShadow(const float* pv,float x,float y,float z,
 }
 void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floorY,float backZ,
                                                      GLuint tex,float windowW,float windowH) {
-    const float windowY=floorY+2.38f;
+    const float windowY=floorY+2.20f;
     const float halfD=std::fabs(backZ);
     const float frontZ=halfD;
     const auto drawPanoramaSegment=[&](float x,float y,float z,float width,float height,
@@ -2181,7 +2181,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // The penthouse gets a near-wall-to-wall glazing system instead of a small picture window.
     const float roomWindowWidth=std::min(halfW*1.78f,
         settings_.roomSize=="small"?3.7f:(settings_.roomSize=="large"?10.5f:7.35f));
-    const float roomWindowHeight=activeEnvironmentIndex_==29?2.88f:
+    const float roomWindowHeight=activeEnvironmentIndex_==29?3.72f:
         (activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f);
     drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,roomWindowWidth,roomWindowHeight);
 
@@ -2321,10 +2321,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float shadowDeskZ=-halfD+0.55f;
     const float shadowDeskWidth=std::min(2.65f,halfW*1.02f);
     drawGroundShadow(pv.data(),shadowDeskX,floorY+0.004f,shadowDeskZ+0.02f,shadowDeskWidth*.82f,1.10f,.42f);
-    drawGroundShadow(pv.data(),halfW-1.25f,floorY+0.004f,.05f,1.55f,2.35f,.40f);
+    drawGroundShadow(pv.data(),halfW-1.33f,floorY+0.004f,halfD-.62f,2.10f,.72f,.25f);
     drawGroundShadow(pv.data(),shadowDeskX-.25f,floorY+0.004f,shadowDeskZ+1.20f,.92f,1.02f,.34f);
     drawGroundShadow(pv.data(),1.12f,floorY+0.004f,.08f,1.55f,1.78f,.30f);
-    drawGroundShadow(pv.data(),halfW-.62f,floorY+0.004f,backZ+.44f,.62f,.64f,.24f);
+    drawGroundShadow(pv.data(),-halfW+.62f,floorY+0.004f,halfD-.62f,.62f,.64f,.24f);
 
     const float trimY = floorY + 3.72f;
     // Recessed RGB coves sit inside a dark ceiling reveal; the cores are truly emissive.
