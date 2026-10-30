@@ -59,6 +59,9 @@ private:
     void drawRoundedBox(const float* projectionView, float x, float y, float z,
                         float sx, float sy, float sz, const std::array<float, 4>& color,
                         float yaw = 0.0f, int material = 0);
+    void drawPillow(const float* projectionView, float x, float y, float z,
+                    float sx, float sy, float sz, const std::array<float, 4>& color,
+                    float yaw = 0.0f, float pitch = 0.0f, int material = 3);
     void drawCylinder(const float* projectionView, float x, float y, float z,
                       float diameter, float height, const std::array<float, 4>& color,
                       int material = 0);
@@ -88,6 +91,9 @@ private:
     GLuint roundedVao_ = 0;
     GLuint roundedVbo_ = 0;
     GLsizei roundedVertexCount_ = 0;
+    GLuint pillowVao_ = 0;
+    GLuint pillowVbo_ = 0;
+    GLsizei pillowVertexCount_ = 0;
     GLuint cylinderVao_ = 0;
     GLuint cylinderVbo_ = 0;
     GLsizei cylinderVertexCount_ = 0;
