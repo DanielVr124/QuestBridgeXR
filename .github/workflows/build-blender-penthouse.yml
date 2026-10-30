@@ -73,6 +73,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Preserve this render, then layer it onto the latest source branch so
+          # parallel/older renders cannot overwrite source changes or conflict on add/add.
+          mkdir -p /tmp/qbx-penthouse-export
+          cp dist/skyline-penthouse/skyline_penthouse.qbxmesh /tmp/qbx-penthouse-export/
+          cp dist/skyline-penthouse/skyline_penthouse.glb /tmp/qbx-penthouse-export/
+          cp dist/skyline-penthouse/skyline_penthouse.blend /tmp/qbx-penthouse-export/
+          git fetch origin "${GITHUB_REF_NAME}"
+          git reset --hard "origin/${GITHUB_REF_NAME}"
+          mkdir -p quest-client/app/src/main/assets/models tools/blender/projects
+          cp /tmp/qbx-penthouse-export/skyline_penthouse.qbxmesh quest-client/app/src/main/assets/models/
+          cp /tmp/qbx-penthouse-export/skyline_penthouse.glb quest-client/app/src/main/assets/models/
+          cp /tmp/qbx-penthouse-export/skyline_penthouse.blend tools/blender/projects/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
@@ -81,9 +93,6 @@ jobs:
             tools/blender/projects/skyline_penthouse.blend
           if ! git diff --cached --quiet; then
             git commit -m "Add Blender-built skyline penthouse model assets"
-            # Other source commits may land while a render is running.
-            git fetch origin "${GITHUB_REF_NAME}"
-            git rebase "origin/${GITHUB_REF_NAME}"
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
 
