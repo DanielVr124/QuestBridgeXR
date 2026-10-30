@@ -95,6 +95,8 @@ private:
     GLint locModel_ = -1;
     GLint locRounded_ = -1;
     GLint locBevel_ = -1;
+    GLint locMaterialAtlas_ = -1;
+    GLint locHasMaterialAtlas_ = -1;
     GLint locCeilingLightPosition_ = -1;
     GLint locCeilingLightColor_ = -1;
     GLint locCeilingLightIntensity_ = -1;
@@ -107,6 +109,7 @@ private:
     int activeEnvironmentIndex_ = 0;
     GLuint videoFallbackTexture_ = 0;
     GLuint groundShadowTexture_ = 0;
+    GLuint materialAtlasTexture_ = 0;
     GLuint textVao_ = 0;
     GLuint textVbo_ = 0;
     GLuint curvedVao_ = 0;
