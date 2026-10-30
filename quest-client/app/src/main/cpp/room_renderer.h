@@ -56,6 +56,9 @@ private:
     void drawBox(const float* projectionView, float x, float y, float z,
                  float sx, float sy, float sz, const std::array<float, 4>& color,
                  float yaw = 0.0f, int material = 0);
+    void drawRoundedBox(const float* projectionView, float x, float y, float z,
+                        float sx, float sy, float sz, const std::array<float, 4>& color,
+                        float yaw = 0.0f, int material = 0);
     void drawText(const float* projectionView, const char* text, float x, float y, float z,
                   float pixelSize, const std::array<float, 4>& color);
     void drawSphere(const float* projectionView, float x, float y, float z,
@@ -77,6 +80,9 @@ private:
     GLuint vbo_ = 0;
     GLuint sphereVao_ = 0;
     GLuint sphereVbo_ = 0;
+    GLuint roundedVao_ = 0;
+    GLuint roundedVbo_ = 0;
+    GLsizei roundedVertexCount_ = 0;
     GLsizei sphereVertexCount_ = 0;
     GLint locMvp_ = -1;
     GLint locColor_ = -1;
@@ -85,6 +91,8 @@ private:
     GLint locUvScale_ = -1;
     GLint locMaterial_ = -1;
     GLint locModel_ = -1;
+    GLint locRounded_ = -1;
+    GLint locBevel_ = -1;
     GLuint cubeTexture_ = 0;
     GLuint planeTexture_ = 0;
     std::array<GLuint, 208> environmentTextures_{};

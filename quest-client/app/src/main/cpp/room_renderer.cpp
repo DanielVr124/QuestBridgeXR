@@ -296,11 +296,22 @@ layout(location=0) in vec3 aPosition;
 layout(location=1) in vec2 aUv;
 uniform mat4 uMvp;
 uniform mat4 uModel;
+uniform int uRounded;
+uniform vec3 uBevel;
 out vec2 vUv;
 out vec3 vWorldPosition;
 void main(){
-  vec4 world=uModel*vec4(aPosition,1.0);
-  gl_Position = uMvp * vec4(aPosition,1.0);
+  vec3 localPosition=aPosition;
+  if(uRounded!=0) {
+    vec3 bevel=max(uBevel,vec3(0.0001));
+    vec3 inner=clamp(aPosition,vec3(-0.5)+bevel,vec3(0.5)-bevel);
+    vec3 delta=aPosition-inner;
+    vec3 scaledDelta=delta/bevel;
+    float deltaLength=length(scaledDelta);
+    if(deltaLength>0.0001) localPosition=inner+(scaledDelta/deltaLength)*bevel;
+  }
+  vec4 world=uModel*vec4(localPosition,1.0);
+  gl_Position = uMvp * vec4(localPosition,1.0);
   vUv=aUv;
   vWorldPosition=world.xyz;
 }
@@ -990,7 +1001,8 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     locMvp_=glGetUniformLocation(program_,"uMvp");locColor_=glGetUniformLocation(program_,"uColor");
     locTexture_=glGetUniformLocation(program_,"uTexture");locTextured_=glGetUniformLocation(program_,"uTextured");
     locUvScale_=glGetUniformLocation(program_,"uUvScale");locMaterial_=glGetUniformLocation(program_,"uMaterial");
-    locModel_=glGetUniformLocation(program_,"uModel");
+    locModel_=glGetUniformLocation(program_,"uModel");locRounded_=glGetUniformLocation(program_,"uRounded");
+    locBevel_=glGetUniformLocation(program_,"uBevel");
     GLuint vvs=compileShader(GL_VERTEX_SHADER,kVignetteVertex), vfs=compileShader(GL_FRAGMENT_SHADER,kVignetteFragment);
     if(vvs&&vfs){vignetteProgram_=glCreateProgram();glAttachShader(vignetteProgram_,vvs);glAttachShader(vignetteProgram_,vfs);glLinkProgram(vignetteProgram_);GLint vok=GL_FALSE;glGetProgramiv(vignetteProgram_,GL_LINK_STATUS,&vok);if(vok!=GL_TRUE){glDeleteProgram(vignetteProgram_);vignetteProgram_=0;}}
     if(vvs)glDeleteShader(vvs);if(vfs)glDeleteShader(vfs);
@@ -1036,6 +1048,42 @@ void RoomRenderer::createGeometry() {
     glEnableVertexAttribArray(0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(0));
     glEnableVertexAttribArray(1);glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(3*sizeof(float)));
     glBindVertexArray(0);
+    // Subdivided cube surface lets the vertex shader produce true multi-segment bevels.
+    // This mesh is shared by the desk, PC chassis, drawers and other hard-surface furniture.
+    std::vector<Vertex> roundedVertices;
+    constexpr int bevelGrid = 24;
+    auto roundedPoint = [](int axis,int sign,float u,float v) {
+        Vertex out{};
+        if(axis==0){out.x=sign*0.5f;out.y=u-0.5f;out.z=v-0.5f;}
+        else if(axis==1){out.x=u-0.5f;out.y=sign*0.5f;out.z=v-0.5f;}
+        else {out.x=u-0.5f;out.y=v-0.5f;out.z=sign*0.5f;}
+        out.u=u;out.v=v;
+        return out;
+    };
+    roundedVertices.reserve(6u*2u*bevelGrid*bevelGrid*6u);
+    for(int axis=0;axis<3;++axis) for(int sign : {-1,1}) {
+        for(int row=0;row<bevelGrid;++row) for(int col=0;col<bevelGrid;++col) {
+            const float u0=float(col)/bevelGrid,u1=float(col+1)/bevelGrid;
+            const float v0=float(row)/bevelGrid,v1=float(row+1)/bevelGrid;
+            const Vertex a=roundedPoint(axis,sign,u0,v0);
+            const Vertex b=roundedPoint(axis,sign,u1,v0);
+            const Vertex c=roundedPoint(axis,sign,u1,v1);
+            const Vertex d=roundedPoint(axis,sign,u0,v1);
+            roundedVertices.insert(roundedVertices.end(),{a,b,c,a,c,d});
+        }
+    }
+    roundedVertexCount_=static_cast<GLsizei>(roundedVertices.size());
+    glGenVertexArrays(1,&roundedVao_);
+    glGenBuffers(1,&roundedVbo_);
+    glBindVertexArray(roundedVao_);
+    glBindBuffer(GL_ARRAY_BUFFER,roundedVbo_);
+    glBufferData(GL_ARRAY_BUFFER,static_cast<GLsizeiptr>(roundedVertices.size()*sizeof(Vertex)),roundedVertices.data(),GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(Vertex),nullptr);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(3*sizeof(float)));
+    glBindVertexArray(0);
+
     const float plane[] = {-0.5f,-0.5f,0,0,1, 0.5f,-0.5f,0,1,1, 0.5f,0.5f,0,1,0, -0.5f,-0.5f,0,0,1, 0.5f,0.5f,0,1,0, -0.5f,0.5f,0,0,0};
     glGenVertexArrays(1,&planeTexture_); // plane VAO handles geometry separately
     glGenBuffers(1,&cubeTexture_); // IDs are reused as plane VAO/VBO handles; no texture objects here
@@ -1047,7 +1095,7 @@ void RoomRenderer::createGeometry() {
     // Smooth UV sphere mesh used for rounded cushions, chair details and PC cooling fans.
     // It is generated once and shared by every room object to keep draw overhead low.
     std::vector<float> sphere;
-    constexpr int rings = 12, segments = 20;
+    constexpr int rings = 24, segments = 32;
     sphere.reserve(static_cast<size_t>(rings * segments * 6 * 5));
     auto vertex = [&](float lat, float lon) {
         const float cl = std::cos(lat);
@@ -1183,10 +1231,31 @@ void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,floa
     Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,sz))); Mat4 mvp=mul(projectionView,model);
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
     glUniform4fv(locColor_,1,color.data());glUniform1i(locTextured_,0);glUniform1i(locMaterial_,material);
+    glUniform1i(locRounded_,0);
     const float scaleX=material==6?std::max(1.0f,sx*.60f):std::max(1.0f,std::max(sx,sz)*2.6f);
     const float scaleY=material==6?std::max(1.0f,sz*.92f):std::max(1.0f,std::max(sy,sz)*2.6f);
     glUniform2f(locUvScale_,scaleX,scaleY);
     glBindVertexArray(vao_);glDrawArrays(GL_TRIANGLES,0,36);glBindVertexArray(0);
+}
+void RoomRenderer::drawRoundedBox(const float* pv,float x,float y,float z,float sx,float sy,float sz,
+                                      const std::array<float,4>& color,float yaw,int material) {
+    Mat4 projectionView{}; std::copy(pv,pv+projectionView.size(),projectionView.begin());
+    const Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,sz)));
+    const Mat4 mvp=mul(projectionView,model);
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
+    glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
+    glUniform4fv(locColor_,1,color.data());
+    glUniform1i(locTextured_,0);glUniform1i(locMaterial_,material);glUniform1i(locRounded_,1);
+    const float bevelWorld=std::min(0.025f,std::min({sx,sy,sz})*0.18f);
+    glUniform3f(locBevel_,std::clamp(bevelWorld/std::max(sx,0.001f),0.005f,0.24f),
+                           std::clamp(bevelWorld/std::max(sy,0.001f),0.005f,0.24f),
+                           std::clamp(bevelWorld/std::max(sz,0.001f),0.005f,0.24f));
+    const float scaleX=material==6?std::max(1.0f,sx*.60f):std::max(1.0f,std::max(sx,sz)*2.6f);
+    const float scaleY=material==6?std::max(1.0f,sz*.92f):std::max(1.0f,std::max(sy,sz)*2.6f);
+    glUniform2f(locUvScale_,scaleX,scaleY);
+    glBindVertexArray(roundedVao_);
+    glDrawArrays(GL_TRIANGLES,0,roundedVertexCount_);
+    glBindVertexArray(0);
 }
 void RoomRenderer::drawText(const float* pv, const char* text, float x, float y, float z,
                             float pixelSize, const std::array<float,4>& color) {
@@ -1259,6 +1328,7 @@ void RoomRenderer::drawText(const float* pv, const char* text, float x, float y,
     glUniform4fv(locColor_, 1, color.data());
     glUniform1i(locTextured_, 0);
     glUniform1i(locMaterial_,-1);
+    glUniform1i(locRounded_,0);
     glBindVertexArray(textVao_);
     glBindBuffer(GL_ARRAY_BUFFER, textVbo_);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_DYNAMIC_DRAW);
@@ -1274,6 +1344,7 @@ void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,f
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
     glUniform4fv(locColor_,1,color.data());
     glUniform1i(locTextured_,0);glUniform1i(locMaterial_,material);glUniform2f(locUvScale_,1.0f,1.0f);
+    glUniform1i(locRounded_,0);
     glBindVertexArray(sphereVao_);
     glDrawArrays(GL_TRIANGLES,0,sphereVertexCount_);
     glBindVertexArray(0);
@@ -1282,7 +1353,7 @@ void RoomRenderer::drawPlane(const float* pv,float x,float y,float z,float sx,fl
     Mat4 projectionView{}; std::copy(pv, pv + projectionView.size(), projectionView.begin());
     Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,1)));Mat4 mvp=mul(projectionView,model);
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
-    glUniform4fv(locColor_,1,color.data());glUniform1i(locTextured_,texture?1:0);glUniform1i(locMaterial_,-1);
+    glUniform4fv(locColor_,1,color.data());glUniform1i(locTextured_,texture?1:0);glUniform1i(locMaterial_,-1);glUniform1i(locRounded_,0);
     glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,texture?texture:videoFallbackTexture_);glUniform1i(locTexture_,0);
     glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);glBindTexture(GL_TEXTURE_2D,0);
 }
@@ -1327,6 +1398,7 @@ void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
     glUniform4fv(locColor_, 1, color.data());
     glUniform1i(locTextured_, texture ? 1 : 0);
     glUniform1i(locMaterial_,texture ? -1 : 4);
+    glUniform1i(locRounded_,0);
     glUniform2f(locUvScale_,1.0f,1.0f);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture ? texture : videoFallbackTexture_);
@@ -1481,6 +1553,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         wood = rgb(palette.skyTop[0] / 420.0f, palette.skyTop[1] / 420.0f, palette.skyTop[2] / 420.0f);
         sofa = rgb(palette.skyHorizon[0] / 400.0f, palette.skyHorizon[1] / 400.0f, palette.skyHorizon[2] / 400.0f);
     }
+    // Neutral, physically plausible finishes keep the room interior grounded;
+    // selected scenes remain visible through the window and in practical accent lights.
+    wall=rgb(.70f,.67f,.61f);
+    floor=rgb(.27f,.20f,.15f);
+    wood=rgb(.40f,.27f,.18f);
+    sofa=rgb(.20f,.24f,.30f);
     glUseProgram(program_);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDisable(GL_CULL_FACE);
     glUniform1i(locTexture_,0);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
@@ -1574,7 +1652,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float deskWidth=std::min(2.65f,halfW*1.02f);
     const float deskFrontZ=deskZ+.45f;
     const float deskTopY=floorY+.78f;
-    drawBox(pv.data(),deskX,deskTopY,deskZ,deskWidth,.085f,.88f,wood,0.0f,1);
+    drawRoundedBox(pv.data(),deskX,deskTopY,deskZ,deskWidth,.085f,.88f,wood,0.0f,1);
     drawBox(pv.data(),deskX-deskWidth*.42f,floorY+.39f,deskZ,.075f,.70f,.78f,trimDark);
     drawBox(pv.data(),deskX+deskWidth*.42f,floorY+.39f,deskZ,.075f,.70f,.78f,trimDark);
     drawBox(pv.data(),deskX,deskTopY+.055f,deskZ,deskWidth-.08f,.018f,.80f,rgb(.10f,.12f,.17f));
@@ -1582,7 +1660,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(),deskX,deskTopY-.105f,deskZ-.365f,deskWidth*.82f,.12f,.035f,trimDark);
     for(int drawer=0;drawer<3;++drawer) {
         const float dx=deskX+(drawer-1)*.31f;
-        drawBox(pv.data(),dx,deskTopY-.105f,deskZ-.386f,.285f,.082f,.010f,wood,0.0f,1);
+        drawRoundedBox(pv.data(),dx,deskTopY-.105f,deskZ-.386f,.285f,.082f,.010f,wood,0.0f,1);
         drawBox(pv.data(),dx,deskTopY-.105f,deskZ-.394f,.065f,.006f,.008f,silver);
     }
     drawBox(pv.data(),deskX,deskTopY-.19f,deskZ+.34f,deskWidth*.72f,.035f,.12f,trimDark);
@@ -1729,7 +1807,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float pcZ=deskZ+.12f;
     const auto pcWhite=rgb(.88f,.91f,.96f);
     const auto pcEdge=rgb(.66f,.72f,.80f);
-    drawBox(pv.data(),pcX,pcY,pcZ,.43f,.66f,.57f,pcWhite,0.0f,5);
+    drawRoundedBox(pv.data(),pcX,pcY,pcZ,.43f,.66f,.57f,pcWhite,0.0f,5);
     drawBox(pv.data(),pcX,pcY,pcZ+.292f,.37f,.60f,.012f,rgb(.10f,.13f,.20f));
     drawBox(pv.data(),pcX-.16f,pcY,pcZ+.302f,.045f,.55f,.008f,rgb(.20f,.24f,.33f));
     drawBox(pv.data(),pcX+.16f,pcY,pcZ+.302f,.045f,.55f,.008f,rgb(.20f,.24f,.33f));
@@ -1770,7 +1848,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     if(settings_.showCouch) {
         const float couchX=halfW-1.25f, couchZ=.05f, couchYaw=-kPi*.5f;
         const float cx=couchX;
-        drawBox(pv.data(),cx,floorY+.38f,couchZ, .86f,.24f,1.92f,trimDark,couchYaw);
+        drawRoundedBox(pv.data(),cx,floorY+.38f,couchZ, .86f,.24f,1.92f,trimDark,couchYaw,5);
         drawSphere(pv.data(),cx,floorY+.53f,couchZ,.48f,.24f,.82f,sofa,3);
         // Raised back is on the +X side, so the sitting position faces the TV on the -X wall.
         drawSphere(pv.data(),cx+.22f,floorY+.68f,couchZ-.48f,.25f,.28f,.39f,sofa,3);
@@ -1872,6 +1950,7 @@ void RoomRenderer::release() {
     if(textVao_)glDeleteVertexArrays(1,&textVao_);if(textVbo_)glDeleteBuffers(1,&textVbo_);
     if(curvedVao_)glDeleteVertexArrays(1,&curvedVao_);if(curvedVbo_)glDeleteBuffers(1,&curvedVbo_);
     if(sphereVao_)glDeleteVertexArrays(1,&sphereVao_);if(sphereVbo_)glDeleteBuffers(1,&sphereVbo_);
+    if(roundedVao_)glDeleteVertexArrays(1,&roundedVao_);if(roundedVbo_)glDeleteBuffers(1,&roundedVbo_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;sphereVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=0;sphereVertexCount_=roundedVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
