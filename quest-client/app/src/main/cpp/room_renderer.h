@@ -82,7 +82,8 @@ private:
     void updateMenuTexture();
     void drawCurvedPanel(const float* projectionView, float x, float y, float z,
                          float width, float height, float curveDepth, GLuint texture,
-                         const std::array<float, 4>& color, int segments = 24);
+                         const std::array<float, 4>& color, int segments = 24,
+                         float yaw = 0.0f);
     void drawGroundShadow(const float* projectionView, float x, float y, float z,
                           float width, float depth, float opacity);
     void drawEnvironmentWindow(const float* projectionView, float halfW, float floorY, float backZ,

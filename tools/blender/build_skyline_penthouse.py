@@ -71,9 +71,10 @@ M["wood_dark"]=mat("Black stained oak",(.025,.028,.040),.31,.06,1,13,.08)
 M["metal"]=mat("Black anodized aluminium",(.055,.070,.090),.27,.82,4,150,.04)
 M["chrome"]=mat("Brushed titanium",(.36,.40,.47),.25,.88,4,180,.035)
 M["brass"]=mat("Champagne brushed brass",(.38,.25,.12),.29,.78,4,210,.025)
-M["glass"]=mat("Smoked architectural glass",(.012,.022,.043),.13,.55,9,None,0,transmission=.18)
+M["glass"]=mat("Low-iron architectural glazing",(.012,.022,.043),.10,.08,9,None,0,transmission=.78)
 M["screen"]=mat("OLED black glass",(.004,.009,.020),.12,.22,-1)
-M["screen_glow"]=mat("Monitor cyan violet artwork",(.025,.12,.36),.20,.05,7,None,0,(.045,.20,.82),2.8)
+M["screen_glow"]=mat("Dim OLED midnight blue",(.010,.018,.048),.22,.08,7,None,0,(.018,.065,.22),.75)
+M["coffee_glass"]=mat("Smoked blue-grey glass tabletop",(.035,.052,.078),.14,.42,5,95,.018,transmission=.42)
 M["blue"]=mat("Electric blue LED diffuser",(.04,.35,1.),.24,0,7,None,0,(.015,.22,1.),4.)
 M["violet"]=mat("Violet LED diffuser",(.38,.08,1.),.22,0,7,None,0,(.32,.045,1.),3.5)
 M["pink"]=mat("Magenta LED diffuser",(1.,.035,.38),.22,0,7,None,0,(1.,.015,.28),3.)
@@ -93,6 +94,30 @@ def cube(name,loc,scale,material,edge=.02):
     o.dimensions=scale; bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
     if material: o.data.materials.append(material)
     move_to(o); bevel(o,edge,3); return o
+
+def curved_panel_x(name, x, y, z, width, height, sag, material, nx=64, nz=20):
+    """Curved vertical display surface facing +X, with UVs following its horizontal arc."""
+    verts=[]; faces=[]
+    for j in range(nz+1):
+        v=j/nz
+        for i in range(nx+1):
+            u=i/nx
+            across=2.0*u-1.0
+            verts.append((x+sag*(1.0-across*across), y+(u-.5)*width, z+(v-.5)*height))
+    for j in range(nz):
+        for i in range(nx):
+            a=j*(nx+1)+i
+            faces.append((a,a+1,a+nx+2,a+nx+1))
+    me=bpy.data.meshes.new(name+" mesh"); me.from_pydata(verts,[],faces)
+    me.materials.append(material)
+    uv=me.uv_layers.new(name="UVMap")
+    for poly in me.polygons:
+        for loop_index in poly.loop_indices:
+            vi=me.loops[loop_index].vertex_index
+            uv.data[loop_index].uv=((vi%(nx+1))/nx,(vi//(nx+1))/nz)
+    ob=bpy.data.objects.new(name,me); SCENE_COL.objects.link(ob)
+    for poly in me.polygons: poly.use_smooth=True
+    return ob
 
 def uv_sphere(name,loc,scale,material,segments=24,rings=16):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=segments,ring_count=rings,location=loc)
@@ -259,11 +284,13 @@ for yy in (by-.94,by-.56,by-.18,by+.20,by+.58):
         x=bx-1.+i*2/31; pts.append((x,yy+.012*sin(i*.26),.824+.012*sin(i*.34+yy*2)))
     curve_obj("Duvet stitch line",pts,.0035,M["fabric_light"])
 for i in range(3):
-    x=bx-.69+i*.69; p=uv_sphere("Large down pillow",(x,by-1.02,.91),(.39,.28,.16),M["fabric_light"],32,20)
+    x=bx-.69+i*.69
+    p=cube("Large tailored down pillow",(x,by-1.02,.91),(.74,.52,.25),M["fabric_light"],.105)
     p.rotation_euler[2]=random.uniform(-.10,.10)
     curve_obj("Pillow welt",[(x-.31,by-1.02,.93),(x,by-1.285,.93),(x+.31,by-1.02,.93)],.006,M["duvet"])
 for i in range(2):
-    x=bx-.40+i*.80; p=uv_sphere("Accent pillow",(x,by-.75,.95),(.32,.20,.14),M["fabric"],32,20)
+    x=bx-.40+i*.80
+    p=cube("Accent tailored pillow",(x,by-.75,.95),(.60,.39,.24),M["fabric"],.105)
     p.rotation_euler[2]=(-1 if i==0 else 1)*.08
 cube("Bed headboard core",(bx,by-1.57,1.36),(2.52,.20,1.36),M["leather"],.09)
 for i in range(9):
@@ -298,8 +325,21 @@ for y in (dy-1.04,dy+1.04):
     cube("Desk trestle upright",(-2.28,y,.40),(.065,.065,.70),M["metal"],.018)
     cube("Desk foot glide",(-2.28,y,.055),(.55,.11,.045),M["metal"],.015)
 cube("Ultrawide monitor aluminium shell",(-3.955,dy,1.73),(.13,2.12,1.13),M["metal"],.05)
-cube("Ultrawide black bezel",(-3.878,dy,1.73),(.035,2.02,1.03),M["screen"],.025)
-cube("Ultrawide OLED display",(-3.854,dy,1.73),(.012,1.94,.95),M["screen_glow"],.008)
+curved_panel_x("Ultrawide curved black bezel",-3.878,dy,1.73,2.02,1.03,.095,M["screen"])
+curved_panel_x("Ultrawide curved OLED active area",-3.854,dy,1.73,1.94,.95,.086,M["screen_glow"])
+def monitor_surface_x(y):
+    t=2.0*(y-dy)/1.94
+    return -3.854+.086*(1.0-t*t)+.006
+curve_obj("Monitor UI | cyan top rule",
+          [(monitor_surface_x(y),y,2.105) for y in (dy-.72,dy-.36,dy,dy+.36,dy+.72)],
+          .006,M["blue"])
+curve_obj("Monitor UI | violet signal trace",
+          [(monitor_surface_x(y),y,1.725+.095*sin((y-dy)*5.4)) for y in [dy-.66+i*.055 for i in range(25)]],
+          .004,M["violet"])
+for row in range(3):
+    y=dy-.68+row*.19
+    cube("Monitor UI | status line",(monitor_surface_x(y),y,1.91),(.009,.23-.035*row,.012),
+         M["blue"] if row==0 else M["violet"],.004)
 cube("Monitor lower chin",(-3.84,dy,1.18),(.045,2.04,.065),M["wood_dark"],.012)
 cube("Monitor logo",(-3.811,dy,1.18),(.012,.11,.018),M["chrome"],.004)
 curve_obj("Monitor VESA arm",[(-3.90,dy,1.48),(-3.69,dy,1.42),(-3.69,dy,1.15)],.035,M["metal"])
@@ -353,16 +393,18 @@ cube("Sectional upholstered base",(sx,sy,.42),(1.45,2.75,.42),M["leather"],.16)
 cube("Sectional chaise return",(sx-.18,sy-1.07,.42),(1.80,.70,.42),M["leather"],.14)
 for i in range(3):
     y=sy-.91+i*.91
-    uv_sphere("Sectional deep seat cushion",(sx+.20,y,.69),(.52,.43,.19),M["fabric"],32,24)
-    curve_obj("Seat cushion welt",[(sx-.17,y-.39,.73),(sx+.20,y-.42,.73),(sx+.58,y-.39,.73)],.006,M["fabric_light"])
+    cube("Sectional tailored seat cushion",(sx+.20,y,.69),(.98,.82,.31),M["fabric"],.135)
+    curve_obj("Seat cushion welt",[(sx-.25,y-.38,.73),(sx+.20,y-.42,.73),(sx+.65,y-.38,.73)],.006,M["fabric_light"])
 for i in range(3):
-    y=sy-.90+i*.91; p=uv_sphere("Sectional back cushion",(sx-.42,y,1.03),(.24,.43,.43),M["fabric_light"],32,24); p.rotation_euler[1]=-.12
-    curve_obj("Back cushion seam",[(sx-.61,y-.33,1.02),(sx-.62,y,1.34),(sx-.61,y+.33,1.02)],.006,M["fabric"])
-uv_sphere("Draped lounge throw",(sx+.18,sy+1.10,.89),(.42,.38,.10),M["duvet"],32,16)
+    y=sy-.90+i*.91
+    p=cube("Sectional tailored back cushion",(sx-.42,y,1.03),(.43,.82,.78),M["fabric_light"],.145)
+    p.rotation_euler[1]=-.10
+    curve_obj("Back cushion seam",[(sx-.64,y-.33,1.02),(sx-.66,y,1.34),(sx-.64,y+.33,1.02)],.006,M["fabric"])
+cube("Folded lounge throw",(sx+.18,sy+1.10,.89),(.76,.64,.18),M["duvet"],.075)
 cube("Large woven area rug",(1.05,1.25,.035),(3.25,3.40,.055),M["rug"],.05)
 for i in range(6):
     yy=-.30+i*.62; curve_obj("Rug woven border line",[(-.50,yy,.067),(2.65,yy,.067)],.003,M["fabric_light"])
-cube("Floating coffee table glass top",(1.05,1.50,.47),(1.12,1.65,.075),M["stone_light"],.07)
+cube("Floating smoked glass coffee table top",(1.05,1.50,.47),(1.02,1.48,.052),M["coffee_glass"],.055)
 cube("Coffee table lower shelf",(1.05,1.50,.24),(.92,1.43,.055),M["wood_dark"],.025)
 for x in (.62,1.48):
     for y in (.88,2.12): cylinder("Coffee table brushed leg",(x,y,.32),.027,.28,M["brass"])
@@ -430,9 +472,9 @@ def look_at(obj,point): obj.rotation_euler=(Vector(point)-obj.location).to_track
 def camera(name,loc,target,lens=27):
     data=bpy.data.cameras.new(name); data.lens=lens; data.sensor_width=36
     o=bpy.data.objects.new(name,data); CAM_COL.objects.link(o); o.location=loc; look_at(o,target); return o
-cam_wide=camera("01 | Full penthouse hero",(.20,4.95,2.15),(0.,-1.35,1.95),25)
-cam_desk=camera("02 | Gaming studio detail",(-.75,2.95,1.75),(-3.12,.35,1.55),34)
-cam_lounge=camera("03 | Lounge and bedroom",(2.55,4.65,1.75),(1.65,-1.05,1.75),30)
+cam_wide=camera("01 | Full penthouse hero",(.20,7.35,2.35),(0.,-.55,1.82),24)
+cam_desk=camera("02 | Gaming studio detail",(-.75,-.80,1.78),(-3.18,.42,1.57),34)
+cam_lounge=camera("03 | Lounge and bedroom",(3.20,5.85,2.05),(.85,-.45,1.40),32)
 
 scene=bpy.context.scene
 scene.render.engine='CYCLES'; scene.cycles.samples=32; scene.cycles.use_denoising=True; scene.cycles.use_adaptive_sampling=True; scene.cycles.adaptive_threshold=0.02; scene.cycles.max_bounces=6; scene.cycles.preview_samples=16
