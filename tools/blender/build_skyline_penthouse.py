@@ -314,16 +314,6 @@ for side in (-1,1):
     point_light("Bedside warm practical",(nx,ny,1.52),(1.,.46,.22),28,.28)
     cube("Nightstand book",(nx+side*.12,ny+.05,1.085),(.22,.32,.035),M["fabric"],.008)
 
-# A compact, tactile RGB remote lives on the right bedside table. The five
-# buttons are runtime-selectable presets; their Blender colours are preview art.
-remote_x,remote_y=bx+1.55,by-.83
-cube("RGB lighting remote aluminium shell",(remote_x,remote_y,1.085),(.205,.405,.052),M["metal"],.035)
-cube("RGB lighting remote glass face",(remote_x,remote_y,1.116),(.176,.372,.012),M["screen"],.024)
-for index,button_mat in enumerate((M["blue"],M["blue"],M["violet"],M["pink"],M["warm"])):
-    button_y=remote_y-.14+index*.07
-    cylinder("RGB remote tactile preset button",(remote_x,button_y,1.137),.022,.018,button_mat,24)
-cube("RGB remote status display",(remote_x,remote_y+.175,1.133),(.11,.035,.008),M["screen_glow"],.008)
-
 # --- Gaming setup on left: ultrawide, real keyboard, glass PC, chair and studio gear ---
 dx,dy=-3.12,.42
 cube("Gaming desk walnut slab",(-3.02,dy,.79),(1.72,2.48,.10),M["wood"],.045)
@@ -456,6 +446,16 @@ cube("Console streaming box",(tvx-.95,console_y,1.00),(.30,.34,.08),M["wood_dark
 uv_sphere("Wireless controller",(tvx+.96,console_y,1.04),(.16,.25,.055),M["leather"])
 for side in (-1,1):
     cylinder("Controller thumbstick",(tvx+.96+side*.07,console_y,1.095),.025,.018,M["chrome"],24,(pi/2,0,0))
+
+# Compact tactile RGB remote, kept within the open centre of the media console.
+# The trigger selects one of five clearly colour-coded presets.
+remote_x,remote_y=tvx,console_y
+cube("RGB lighting remote aluminium shell",(remote_x,remote_y,.959),(.185,.345,.045),M["metal"],.032)
+cube("RGB lighting remote glass face",(remote_x,remote_y,.983),(.158,.318,.010),M["screen"],.022)
+for index,button_mat in enumerate((M["blue"],M["blue"],M["violet"],M["pink"],M["warm"])):
+    button_y=remote_y-.12+index*.06
+    cylinder("RGB remote tactile preset button",(remote_x,button_y,.994),.020,.014,button_mat,24)
+cube("RGB remote status display",(remote_x,remote_y+.145,.992),(.105,.026,.006),M["screen_glow"],.006)
 
 # --- Decor, shelves, abstract artwork and indoor greenery ---
 cube("Framed abstract artwork body",(-3.63,-4.98,2.34),(.06,.70,1.15),M["metal"],.025)
