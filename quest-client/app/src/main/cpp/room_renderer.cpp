@@ -1457,7 +1457,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     for(int row=0;row<2;++row) for(int col=0;col<3;++col) {
         const float lx=(col-1)*halfW*.62f;
         const float lz=(row==0?-1.0f:1.0f)*halfD*.42f;
-        drawBox(pv.data(),lx,ceilingY-.012f,lz,.34f,.012f,.12f,trimDark);
+        drawBox(pv.data(),lx,ceilingY-.012f,lz,.34f,.012f,.12f,wallTrim);
         drawBox(pv.data(),lx,ceilingY-.020f,lz,.25f,.006f,.075f,
                 row==0?rgb(.92f,.78f,.60f):rgb(.68f,.78f,1.0f));
     }
