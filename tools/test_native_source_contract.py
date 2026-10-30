@@ -126,6 +126,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("Four metallic fastener heads", renderer)
         self.assertIn("fine speaker perforations", renderer)
         self.assertIn("Finished entry opening", renderer)
+        self.assertIn("Divided-light sash, deep interior sill", renderer)
+        self.assertIn("windowY+windowH*.12f", renderer)
         self.assertIn("Three brass hinges and a backplate/lever", renderer)
         self.assertIn("drawRoundedBox(pv.data(),doorX,doorY,doorZ", renderer)
         self.assertIn("const float menuZ = monitorZ + 0.132f", renderer)
