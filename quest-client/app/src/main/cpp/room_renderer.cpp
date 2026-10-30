@@ -337,6 +337,8 @@ uniform vec4 uColor;
 uniform sampler2D uTexture;
 uniform sampler2D uMaterialAtlas;
 uniform int uHasMaterialAtlas;
+uniform sampler2D uNormalAtlas;
+uniform int uHasNormalAtlas;
 uniform int uTextured;
 uniform int uMaterial;
 uniform vec2 uUvScale;
@@ -370,6 +372,7 @@ void main(){
   if (uTextured != 0 || uMaterial < 0) { outColor=base; return; }
 
   vec2 uv=vUv*uUvScale;
+  vec2 materialAtlasUv=vec2(0.0);
   float roughness=0.72;
   float metallic=0.04;
   float surface=0.0;
@@ -418,13 +421,25 @@ void main(){
     // Atlas tiles are inset from their boundaries to prevent mip bleed.
     vec2 atlasTile=fract(uv*0.42);
     vec2 atlasUv=atlasOrigin+vec2(0.012)+atlasTile*0.476;
+    materialAtlasUv=atlasUv;
     float texel=texture(uMaterialAtlas,atlasUv).r;
     surface += (texel-0.86)*0.55;
   }
   base.rgb=max(base.rgb*(1.0+surface),vec3(0.0));
 
-  vec3 normal=normalize(cross(dFdx(vWorldPosition),dFdy(vWorldPosition)));
+  vec3 dpdx=dFdx(vWorldPosition), dpdy=dFdy(vWorldPosition);
+  vec3 normal=normalize(cross(dpdx,dpdy));
+  vec2 duvdx=dFdx(uv), duvdy=dFdy(uv);
+  vec3 tangent=normalize(dpdx*duvdy.y-dpdy*duvdx.y);
+  vec3 bitangent=normalize(-dpdx*duvdy.x+dpdy*duvdx.x);
   if (!gl_FrontFacing) normal=-normal;
+  if(uHasNormalAtlas!=0 && uHasMaterialAtlas!=0 &&
+     (uMaterial==1 || uMaterial==2 || uMaterial==3 || uMaterial==4 || uMaterial==6)) {
+    vec3 tangentNormal=texture(uNormalAtlas,materialAtlasUv).xyz*2.0-1.0;
+    tangentNormal.xy*=0.38;
+    tangentNormal=normalize(tangentNormal);
+    normal=normalize(mat3(tangent,bitangent,normal)*tangentNormal);
+  }
   vec3 lightDir=normalize(vec3(-0.42,0.78,0.46));
   vec3 viewDir=normalize(-vWorldPosition+vec3(0.0,0.12,0.0));
   vec3 halfDir=normalize(lightDir+viewDir);
@@ -1042,6 +1057,8 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     locPracticalLightIntensity_=glGetUniformLocation(program_,"uPracticalLightIntensity");
     locMaterialAtlas_=glGetUniformLocation(program_,"uMaterialAtlas");
     locHasMaterialAtlas_=glGetUniformLocation(program_,"uHasMaterialAtlas");
+    locNormalAtlas_=glGetUniformLocation(program_,"uNormalAtlas");
+    locHasNormalAtlas_=glGetUniformLocation(program_,"uHasNormalAtlas");
     GLuint vvs=compileShader(GL_VERTEX_SHADER,kVignetteVertex), vfs=compileShader(GL_FRAGMENT_SHADER,kVignetteFragment);
     if(vvs&&vfs){vignetteProgram_=glCreateProgram();glAttachShader(vignetteProgram_,vvs);glAttachShader(vignetteProgram_,vfs);glLinkProgram(vignetteProgram_);GLint vok=GL_FALSE;glGetProgramiv(vignetteProgram_,GL_LINK_STATUS,&vok);if(vok!=GL_TRUE){glDeleteProgram(vignetteProgram_);vignetteProgram_=0;}}
     if(vvs)glDeleteShader(vvs);if(vfs)glDeleteShader(vfs);
@@ -1050,6 +1067,16 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     environmentTextures_[1]=loadRgbAsset(assets,"environments/night_city.rgb");
     environmentTextures_[2]=loadRgbAsset(assets,"environments/golden_city.rgb");
     materialAtlasTexture_=loadRgbAsset(assets,"materials/room_surface_atlas.rgb");
+    normalAtlasTexture_=loadRgbAsset(assets,"materials/room_normal_atlas.rgb");
+    if(normalAtlasTexture_) {
+        glBindTexture(GL_TEXTURE_2D,normalAtlasTexture_);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D,0);
+        LOGI("loaded tangent-space normal atlas");
+    }
     if(materialAtlasTexture_) {
         glBindTexture(GL_TEXTURE_2D,materialAtlasTexture_);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
@@ -1657,6 +1684,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glBindTexture(GL_TEXTURE_2D,materialAtlasTexture_);
     glUniform1i(locMaterialAtlas_,1);
     glUniform1i(locHasMaterialAtlas_,materialAtlasTexture_?1:0);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D,normalAtlasTexture_);
+    glUniform1i(locNormalAtlas_,2);
+    glUniform1i(locHasNormalAtlas_,normalAtlasTexture_?1:0);
     glActiveTexture(GL_TEXTURE0);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
     glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
@@ -2152,5 +2183,6 @@ void RoomRenderer::release() {
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
     if(groundShadowTexture_)glDeleteTextures(1,&groundShadowTexture_);
     if(materialAtlasTexture_)glDeleteTextures(1,&materialAtlasTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=0;sphereVertexCount_=roundedVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    if(normalAtlasTexture_)glDeleteTextures(1,&normalAtlasTexture_);
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=0;sphereVertexCount_=roundedVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
