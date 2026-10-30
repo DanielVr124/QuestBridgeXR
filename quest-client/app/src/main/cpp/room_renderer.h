@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <array>
+#include <vector>
 #include <GLES3/gl3.h>
 #include <android/asset_manager.h>
 #include <openxr/openxr.h>
@@ -48,8 +49,11 @@ public:
 
 private:
     struct Vertex { float x, y, z, u, v; };
+    struct PenthouseBatch { int material = 0; std::array<float, 4> color{}; GLsizei first = 0; GLsizei count = 0; };
     GLuint compileShader(GLenum type, const char* source);
     GLuint loadRgbAsset(AAssetManager* assets, const char* filename);
+    bool loadPenthouseMesh(AAssetManager* assets);
+    void drawPenthouseMesh(const float* projectionView, float floorY);
     GLuint createProceduralEnvironment(int sceneIndex);
     void createGeometry();
     void chooseEnvironment();
@@ -140,6 +144,10 @@ private:
     int activeEnvironmentIndex_ = 0;
     GLuint videoFallbackTexture_ = 0;
     GLuint groundShadowTexture_ = 0;
+    GLuint penthouseVao_ = 0;
+    GLuint penthouseVbo_ = 0;
+    GLsizei penthouseVertexCount_ = 0;
+    std::vector<PenthouseBatch> penthouseBatches_;
     GLuint materialAtlasTexture_ = 0;
     GLuint normalAtlasTexture_ = 0;
     GLuint roughnessAtlasTexture_ = 0;
@@ -148,6 +156,7 @@ private:
     GLuint curvedVao_ = 0;
     GLuint curvedVbo_ = 0;
     bool initialized_ = false;
+    bool skipProceduralDraws_ = false;
     float moveX_ = 0.0f;
     float moveZ_ = 0.0f;
     float virtualYaw_ = 0.0f;
