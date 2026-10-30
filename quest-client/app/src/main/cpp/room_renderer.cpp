@@ -2066,6 +2066,46 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             sidePanelWidth,ceilingY-floorY,0.10f,wall,0.0f,2);
     drawBox(pv.data(),0,ceilingY-1.05f,frontZ+0.02f,1.4f,2.1f,0.10f,wall,0.0f,2);
 
+    // Minimal setup preview: keep the room shell, but render only the supplied desk
+    // and curved monitor models. All bedroom furniture, accessories and extra props
+    // below this point are intentionally skipped in this stripped-down environment.
+    {
+        const float deskZ=-halfD+1.35f;
+        const float deskX=-halfW+1.48f;
+        const float monitorX=deskX-.36f;
+        const float deskSurface=floorY+.83f;
+        const float monitorZ=deskZ-.34f;
+        if (deskModel_.loaded()) {
+            const float deskPlacement[16] = {
+                1,0,0,0, 0,1,0,0, 0,0,1,0,
+                deskX-0.029f,floorY,deskZ+0.011f,1
+            };
+            deskModel_.draw(pv.data(),deskPlacement,locMvp_,locModel_,locColor_,
+                            locTextured_,locTexture_,locMaterial_,locRounded_,locUvScale_);
+        }
+        if (monitorModel_.loaded()) {
+            const float monitorScale=1.65f;
+            const float monitorPlacement[16] = {
+                monitorScale,0,0,0, 0,monitorScale,0,0, 0,0,monitorScale,0,
+                monitorX,deskSurface+0.38f,monitorZ+0.030f,1
+            };
+            monitorModel_.draw(pv.data(),monitorPlacement,locMvp_,locModel_,locColor_,
+                               locTextured_,locTexture_,locMaterial_,locRounded_,locUvScale_);
+            const bool streamOn=settings_.screenDestination=="monitor"||
+                                settings_.screenDestination=="both";
+            if(streamOn) {
+                drawCurvedPanel(pv.data(),monitorX,deskSurface+0.38f,monitorZ+0.082f,
+                    0.966f,0.548f,0.030f,
+                    hasVideo?videoTexture:videoFallbackTexture_,rgb(1,1,1),32);
+            }
+        }
+    }
+    glBindTexture(GL_TEXTURE_2D,0);
+    glBindVertexArray(0);
+    glUseProgram(0);
+    glDisable(GL_DEPTH_TEST);
+    return;
+
     // Finished entry opening: a real casing, timber leaf, inset panels, threshold and metal hardware.
     const float doorWidth=1.28f,doorHeight=2.24f,doorYaw=-0.70f;
     const float doorHingeX=.66f;
