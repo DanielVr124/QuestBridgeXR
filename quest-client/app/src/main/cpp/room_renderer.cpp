@@ -1265,6 +1265,85 @@ void RoomRenderer::createGeometry() {
     glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(3*sizeof(float)));
     glBindVertexArray(0);
 
+    // Parametric upholstery mesh: domed faces, softly bulged side walls and closed seams.
+    // Unlike flattened spheres, this gives seat cushions and back cushions a tailored,
+    // rectangular silhouette with a believable padded crown.
+    std::vector<Vertex> pillowVertices;
+    constexpr int pillowGrid=20;
+    auto topY=[](float u,float v) {
+        const float px=std::max(0.0f,1.0f-4.0f*u*u);
+        const float pz=std::max(0.0f,1.0f-4.0f*v*v);
+        return 0.255f+0.205f*std::pow(px,0.72f)*std::pow(pz,0.72f);
+    };
+    auto addTri=[&](const Vertex& a,const Vertex& b,const Vertex& c) {
+        pillowVertices.push_back(a);pillowVertices.push_back(b);pillowVertices.push_back(c);
+    };
+    auto topPoint=[&](float u,float v) {
+        return Vertex{u,topY(u,v),v,u+0.5f,v+0.5f};
+    };
+    auto bottomPoint=[](float u,float v) {
+        return Vertex{u,-0.255f,v,u+0.5f,v+0.5f};
+    };
+    for(int row=0;row<pillowGrid;++row) for(int col=0;col<pillowGrid;++col) {
+        const float x0=-0.5f+float(col)/pillowGrid;
+        const float x1=-0.5f+float(col+1)/pillowGrid;
+        const float z0=-0.5f+float(row)/pillowGrid;
+        const float z1=-0.5f+float(row+1)/pillowGrid;
+        const Vertex a=topPoint(x0,z0),b=topPoint(x1,z0),c=topPoint(x1,z1),d=topPoint(x0,z1);
+        addTri(a,d,b);addTri(b,d,c); // top surface faces +Y
+        const Vertex ba=bottomPoint(x0,z0),bb=bottomPoint(x1,z0);
+        const Vertex bc=bottomPoint(x1,z1),bd=bottomPoint(x0,z1);
+        addTri(ba,bb,bd);addTri(bb,bc,bd); // closed underside
+    }
+    // Front and rear gussets have a slight outward belly between their welt seams.
+    for(int row=0;row<pillowGrid;++row) {
+        const float x0=-0.5f+float(row)/pillowGrid;
+        const float x1=-0.5f+float(row+1)/pillowGrid;
+        for(int step=0;step<8;++step) {
+            const float t0=float(step)/8.0f,t1=float(step+1)/8.0f;
+            const float y0=-0.255f+0.510f*t0,y1=-0.255f+0.510f*t1;
+            const float bulge0=0.035f*std::sin(kPi*t0),bulge1=0.035f*std::sin(kPi*t1);
+            for(int side : {-1,1}) {
+                const Vertex a{x0,y0,side*(0.5f+bulge0),x0+0.5f,t0};
+                const Vertex b{x1,y0,side*(0.5f+bulge0),x1+0.5f,t0};
+                const Vertex c{x1,y1,side*(0.5f+bulge1),x1+0.5f,t1};
+                const Vertex d{x0,y1,side*(0.5f+bulge1),x0+0.5f,t1};
+                if(side>0){addTri(a,b,c);addTri(a,c,d);}
+                else {addTri(a,c,b);addTri(a,d,c);}
+            }
+        }
+    }
+    // Left and right gussets use opposite winding, keeping the pillow watertight.
+    for(int row=0;row<pillowGrid;++row) {
+        const float z0=-0.5f+float(row)/pillowGrid;
+        const float z1=-0.5f+float(row+1)/pillowGrid;
+        for(int step=0;step<8;++step) {
+            const float t0=float(step)/8.0f,t1=float(step+1)/8.0f;
+            const float y0=-0.255f+0.510f*t0,y1=-0.255f+0.510f*t1;
+            const float bulge0=0.035f*std::sin(kPi*t0),bulge1=0.035f*std::sin(kPi*t1);
+            for(int side : {-1,1}) {
+                const float x0=side*(0.5f+bulge0),x1=side*(0.5f+bulge1);
+                const Vertex a{x0,y0,z0,float(row)/pillowGrid,t0};
+                const Vertex b{x0,y0,z1,float(row+1)/pillowGrid,t0};
+                const Vertex c{x1,y1,z1,float(row+1)/pillowGrid,t1};
+                const Vertex d{x1,y1,z0,float(row)/pillowGrid,t1};
+                if(side>0){addTri(a,b,c);addTri(a,c,d);}
+                else {addTri(a,c,b);addTri(a,d,c);}
+            }
+        }
+    }
+    pillowVertexCount_=static_cast<GLsizei>(pillowVertices.size());
+    glGenVertexArrays(1,&pillowVao_);
+    glGenBuffers(1,&pillowVbo_);
+    glBindVertexArray(pillowVao_);
+    glBindBuffer(GL_ARRAY_BUFFER,pillowVbo_);
+    glBufferData(GL_ARRAY_BUFFER,static_cast<GLsizeiptr>(pillowVertices.size()*sizeof(Vertex)),pillowVertices.data(),GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(Vertex),nullptr);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(3*sizeof(float)));
+    glBindVertexArray(0);
+
     // Smooth UV sphere mesh used for rounded cushions, chair details and PC cooling fans.
     // It is generated once and shared by every room object to keep draw overhead low.
     std::vector<float> sphere;
@@ -1410,6 +1489,22 @@ void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,floa
     glUniform2f(locUvScale_,scaleX,scaleY);
     glBindVertexArray(vao_);glDrawArrays(GL_TRIANGLES,0,36);glBindVertexArray(0);
 }
+void RoomRenderer::drawPillow(const float* pv,float x,float y,float z,float sx,float sy,float sz,
+                               const std::array<float,4>& color,float yaw,float pitch,int material) {
+    Mat4 projectionView{};std::copy(pv,pv+projectionView.size(),projectionView.begin());
+    const Mat4 orientation=mul(rotateY(yaw),rotateX(pitch));
+    const Mat4 model=mul(translation(x,y,z),mul(orientation,scaling(sx,sy,sz)));
+    const Mat4 mvp=mul(projectionView,model);
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
+    glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
+    glUniform4fv(locColor_,1,color.data());
+    glUniform1i(locTextured_,0);glUniform1i(locMaterial_,material);glUniform1i(locRounded_,0);
+    glUniform2f(locUvScale_,std::max(1.0f,sx*2.8f),std::max(1.0f,sz*2.8f));
+    glBindVertexArray(pillowVao_);
+    glDrawArrays(GL_TRIANGLES,0,pillowVertexCount_);
+    glBindVertexArray(0);
+}
+
 void RoomRenderer::drawCylinder(const float* pv,float x,float y,float z,float diameter,float height,
                                 const std::array<float,4>& color,int material) {
     Mat4 projectionView{};std::copy(pv,pv+projectionView.size(),projectionView.begin());
@@ -2200,47 +2295,66 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawBox(pv.data(),tvX+.08f,tvY-tvH*.5f-.08f,tvZ,.025f,.018f,.28f,accentBlue);
     }
 
-    // Couch moved directly opposite the wall TV. Soft, rounded cushions replace the old blocky sofa.
+    // Tailored sofa: a rigid upholstered frame carries separate domed seat and back cushions.
+    // The cushion mesh has sewn gussets and a rounded crown rather than ellipsoidal placeholder blobs.
     if(settings_.showCouch) {
         const float couchX=halfW-1.25f, couchZ=.05f, couchYaw=-kPi*.5f;
         const float cx=couchX;
-        drawRoundedBox(pv.data(),cx,floorY+.38f,couchZ, .86f,.24f,1.92f,trimDark,couchYaw,5);
-        drawSphere(pv.data(),cx,floorY+.53f,couchZ,.48f,.24f,.82f,sofa,3);
-        // Raised back is on the +X side, so the sitting position faces the TV on the -X wall.
-        drawSphere(pv.data(),cx+.22f,floorY+.68f,couchZ-.48f,.25f,.28f,.39f,sofa,3);
-        drawSphere(pv.data(),cx+.22f,floorY+.68f,couchZ+.48f,.25f,.28f,.39f,sofa,3);
-        drawSphere(pv.data(),cx-.12f,floorY+.75f,couchZ-.23f,.22f,.15f,.35f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
-        drawSphere(pv.data(),cx-.12f,floorY+.75f,couchZ+.23f,.22f,.15f,.35f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
-        // Separate seat and back cushions with stitched piping and panel seams.
-        drawSphere(pv.data(),cx-.13f,floorY+.49f,couchZ-.28f,.30f,.10f,.34f,rgb(sofa[0]*1.12f,sofa[1]*1.12f,sofa[2]*1.12f),3);
-        drawSphere(pv.data(),cx-.13f,floorY+.49f,couchZ+.28f,.30f,.10f,.34f,rgb(sofa[0]*1.12f,sofa[1]*1.12f,sofa[2]*1.12f),3);
-        drawBox(pv.data(),cx-.18f,floorY+.51f,couchZ,.012f,.006f,.78f,wallHighlight,couchYaw);
-        // Rounded arm pads and short dark feet.
-        drawSphere(pv.data(),cx,floorY+.61f,couchZ-.88f,.48f,.27f,.16f,sofa);
-        drawSphere(pv.data(),cx,floorY+.61f,couchZ+.88f,.48f,.27f,.16f,sofa);
-        for(int side : {-1,1}) for(int end : {-1,1})
-            drawBox(pv.data(),cx+side*.29f,floorY+.15f,couchZ+end*.70f,.07f,.25f,.07f,trimDark,couchYaw);
+        drawRoundedBox(pv.data(),cx,floorY+.38f,couchZ,.88f,.25f,1.92f,trimDark,couchYaw,5);
+        drawRoundedBox(pv.data(),cx+.20f,floorY+.66f,couchZ,.24f,.47f,1.82f,trimDark,couchYaw,5);
+        // Separate seat cushions sit proud of the upholstered deck with a visible center split.
+        for(int seat=-1;seat<=1;seat+=2) {
+            drawPillow(pv.data(),cx-.10f,floorY+.535f,couchZ+seat*.34f,
+                       .70f,.13f,.67f,sofa,couchYaw,0.0f,3);
+        }
+        // The back pads face the television and lean gently into the sofa frame.
+        for(int pad=-1;pad<=1;pad+=2) {
+            drawPillow(pv.data(),cx+.31f,floorY+.78f,couchZ+pad*.39f,
+                       .72f,.16f,.62f,sofa,couchYaw,kPi*.5f,3);
+        }
+        // Soft, broad arm caps and welt strips finish both exposed ends.
+        for(int end : {-1,1}) {
+            drawPillow(pv.data(),cx+.02f,floorY+.625f,couchZ+end*.86f,
+                       .40f,.17f,.27f,sofa,couchYaw,0.0f,3);
+            drawBox(pv.data(),cx-.10f,floorY+.62f,couchZ+end*.86f,
+                    .010f,.008f,.28f,wallHighlight,couchYaw);
+        }
+        // Four recessed legs are set in from the corners.
+        for(int side : {-1,1}) for(int end : {-1,1}) {
+            const float legX=cx+side*.30f,legZ=couchZ+end*.70f;
+            drawCylinder(pv.data(),legX,floorY+.13f,legZ,.075f,.24f,trimDark,4);
+            drawCylinder(pv.data(),legX,floorY+.035f,legZ,.082f,.035f,silver,4);
+        }
     }
 
-    // Ergonomic gaming chair with rounded headrest, cushioned seat and five-star base.
+    // Ergonomic task chair with a molded back shell, domed seat and independent lumbar pad.
     if(settings_.showChair) {
         const float chairX=deskX-.25f, chairZ=deskZ+1.20f;
-        drawSphere(pv.data(),chairX,floorY+.62f,chairZ,.36f,.13f,.34f,sofa,3);
-        drawSphere(pv.data(),chairX,floorY+1.00f,chairZ-.22f,.34f,.44f,.13f,sofa,3);
-        drawSphere(pv.data(),chairX,floorY+1.34f,chairZ-.24f,.20f,.18f,.12f,sofa,3);
-        drawCylinder(pv.data(),chairX,floorY+.27f,chairZ,.07f,.38f,silver,4);
+        drawRoundedBox(pv.data(),chairX,floorY+.62f,chairZ,.70f,.17f,.68f,trimDark,0.0f,5);
+        drawPillow(pv.data(),chairX,floorY+.665f,chairZ,.62f,.15f,.58f,sofa,0.0f,0.0f,3);
+        // A tapered support shell sits behind the fabric backrest.
+        drawRoundedBox(pv.data(),chairX,floorY+1.03f,chairZ-.23f,.61f,.83f,.15f,trimDark,0.0f,5);
+        drawPillow(pv.data(),chairX,floorY+1.03f,chairZ-.135f,.55f,.14f,.72f,sofa,0.0f,kPi*.5f,3);
+        drawPillow(pv.data(),chairX,floorY+.94f,chairZ-.045f,.43f,.10f,.20f,
+                   rgb(sofa[0]*1.12f,sofa[1]*1.12f,sofa[2]*1.12f),0.0f,kPi*.5f,3);
+        // Padded armrests sit on swept metal supports instead of bare spherical stubs.
+        for(int side : {-1,1}) {
+            drawRoundedBox(pv.data(),chairX+side*.31f,floorY+.56f,chairZ-.04f,
+                           .045f,.30f,.055f,silver,side*.11f,4);
+            drawPillow(pv.data(),chairX+side*.32f,floorY+.72f,chairZ+.01f,
+                       .15f,.085f,.37f,sofa,0.0f,0.0f,3);
+        }
+        // Height-adjustable gas lift, five-spoke metal base, and individual caster wheels.
+        drawCylinder(pv.data(),chairX,floorY+.28f,chairZ,.075f,.42f,silver,4);
+        drawCylinder(pv.data(),chairX,floorY+.075f,chairZ,.12f,.10f,trimDark,5);
         for(int i=0;i<5;++i) {
             const float a=2*kPi*i/5;
-            drawBox(pv.data(),chairX+std::cos(a)*.30f,floorY+.07f,chairZ+std::sin(a)*.28f,.32f,.045f,.055f,trimDark,a);
+            const float wx=chairX+std::cos(a)*.36f,wz=chairZ+std::sin(a)*.32f;
+            drawRoundedBox(pv.data(),chairX+std::cos(a)*.20f,floorY+.075f,
+                           chairZ+std::sin(a)*.18f,.38f,.055f,.075f,silver,a,4);
+            drawSphere(pv.data(),wx,floorY+.045f,wz,.075f,.075f,.052f,trimDark,5);
+            drawCylinder(pv.data(),wx,floorY+.045f,wz,.035f,.09f,silver,4);
         }
-        drawSphere(pv.data(),chairX-.25f,floorY+.57f,chairZ,.10f,.06f,.26f,trimDark);
-        drawSphere(pv.data(),chairX+.25f,floorY+.57f,chairZ,.10f,.06f,.26f,trimDark);
-        // Padded arm caps, lumbar insert, and segmented backrest stitching.
-        drawSphere(pv.data(),chairX,floorY+.91f,chairZ-.105f,.24f,.20f,.035f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
-        drawSphere(pv.data(),chairX-.25f,floorY+.63f,chairZ,.13f,.055f,.25f,sofa);
-        drawSphere(pv.data(),chairX+.25f,floorY+.63f,chairZ,.13f,.055f,.25f,sofa);
-        for(int seam=0;seam<3;++seam)
-            drawBox(pv.data(),chairX,floorY+.82f+seam*.09f,chairZ-.115f,.34f,.004f,.008f,wallHighlight);
     }
 
     // Warm practical lamp and a restrained light accent near the PC setup.
@@ -2307,11 +2421,12 @@ void RoomRenderer::release() {
     if(curvedVao_)glDeleteVertexArrays(1,&curvedVao_);if(curvedVbo_)glDeleteBuffers(1,&curvedVbo_);
     if(sphereVao_)glDeleteVertexArrays(1,&sphereVao_);if(sphereVbo_)glDeleteBuffers(1,&sphereVbo_);
     if(roundedVao_)glDeleteVertexArrays(1,&roundedVao_);if(roundedVbo_)glDeleteBuffers(1,&roundedVbo_);
+    if(pillowVao_)glDeleteVertexArrays(1,&pillowVao_);if(pillowVbo_)glDeleteBuffers(1,&pillowVbo_);
     if(cylinderVao_)glDeleteVertexArrays(1,&cylinderVao_);if(cylinderVbo_)glDeleteBuffers(1,&cylinderVbo_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
     if(groundShadowTexture_)glDeleteTextures(1,&groundShadowTexture_);
     if(materialAtlasTexture_)glDeleteTextures(1,&materialAtlasTexture_);
     if(normalAtlasTexture_)glDeleteTextures(1,&normalAtlasTexture_);
     if(roughnessAtlasTexture_)glDeleteTextures(1,&roughnessAtlasTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=pillowVao_=pillowVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=pillowVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
