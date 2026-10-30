@@ -2435,10 +2435,16 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform1i(locRoughnessAtlas_,3);
     glUniform1i(locHasRoughnessAtlas_,roughnessAtlasTexture_?1:0);
     glActiveTexture(GL_TEXTURE0);
-    glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
-    glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
+    static const std::array<std::array<float, 3>, 5> roomLedPresets{{
+        {{0.02f, 0.80f, 1.00f}}, {{0.04f, 0.20f, 1.00f}},
+        {{0.48f, 0.08f, 1.00f}}, {{1.00f, 0.035f, 0.32f}},
+        {{1.00f, 0.62f, 0.28f}}
+    }};
+    const auto& roomLedColor = roomLedPresets[static_cast<size_t>(std::clamp(ledPreset_, 0, 4))];
     const float roomLightLevel = roomLightsOn_ ? 1.0f : 0.015f;
     glUniform1f(locRoomLightLevel_, roomLightLevel);
+    glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
+    glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
     glUniform1f(locCeilingLightIntensity_,1.55f*roomLightLevel);
     glUniform3f(locPracticalLightPosition_,-halfW+0.30f,floorY+1.92f,-1.45f);
     glUniform3f(locPracticalLightColor_,0.40f,0.32f,1.0f);
@@ -2446,13 +2452,13 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // All RGB emitters share one selected preset; the Blender material batches
     // are recolored at draw time, leaving the skyline windows unchanged.
     glUniform3f(locNeonBluePosition_,-halfW+0.20f,floorY+2.75f,-0.45f);
-    glUniform3f(locNeonBlueColor_,0.12f,0.34f,1.0f);
+    glUniform3f(locNeonBlueColor_,roomLedColor[0],roomLedColor[1],roomLedColor[2]);
     glUniform1f(locNeonBlueIntensity_,2.25f*roomLightLevel);
     glUniform3f(locNeonVioletPosition_,halfW-0.20f,floorY+2.55f,0.80f);
-    glUniform3f(locNeonVioletColor_,0.55f,0.14f,1.0f);
+    glUniform3f(locNeonVioletColor_,roomLedColor[0],roomLedColor[1],roomLedColor[2]);
     glUniform1f(locNeonVioletIntensity_,2.05f*roomLightLevel);
     glUniform3f(locNeonPinkPosition_,0.0f,floorY+2.25f,backZ+0.58f);
-    glUniform3f(locNeonPinkColor_,1.0f,0.075f,0.38f);
+    glUniform3f(locNeonPinkColor_,roomLedColor[0],roomLedColor[1],roomLedColor[2]);
     glUniform1f(locNeonPinkIntensity_,1.55f*roomLightLevel);
     // Use the Blender-authored mesh for the base penthouse when all model visibility
     // toggles are in their default state. Preserve the procedural fallback for variants.
