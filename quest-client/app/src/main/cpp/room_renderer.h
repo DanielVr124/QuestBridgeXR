@@ -15,10 +15,10 @@ struct RoomSettings {
     int monitorCount = 1;                       // 1..3, replicated stream
     bool showTv = true;
     bool showCouch = false; // Legacy config field; the bedroom renderer no longer draws a couch.
-    bool showChair = true;
+    bool showChair = false; // Legacy config setting; no chair is rendered or collided with.
     bool roomControlsEnabled = true;
-    bool sittingToggleEnabled = true;
-    float sittingHeadDropM = 0.42f;
+    bool sittingToggleEnabled = false; // Legacy setting retained for config compatibility.
+    float sittingHeadDropM = 0.42f; // Legacy setting; seated mode is no longer active.
     bool smoothTurn = false;
     bool comfortVignette = true;
     float movementSpeed = 1.35f;
@@ -36,11 +36,9 @@ public:
                           const XrPosef& headPose);
     void cycleScreenDestination();
     void cycleEnvironment();
-    void toggleSitting(const XrPosef& headPose);
     void toggleMenu();
     bool menuVisible() const { return menuVisible_; }
     void handleMenuInput(float vertical, bool selectPressed);
-    bool sitting() const { return sitting_; }
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
                    GLuint videoTexture, bool hasVideo);
     float locomotionX() const { return moveX_; }
@@ -156,7 +154,6 @@ private:
     float snapCooldown_ = 0.0f;
     bool previousTurnRight_ = false;
     bool previousTurnLeft_ = false;
-    bool sitting_ = false;
     bool menuVisible_ = false;
     int menuSelection_ = 0;
     bool previousMenuNavigation_ = false;
