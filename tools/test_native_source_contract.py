@@ -73,6 +73,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("uCeilingLightPosition", renderer)
         self.assertIn("uMaterialAtlas", renderer)
         self.assertIn("materials/room_surface_atlas.rgb", renderer)
+        self.assertIn("vec3 albedoTexel=texture(uMaterialAtlas,atlasUv).rgb", renderer)
+        self.assertIn("albedoTexel*1.15", renderer)
         self.assertIn("materials/room_normal_atlas.rgb", renderer)
         self.assertIn("materials/room_roughness_atlas.rgb", renderer)
         self.assertIn("uniform sampler2D uRoughnessAtlas", renderer)
