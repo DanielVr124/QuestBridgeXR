@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iterator>
 #include <vector>
+#include <zlib.h>
 
 #define QBX_LOG_TAG "QuestBridgeRoom"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, QBX_LOG_TAG, __VA_ARGS__)
@@ -294,12 +295,15 @@ const char* kVertexShader = R"GLSL(#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
 layout(location=1) in vec2 aUv;
+layout(location=2) in vec3 aNormal;
 uniform mat4 uMvp;
 uniform mat4 uModel;
 uniform int uRounded;
+uniform int uUseVertexNormal;
 uniform vec3 uBevel;
 out vec2 vUv;
 out vec3 vWorldPosition;
+out vec3 vVertexNormal;
 void main(){
   vec3 localPosition=aPosition;
   if(uRounded!=0) {
@@ -314,6 +318,7 @@ void main(){
   gl_Position = uMvp * vec4(localPosition,1.0);
   vUv=aUv;
   vWorldPosition=world.xyz;
+  vVertexNormal=normalize(mat3(uModel)*aNormal);
 }
 )GLSL";
 const char* kVignetteVertex = R"GLSL(#version 300 es
@@ -333,6 +338,8 @@ const char* kFragmentShader = R"GLSL(#version 300 es
 precision highp float;
 in vec2 vUv;
 in vec3 vWorldPosition;
+in vec3 vVertexNormal;
+uniform int uUseVertexNormal;
 uniform vec4 uColor;
 uniform sampler2D uTexture;
 uniform sampler2D uMaterialAtlas;
@@ -482,8 +489,8 @@ void main(){
   base.rgb=max(base.rgb*(1.0+surface),vec3(0.0));
 
   vec3 dpdx=dFdx(vWorldPosition), dpdy=dFdy(vWorldPosition);
-  vec3 normal=normalize(cross(dpdx,dpdy));
-  if (!gl_FrontFacing) normal=-normal;
+  vec3 normal=uUseVertexNormal!=0?normalize(vVertexNormal):normalize(cross(dpdx,dpdy));
+  if (uUseVertexNormal==0 && !gl_FrontFacing) normal=-normal;
   if(uHasNormalAtlas!=0 && uHasMaterialAtlas!=0 &&
      (uMaterial==1 || uMaterial==2 || uMaterial==3 || uMaterial==4 || uMaterial==6)) {
     vec2 duvdx=dFdx(uv), duvdy=dFdy(uv);
@@ -588,26 +595,212 @@ GLuint RoomRenderer::compileShader(GLenum type, const char* source) {
     return shader;
 }
 
-GLuint RoomRenderer::loadRgbAsset(AAssetManager* assets, const char* filename) {
-    if(!assets) return 0;
-    AAsset* a=AAssetManager_open(assets,filename,AASSET_MODE_BUFFER);
-    if(!a) { LOGW("environment asset missing: %s",filename); return 0; }
-    const auto length=AAsset_getLength(a);
-    std::vector<uint8_t> bytes(static_cast<size_t>(length));
-    const int64_t read=AAsset_read(a,bytes.data(),bytes.size()); AAsset_close(a);
-    if(read<8) return 0;
-    uint32_t w=0,h=0; std::memcpy(&w,bytes.data(),4); std::memcpy(&h,bytes.data()+4,4);
-    if(w<2||h<2||w>2048||h>2048||static_cast<uint64_t>(w)*h*3+8>static_cast<uint64_t>(read)) { LOGW("bad RGB asset: %s",filename); return 0; }
-    GLuint t=0; glGenTextures(1,&t); glBindTexture(GL_TEXTURE_2D,t);
+
+namespace {
+bool readRoomAssetPayload(AAssetManager* assets,const char* filename,std::vector<uint8_t>& output) {
+    output.clear();
+    if(!assets||!filename) return false;
+    AAsset* asset=AAssetManager_open(assets,filename,AASSET_MODE_BUFFER);
+    if(!asset) { LOGW("room asset missing: %s",filename); return false; }
+    const int64_t length=AAsset_getLength(asset);
+    if(length<=0||length>64LL*1024LL*1024LL) { AAsset_close(asset); LOGW("invalid room asset size: %s",filename); return false; }
+    std::vector<uint8_t> input(static_cast<size_t>(length));
+    const int64_t read=AAsset_read(asset,input.data(),static_cast<size_t>(length));
+    AAsset_close(asset);
+    if(read!=length) { LOGW("short room asset read: %s",filename); return false; }
+
+    const size_t nameLength=std::strlen(filename);
+    const bool isBase64=nameLength>=4&&std::strcmp(filename+nameLength-4,".b64")==0;
+    if(isBase64) {
+        std::vector<uint8_t> decoded;
+        decoded.reserve(input.size()*3u/4u);
+        uint32_t accumulator=0;
+        int bits=-8;
+        auto value=[](uint8_t ch)->int {
+            if(ch>='A'&&ch<='Z') return ch-'A';
+            if(ch>='a'&&ch<='z') return ch-'a'+26;
+            if(ch>='0'&&ch<='9') return ch-'0'+52;
+            if(ch=='+') return 62;
+            if(ch=='/') return 63;
+            return -1;
+        };
+        for(uint8_t ch:input) {
+            if(ch=='=') break;
+            const int v=value(ch);
+            if(v<0) continue;
+            accumulator=(accumulator<<6)|static_cast<uint32_t>(v);
+            bits+=6;
+            if(bits>=0) {
+                decoded.push_back(static_cast<uint8_t>((accumulator>>bits)&0xffu));
+                bits-=8;
+                accumulator&=0x00ffffffu;
+            }
+        }
+        input.swap(decoded);
+    }
+
+    if(input.size()>=8&&std::memcmp(input.data(),"QZB1",4)==0) {
+        uint32_t expected=0;
+        std::memcpy(&expected,input.data()+4,sizeof(expected));
+        if(expected==0||expected>64u*1024u*1024u) { LOGW("bad compressed asset header: %s",filename); return false; }
+        output.resize(expected);
+        uLongf actual=static_cast<uLongf>(expected);
+        const int status=uncompress(output.data(),&actual,input.data()+8,static_cast<uLong>(input.size()-8));
+        if(status!=Z_OK||actual!=expected) {
+            LOGW("room asset decompression failed (%d): %s",status,filename);
+            output.clear();
+            return false;
+        }
+        return true;
+    }
+    output.swap(input);
+    return true;
+}
+}
+
+GLuint RoomRenderer::loadRgbAsset(AAssetManager* assets,const char* filename) {
+    std::vector<uint8_t> bytes;
+    if(!readRoomAssetPayload(assets,filename,bytes)||bytes.size()<8) return 0;
+    uint32_t w=0,h=0;
+    std::memcpy(&w,bytes.data(),4);
+    std::memcpy(&h,bytes.data()+4,4);
+    const uint64_t expected=8ull+static_cast<uint64_t>(w)*h*3ull;
+    if(w<2||h<2||w>2048||h>2048||expected>bytes.size()) {
+        LOGW("bad RGB asset: %s",filename);
+        return 0;
+    }
+    GLuint texture=0;
+    glGenTextures(1,&texture);
+    if(!texture) return 0;
+    glBindTexture(GL_TEXTURE_2D,texture);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,static_cast<GLsizei>(w),static_cast<GLsizei>(h),0,GL_RGB,GL_UNSIGNED_BYTE,bytes.data()+8);
-    glBindTexture(GL_TEXTURE_2D,0); LOGI("loaded %s (%ux%u)",filename,w,h); return t;
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,static_cast<GLsizei>(w),static_cast<GLsizei>(h),0,
+                 GL_RGB,GL_UNSIGNED_BYTE,bytes.data()+8);
+    glBindTexture(GL_TEXTURE_2D,0);
+    LOGI("loaded %s (%ux%u)",filename,w,h);
+    return texture;
 }
 
+bool RoomRenderer::loadModelAsset(AAssetManager* assets,const char* filename,std::vector<ModelMesh>& meshes) {
+    for(auto& mesh:meshes) {
+        if(mesh.vao) glDeleteVertexArrays(1,&mesh.vao);
+        if(mesh.vbo) glDeleteBuffers(1,&mesh.vbo);
+        if(mesh.ebo) glDeleteBuffers(1,&mesh.ebo);
+    }
+    meshes.clear();
+    std::vector<uint8_t> bytes;
+    if(!readRoomAssetPayload(assets,filename,bytes)||bytes.size()<8) return false;
+    if(std::memcmp(bytes.data(),"QBM1",4)!=0) {
+        LOGW("bad room model header: %s",filename);
+        return false;
+    }
+    size_t cursor=4;
+    uint32_t meshCount=0;
+    std::memcpy(&meshCount,bytes.data()+cursor,4); cursor+=4;
+    if(meshCount==0||meshCount>64) return false;
+
+    auto read=[&](void* destination,size_t size)->bool {
+        if(cursor>bytes.size()||size>bytes.size()-cursor) return false;
+        std::memcpy(destination,bytes.data()+cursor,size);
+        cursor+=size;
+        return true;
+    };
+    for(uint32_t i=0;i<meshCount;++i) {
+        int32_t material=5;
+        uint32_t textureMode=0,vertexCount=0,indexCount=0;
+        std::array<float,4> color{1.0f,1.0f,1.0f,1.0f};
+        if(!read(&material,4)||!read(&textureMode,4)||!read(&vertexCount,4)||
+           !read(&indexCount,4)||!read(color.data(),sizeof(float)*4)) {
+            LOGW("truncated mesh header: %s",filename);
+            return false;
+        }
+        if(vertexCount<3||vertexCount>250000||indexCount<3||indexCount>750000||
+           (indexCount%3)!=0||textureMode>2) {
+            LOGW("invalid mesh counts: %s",filename);
+            return false;
+        }
+        const size_t vertexBytes=static_cast<size_t>(vertexCount)*8u*sizeof(float);
+        const size_t indexBytes=static_cast<size_t>(indexCount)*sizeof(uint32_t);
+        if(cursor>bytes.size()||vertexBytes>bytes.size()-cursor||
+           indexBytes>bytes.size()-cursor-vertexBytes) {
+            LOGW("mesh payload exceeds asset: %s",filename);
+            return false;
+        }
+        ModelMesh mesh{};
+        mesh.material=material;
+        mesh.textureMode=static_cast<GLint>(textureMode);
+        mesh.indexCount=static_cast<GLsizei>(indexCount);
+        mesh.color=color;
+        glGenVertexArrays(1,&mesh.vao);
+        glGenBuffers(1,&mesh.vbo);
+        glGenBuffers(1,&mesh.ebo);
+        if(!mesh.vao||!mesh.vbo||!mesh.ebo) {
+            if(mesh.vao) glDeleteVertexArrays(1,&mesh.vao);
+            if(mesh.vbo) glDeleteBuffers(1,&mesh.vbo);
+            if(mesh.ebo) glDeleteBuffers(1,&mesh.ebo);
+            return false;
+        }
+        glBindVertexArray(mesh.vao);
+        glBindBuffer(GL_ARRAY_BUFFER,mesh.vbo);
+        glBufferData(GL_ARRAY_BUFFER,static_cast<GLsizeiptr>(vertexBytes),bytes.data()+cursor,GL_STATIC_DRAW);
+        cursor+=vertexBytes;
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,mesh.ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,static_cast<GLsizeiptr>(indexBytes),bytes.data()+cursor,GL_STATIC_DRAW);
+        cursor+=indexBytes;
+        constexpr GLsizei stride=8*static_cast<GLsizei>(sizeof(float));
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,stride,reinterpret_cast<void*>(0));
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,stride,reinterpret_cast<void*>(6*sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2,3,GL_FLOAT,GL_FALSE,stride,reinterpret_cast<void*>(3*sizeof(float)));
+        glBindVertexArray(0);
+        meshes.push_back(mesh);
+    }
+    glBindBuffer(GL_ARRAY_BUFFER,0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
+    LOGI("loaded %s (%u mesh parts)",filename,meshCount);
+    return true;
+}
+
+void RoomRenderer::drawModel(const float* pv,const std::vector<ModelMesh>& meshes,
+                             float x,float y,float z,float scale,float yaw,
+                             GLuint videoTexture,bool hasVideo) {
+    if(meshes.empty()) return;
+    Mat4 projectionView{};
+    std::copy(pv,pv+projectionView.size(),projectionView.begin());
+    const Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(scale,scale,scale)));
+    const Mat4 mvp=mul(projectionView,model);
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
+    glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
+    glUniform1i(locRounded_,0);
+    glUniform2f(locUvScale_,1.0f,1.0f);
+    glUniform1i(locUseVertexNormal_,1);
+    for(const auto& mesh:meshes) {
+        GLuint texture=0;
+        const bool textured=mesh.textureMode!=0;
+        if(mesh.textureMode==1) texture=deskSurfaceTexture_;
+        else if(mesh.textureMode==2) {
+            const bool streamOn=settings_.screenDestination=="monitor"||settings_.screenDestination=="both";
+            texture=(streamOn&&hasVideo)?videoTexture:videoFallbackTexture_;
+        }
+        glUniform4fv(locColor_,1,mesh.color.data());
+        glUniform1i(locTextured_,textured?1:0);
+        glUniform1i(locMaterial_,textured?-1:mesh.material);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D,texture);
+        glUniform1i(locTexture_,0);
+        glBindVertexArray(mesh.vao);
+        glDrawElements(GL_TRIANGLES,mesh.indexCount,GL_UNSIGNED_INT,nullptr);
+    }
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D,0);
+    glUniform1i(locUseVertexNormal_,0);
+}
 
 GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
     // Procedural window scenery is generated on demand. The first three scenes use bundled assets.
@@ -1150,6 +1343,7 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     locUvScale_=glGetUniformLocation(program_,"uUvScale");locMaterial_=glGetUniformLocation(program_,"uMaterial");
     locModel_=glGetUniformLocation(program_,"uModel");locRounded_=glGetUniformLocation(program_,"uRounded");
     locBevel_=glGetUniformLocation(program_,"uBevel");
+    locUseVertexNormal_=glGetUniformLocation(program_,"uUseVertexNormal");
     locCameraPosition_=glGetUniformLocation(program_,"uCameraPosition");
     locCeilingLightPosition_=glGetUniformLocation(program_,"uCeilingLightPosition");
     locCeilingLightColor_=glGetUniformLocation(program_,"uCeilingLightColor");
@@ -1182,6 +1376,12 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     materialAtlasTexture_=loadRgbAsset(assets,"materials/room_surface_atlas.rgb");
     normalAtlasTexture_=loadRgbAsset(assets,"materials/room_normal_atlas.rgb");
     roughnessAtlasTexture_=loadRgbAsset(assets,"materials/room_roughness_atlas.rgb");
+    deskSurfaceTexture_=loadRgbAsset(assets,"models/arc_desk_texture.rgb.b64");
+    environmentTextures_[29]=loadRgbAsset(assets,"environments/golden_city_360.rgb.b64");
+    if(!loadModelAsset(assets,"models/arc_gaming_desk.qbm.b64",deskModel_))
+        LOGW("Claude desk model failed to load; desk geometry will be unavailable.");
+    if(!loadModelAsset(assets,"models/arc27_curved_monitor.qbm.b64",monitorModel_))
+        LOGW("Claude ARC27 monitor failed to load; monitor geometry will be unavailable.");
     if(roughnessAtlasTexture_) {
         glBindTexture(GL_TEXTURE_2D,roughnessAtlasTexture_);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
