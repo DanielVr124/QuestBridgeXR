@@ -9,6 +9,7 @@
 #include <cctype>
 #include <fstream>
 #include <iterator>
+#include <utility>
 #include <vector>
 
 #define QBX_LOG_TAG "QuestBridgeRoom"
