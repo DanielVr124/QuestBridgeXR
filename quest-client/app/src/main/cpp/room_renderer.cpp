@@ -2568,13 +2568,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawBox(pv.data(),tvX,cabinetY+.262f,cabinetZ,.72f,.012f,.38f,accentBlue,0.0f,7);
     }
 
-    // Ergonomic task chair with a molded back shell, domed seat and independent lumbar pad.
-    if(settings_.showChair) {
-        const float chairX=deskX-.25f, chairZ=deskZ+1.20f;
-        drawRoundedBox(pv.data(),chairX,floorY+.62f,chairZ,.70f,.17f,.68f,trimDark,0.0f,5);
-        drawPillow(pv.data(),chairX,floorY+.665f,chairZ,.62f,.15f,.58f,upholstery,0.0f,0.0f,3);
-        // A tapered support shell sits behind the fabric backrest.
-        drawRoundedBox(pv.data(),chairX,floorY+1.03f,chair    // A finished floor lamp: weighted base, slender stem, turned collar, tapered textile shade and diffuser.
+    // Chair removed from the desk-only setup.
     const float lampX=-halfW+.30f,lampZ=-1.45f;
     drawCylinder(pv.data(),lampX,floorY+.055f,lampZ,.34f,.11f,trimDark,5);
     drawCylinder(pv.data(),lampX,floorY+.88f,lampZ,.038f,1.60f,silver,4);
