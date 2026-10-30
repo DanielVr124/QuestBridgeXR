@@ -6,6 +6,7 @@
 #include <GLES3/gl3.h>
 #include <android/asset_manager.h>
 #include <openxr/openxr.h>
+#include "glb_model.h"
 
 struct RoomSettings {
     std::string environment = "skyline_penthouse";       // 208 scenes; see Studio Virtual Room settings
@@ -84,6 +85,8 @@ private:
                                GLuint environmentTexture, float windowW, float windowH);
 
     RoomSettings settings_{};
+    GlbModel deskModel_;
+    GlbModel monitorModel_;
     GLuint program_ = 0;
     GLuint vignetteProgram_ = 0;
     GLuint vao_ = 0;
