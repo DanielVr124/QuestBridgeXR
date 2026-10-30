@@ -665,6 +665,13 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
         ground = palette.ground;
         horizon = palette.horizon;
     }
+    if (sceneIndex == 29) {
+        // A deep midnight sky leaves a clean horizon line behind the penthouse glazing.
+        skyTop = {3.0f, 6.0f, 19.0f};
+        skyHorizon = {12.0f, 20.0f, 43.0f};
+        ground = {3.0f, 8.0f, 19.0f};
+        horizon = 0.80f;
+    }
 
     const int addedPack = sceneIndex >= 88 ? (sceneIndex - 88) / 8 : -1;
     const bool city = sceneIndex == 4 || sceneIndex == 17 || sceneIndex == 18 ||
@@ -694,7 +701,7 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                           sceneIndex == 120 || sceneIndex == 121 || sceneIndex == 122 ||
                           sceneIndex == 139 || sceneIndex == 143 || sceneIndex == 151 ||
                           sceneIndex == 197 || sceneIndex == 203 || sceneIndex == 205;
-    const bool extraNight = sceneIndex == 28 || sceneIndex == 30 || sceneIndex == 31 ||
+    const bool extraNight = sceneIndex == 28 || sceneIndex == 29 || sceneIndex == 30 || sceneIndex == 31 ||
                             sceneIndex == 34 || sceneIndex == 35 || sceneIndex == 46 ||
                             sceneIndex == 51 || sceneIndex == 58 || sceneIndex == 59 ||
                             (sceneIndex >= 61 && sceneIndex <= 67) || sceneIndex == 71 ||
@@ -1078,6 +1085,30 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
             if (sceneIndex == 23 && v > 0.25f && v < 0.55f) {
                 const float cloudEdge = 0.35f + 0.045f * std::sin(u * 18.0f);
                 if (std::fabs(v - cloudEdge) < 0.025f) { r += 18.0f; g += 22.0f; b += 38.0f; }
+            }
+            if (sceneIndex == 29 && v > horizon) {
+                // Break the city lights into softened, vertically stretched reflections
+                // with horizontal ripples so the skyline reads as a waterfront at night.
+                const float depth = std::clamp((v - horizon) / (1.0f - horizon), 0.0f, 1.0f);
+                const float ripple = 0.5f + 0.5f * std::sin(v * 310.0f + u * 23.0f)
+                                            * std::sin(v * 91.0f - u * 13.0f);
+                r = 3.0f + depth * 3.0f + ripple * 2.0f;
+                g = 8.0f + depth * 6.0f + ripple * 4.0f;
+                b = 19.0f + depth * 13.0f + ripple * 8.0f;
+                const int building = x / 16;
+                const uint32_t seed = hash32(static_cast<uint32_t>(building) * 7919U
+                                           + static_cast<uint32_t>(sceneIndex) * 113U + 37U);
+                const int localX = x % 16;
+                const bool litColumn = localX >= 4 && localX <= 10 && ((seed >> 5) % 7U < 3U);
+                const int reflectionRow = static_cast<int>(depth * 92.0f + static_cast<float>((seed >> 12) & 15U));
+                if (litColumn && (reflectionRow % 17) < 4) {
+                    const float glow = (1.0f - depth * 0.72f) * (0.45f + ripple * 0.55f);
+                    if (seed & 1U) { r += 30.0f * glow; g += 105.0f * glow; b += 180.0f * glow; }
+                    else { r += 170.0f * glow; g += 35.0f * glow; b += 120.0f * glow; }
+                }
+                if ((noise % 97U) < 2U && depth < 0.75f) {
+                    r += 4.0f; g += 8.0f; b += 13.0f;
+                }
             }
             const size_t at = static_cast<size_t>((y * width + x) * 3);
             pixels[at] = byte(r);
