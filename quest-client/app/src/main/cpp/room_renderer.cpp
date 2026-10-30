@@ -1171,6 +1171,9 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     if(vvs&&vfs){vignetteProgram_=glCreateProgram();glAttachShader(vignetteProgram_,vvs);glAttachShader(vignetteProgram_,vfs);glLinkProgram(vignetteProgram_);GLint vok=GL_FALSE;glGetProgramiv(vignetteProgram_,GL_LINK_STATUS,&vok);if(vok!=GL_TRUE){glDeleteProgram(vignetteProgram_);vignetteProgram_=0;}}
     if(vvs)glDeleteShader(vvs);if(vfs)glDeleteShader(vfs);
     createGeometry();
+    const bool deskLoaded=deskModel_.load(assets,"models/arc_gaming_desk.glb");
+    const bool monitorLoaded=monitorModel_.load(assets,"models/arc27_curved_monitor.glb");
+    LOGI("custom furniture GLB status: desk=%d monitor=%d",deskLoaded?1:0,monitorLoaded?1:0);
     environmentTextures_[0]=loadRgbAsset(assets,"environments/blossom.rgb");
     environmentTextures_[1]=loadRgbAsset(assets,"environments/night_city.rgb");
     environmentTextures_[2]=loadRgbAsset(assets,"environments/golden_city.rgb");
@@ -2356,6 +2359,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawSphere(pv.data(),artX-.052f,yy,zz-.25f,.012f,.034f,.034f,trace==1?neonMagenta:neonCyan,7);
     }
 
+    // Retain procedural furniture as a fallback if either packaged model cannot be loaded.
+    if (!deskModel_.loaded() || !monitorModel_.loaded()) {
     // Gaming desk occupies the back-right corner, leaving the center of the room open.
     const float deskX=-halfW+1.48f;
     const float deskWidth=std::min(2.65f,halfW*1.02f);
@@ -2519,6 +2524,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 .082f,.020f,.006f,trimDark);
         drawSphere(pv.data(),x,monitorY-monitorH*.5f+.12f,monitorZ+.049f,
                    .006f,.006f,.002f,accentBlue);
+    }
+
+    } else {
+        const float deskPlacement[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, deskX-0.029f,floorY,deskZ+0.011f,1};
+        deskModel_.draw(pv.data(),deskPlacement,locMvp_,locModel_,locColor_,locTextured_,locTexture_,locMaterial_,locRounded_,locUvScale_);
+        // Scale the supplied 27-inch curved display to ~0.99 m wide and rest its stand on the desktop.
+        const float monitorScale=1.65f;
+        const float monitorPlacement[16] = {monitorScale,0,0,0, 0,monitorScale,0,0, 0,0,monitorScale,0, monitorX,deskSurface+0.38f,monitorZ+0.030f,1};
+        monitorModel_.draw(pv.data(),monitorPlacement,locMvp_,locModel_,locColor_,locTextured_,locTexture_,locMaterial_,locRounded_,locUvScale_);
+        const bool streamOn=settings_.screenDestination=="monitor"||settings_.screenDestination=="both";
+        if(streamOn) drawCurvedPanel(pv.data(),monitorX,deskSurface+0.38f,monitorZ+0.082f,0.966f,0.548f,0.030f,
+            hasVideo?videoTexture:videoFallbackTexture_,rgb(1,1,1),32);
     }
 
     // Desk mat, sculpted compact keyboard, mouse and near-field monitor speakers.
@@ -2821,6 +2838,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 }
 
 void RoomRenderer::release() {
+    deskModel_.release(); monitorModel_.release();
     if(!initialized_&&!program_&&!vao_)return;
     if(program_)glDeleteProgram(program_);if(vignetteProgram_)glDeleteProgram(vignetteProgram_);if(vao_)glDeleteVertexArrays(1,&vao_);if(vbo_)glDeleteBuffers(1,&vbo_);
     if(planeTexture_)glDeleteVertexArrays(1,&planeTexture_);if(cubeTexture_)glDeleteBuffers(1,&cubeTexture_);
