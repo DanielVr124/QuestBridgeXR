@@ -407,6 +407,7 @@ void main(){
       surface += (thread-0.42)*0.045+(fbm(uv*vec2(22.0,22.0))-0.5)*0.05;
     }
   } else if(uMaterial==4) {
+    // Satin/brushed metal grain uses the dedicated texture atlas, with this analytic fallback.
     roughness=0.27;
     metallic=0.78;
     if(uHasMaterialAtlas==0) surface += (noise2(vec2(uv.x*7.0,uv.y*260.0))-0.5)*0.035;
