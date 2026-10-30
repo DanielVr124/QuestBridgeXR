@@ -61,7 +61,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("Framed abstract wall art", renderer)
         self.assertIn("void RoomRenderer::drawCylinder", renderer)
         self.assertIn("cylinderSegments=40", renderer)
-        self.assertIn("plant pot cylinder", renderer)
+        self.assertIn("drawCylinder(pv.data(),plantX", renderer)
         self.assertIn("VESA-style mounting plate", renderer)
         self.assertIn("Small blue inlays are recessed", renderer)
         self.assertIn("Front-facing hardware details", renderer)
