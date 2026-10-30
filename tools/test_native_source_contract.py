@@ -185,8 +185,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("locNeonPinkColor_,roomLedColor[0]", renderer)
         self.assertIn("batch.material == 70", renderer)
         self.assertIn("batch.material == 73", renderer)
-        self.assertIn("room_.handleRoomControlInput(roomControlPose", main_source)
-        self.assertIn("previousRoomControlTrigger_", main_source)
+        self.assertIn("room_.handleRoomControlInput(roomControlPose", source)
+        self.assertIn("previousRoomControlTrigger_", source)
 
     def test_fake_vr_bridge_is_connected_and_default_off(self):
         host = (ROOT / "host/src/main.cpp").read_text(encoding="utf-8")
