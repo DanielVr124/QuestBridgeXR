@@ -2111,7 +2111,7 @@ void RoomRenderer::updateMenuTexture() {
         const int x1 = std::clamp(x + width, 0, kWidth);
         const int y1 = std::clamp(y + height, 0, kHeight);
         for (int py = y0; py < y1; ++py) {
-            const size_t row = static_cast<size_t>(kHeight - 1 - py) * kWidth * 4u;
+            const size_t row = static_cast<size_t>(py) * kWidth * 4u;
             for (int px = x0; px < x1; ++px) {
                 const size_t offset = row + static_cast<size_t>(px) * 4u;
                 pixels[offset + 0] = color[0];
