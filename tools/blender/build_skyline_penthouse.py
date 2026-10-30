@@ -407,9 +407,9 @@ uv_sphere("Beanbag top cushion",(1.47,-2.13,.70),(.31,.34,.12),M["fabric_light"]
 # Bed foot is at approximately y=-1.70. The screen front is at y=-0.69,
 # facing toward -Y so it is directly in the bed's line of sight.
 tvx,tvy=bx,-.60
-cube("Freestanding media feature panel",(tvx,tvy+.15,2.00),(3.00,.14,2.18),M["wood_dark"],.045)
+cube("Freestanding media feature panel",(tvx,tvy+.15,2.00),(2.70,.14,2.18),M["wood_dark"],.045)
 for side in (-1,1):
-    px=tvx+side*1.38
+    px=tvx+side*1.24
     cube("Media panel vertical walnut fin",(px,tvy+.065,2.00),(.055,.035,1.92),M["wood"],.012)
     curve_obj("Media panel cyan violet edge light",
               [(px-side*.12,tvy+.035,1.02),(px-side*.12,tvy+.035,2.98)],
@@ -430,12 +430,12 @@ curve_obj("TV bias lighting",
 
 # Low wide walnut cabinet below the screen, aligned to the bed and TV.
 console_y=tvy+.34
-cube("Floating media console cabinet",(tvx,console_y,.62),(.54,3.05,.52),M["wood_dark"],.055)
-cube("Media console walnut top",(tvx,console_y,.90),(.66,3.12,.07),M["wood"],.025)
+cube("Floating media console cabinet",(tvx,console_y,.62),(.54,2.50,.52),M["wood_dark"],.055)
+cube("Media console walnut top",(tvx,console_y,.90),(.66,2.58,.07),M["wood"],.025)
 for i in range(4):
-    x=tvx-1.13+i*.75
-    cube("Media console drawer",(x,console_y-.283,.60),(.69,.025,.36),M["wood"],.025)
-    cube("Media drawer brass pull",(x,console_y-.303,.60),(.12,.012,.018),M["brass"],.005)
+    x=tvx-.90+i*.60
+    cube("Media console drawer",(x,console_y-.283,.60),(.52,.025,.36),M["wood"],.025)
+    cube("Media drawer brass pull",(x,console_y-.303,.60),(.10,.012,.018),M["brass"],.005)
 cube("Atmos soundbar",(tvx,tvy-.145,1.06),(1.62,.12,.09),M["metal"],.025)
 for i in range(18):
     x=tvx-.75+i*.088
@@ -460,7 +460,7 @@ for z,y in ((2.55,-.68),(3.12,-.50)):
         uv_sphere("Shelf collectible sculpture",(-3.72,yy,z+.24),(.10,.09,.12),M["chrome"] if k%2 else M["ceramic"])
 plant("Tall window-side ficus",-3.55,-3.82,.10,1.65,.38)
 plant("TV-side indoor palm",3.26,-3.12,.10,1.72,.42)
-plant("Lounge floor plant",2.95,3.10,.10,1.30,.32)
+plant("Right-side accent plant",2.95,3.10,.10,1.30,.32)
 for y in (-4.2,-2.3,-.4,1.5,3.4):
     cylinder("Slat wall uplight base",(3.89,y,.12),.09,.05,M["metal"])
     point_light("Slat wall grazing light",(3.78,y,.23),(.25,.10,1.),13,.24)
@@ -472,7 +472,7 @@ cylinder("Entry sculptural vase",(2.9,4.50,1.45),.10,.32,M["ceramic"])
 # --- Room lighting: soft key + controlled colored bounce ---
 area_light("Large soft ceiling key",(0,1.,4.15),(0,-1.,.6),(.52,.62,1.),370,5.)
 area_light("Blue desk-side wash",(-3.65,.45,3.40),(-1.5,.7,1.),(.12,.30,1.),220,2.2)
-area_light("Violet media-wall wash",(3.60,1.0,3.45),(1.2,-.4,1.2),(.46,.12,1.),175,2.3)
+area_light("Violet media-wall wash",(3.60,1.0,3.45),(1.0,-.45,1.25),(.46,.12,1.),175,2.3)
 area_light("Warm bedroom bounce",(-.9,-4.3,3.5),(-.9,-2.8,.9),(1.,.56,.31),95,1.8)
 area_light("Cool window fill",(0,-5.1,3.55),(0,0,1.25),(.20,.34,1.),240,4.5)
 area_light("Soft camera-side fill",(0,4.5,3.),(0,0,1.3),(.38,.44,.72),120,4.)
@@ -484,7 +484,7 @@ def camera(name,loc,target,lens=27):
     o=bpy.data.objects.new(name,data); CAM_COL.objects.link(o); o.location=loc; look_at(o,target); return o
 cam_wide=camera("01 | Full penthouse hero",(.20,8.20,2.55),(0.,-.72,1.78),23)
 cam_desk=camera("02 | Gaming studio detail",(-.75,-.80,1.78),(-3.18,.42,1.57),34)
-cam_lounge=camera("03 | Lounge and bedroom",(3.20,5.85,2.05),(.85,-.45,1.40),32)
+cam_lounge=camera("03 | Media wall and bedroom",(3.20,5.85,2.05),(.85,-.45,1.40),32)
 
 scene=bpy.context.scene
 scene.render.engine='CYCLES'; scene.cycles.samples=48; scene.cycles.use_denoising=True; scene.cycles.use_adaptive_sampling=True; scene.cycles.adaptive_threshold=0.02; scene.cycles.max_bounces=6; scene.cycles.preview_samples=16
