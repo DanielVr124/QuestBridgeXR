@@ -17,7 +17,7 @@ class NativeSourceContractTests(unittest.TestCase):
             with self.subTest(environment=env):
                 self.assertIn(env, source)
                 self.assertIn(f"environments/{env}.rgb", source)
-        self.assertIn("void toggleSitting(const XrPosef& headPose)", header)
+        self.assertNotIn("void toggleSitting(const XrPosef& headPose)", header)
         self.assertIn("aurora", source)
         self.assertIn("cyberpunk", source)
         self.assertIn("createProceduralEnvironment(activeEnvironmentIndex_)", source)
@@ -65,7 +65,7 @@ class NativeSourceContractTests(unittest.TestCase):
         renderer = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
         self.assertIn("void RoomRenderer::toggleMenu()", renderer)
         self.assertIn("if (menuVisible_)", renderer)
-        self.assertIn("Monitor-anchored menu", renderer)
+        self.assertIn("Flat 2D controls follow the physical monitor's curved 27-inch glass", renderer)
         self.assertIn("void RoomRenderer::drawCurvedPanel", renderer)
         self.assertNotIn("const float curve=.082f", renderer)
         self.assertNotIn("Twin metal uprights", renderer)
