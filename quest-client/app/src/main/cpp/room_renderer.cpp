@@ -339,6 +339,8 @@ uniform sampler2D uMaterialAtlas;
 uniform int uHasMaterialAtlas;
 uniform sampler2D uNormalAtlas;
 uniform int uHasNormalAtlas;
+uniform sampler2D uRoughnessAtlas;
+uniform int uHasRoughnessAtlas;
 uniform int uTextured;
 uniform int uMaterial;
 uniform vec2 uUvScale;
@@ -426,6 +428,7 @@ void main(){
     materialAtlasUv=atlasUv;
     float texel=texture(uMaterialAtlas,atlasUv).r;
     surface += (texel-0.86)*0.55;
+    if(uHasRoughnessAtlas!=0) roughness=texture(uRoughnessAtlas,atlasUv).r;
   }
   base.rgb=max(base.rgb*(1.0+surface),vec3(0.0));
 
@@ -1062,6 +1065,8 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     locHasMaterialAtlas_=glGetUniformLocation(program_,"uHasMaterialAtlas");
     locNormalAtlas_=glGetUniformLocation(program_,"uNormalAtlas");
     locHasNormalAtlas_=glGetUniformLocation(program_,"uHasNormalAtlas");
+    locRoughnessAtlas_=glGetUniformLocation(program_,"uRoughnessAtlas");
+    locHasRoughnessAtlas_=glGetUniformLocation(program_,"uHasRoughnessAtlas");
     GLuint vvs=compileShader(GL_VERTEX_SHADER,kVignetteVertex), vfs=compileShader(GL_FRAGMENT_SHADER,kVignetteFragment);
     if(vvs&&vfs){vignetteProgram_=glCreateProgram();glAttachShader(vignetteProgram_,vvs);glAttachShader(vignetteProgram_,vfs);glLinkProgram(vignetteProgram_);GLint vok=GL_FALSE;glGetProgramiv(vignetteProgram_,GL_LINK_STATUS,&vok);if(vok!=GL_TRUE){glDeleteProgram(vignetteProgram_);vignetteProgram_=0;}}
     if(vvs)glDeleteShader(vvs);if(vfs)glDeleteShader(vfs);
@@ -1071,6 +1076,16 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     environmentTextures_[2]=loadRgbAsset(assets,"environments/golden_city.rgb");
     materialAtlasTexture_=loadRgbAsset(assets,"materials/room_surface_atlas.rgb");
     normalAtlasTexture_=loadRgbAsset(assets,"materials/room_normal_atlas.rgb");
+    roughnessAtlasTexture_=loadRgbAsset(assets,"materials/room_roughness_atlas.rgb");
+    if(roughnessAtlasTexture_) {
+        glBindTexture(GL_TEXTURE_2D,roughnessAtlasTexture_);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D,0);
+        LOGI("loaded material roughness atlas");
+    }
     if(normalAtlasTexture_) {
         glBindTexture(GL_TEXTURE_2D,normalAtlasTexture_);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
@@ -1691,6 +1706,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glBindTexture(GL_TEXTURE_2D,normalAtlasTexture_);
     glUniform1i(locNormalAtlas_,2);
     glUniform1i(locHasNormalAtlas_,normalAtlasTexture_?1:0);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D,roughnessAtlasTexture_);
+    glUniform1i(locRoughnessAtlas_,3);
+    glUniform1i(locHasRoughnessAtlas_,roughnessAtlasTexture_?1:0);
     glActiveTexture(GL_TEXTURE0);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
     glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
@@ -2215,5 +2234,6 @@ void RoomRenderer::release() {
     if(groundShadowTexture_)glDeleteTextures(1,&groundShadowTexture_);
     if(materialAtlasTexture_)glDeleteTextures(1,&materialAtlasTexture_);
     if(normalAtlasTexture_)glDeleteTextures(1,&normalAtlasTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=0;sphereVertexCount_=roundedVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    if(roughnessAtlasTexture_)glDeleteTextures(1,&roughnessAtlasTexture_);
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=0;sphereVertexCount_=roundedVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
