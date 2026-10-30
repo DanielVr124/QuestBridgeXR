@@ -55,11 +55,12 @@ private:
     void chooseEnvironment();
     void drawBox(const float* projectionView, float x, float y, float z,
                  float sx, float sy, float sz, const std::array<float, 4>& color,
-                 float yaw = 0.0f);
+                 float yaw = 0.0f, int material = 0);
     void drawText(const float* projectionView, const char* text, float x, float y, float z,
                   float pixelSize, const std::array<float, 4>& color);
     void drawSphere(const float* projectionView, float x, float y, float z,
-                    float sx, float sy, float sz, const std::array<float, 4>& color);
+                    float sx, float sy, float sz, const std::array<float, 4>& color,
+                    int material = 0);
     void drawPlane(const float* projectionView, float x, float y, float z,
                    float sx, float sy, GLuint texture, const std::array<float, 4>& color,
                    float yaw = 0.0f);
@@ -82,6 +83,8 @@ private:
     GLint locTexture_ = -1;
     GLint locTextured_ = -1;
     GLint locUvScale_ = -1;
+    GLint locMaterial_ = -1;
+    GLint locModel_ = -1;
     GLuint cubeTexture_ = 0;
     GLuint planeTexture_ = 0;
     std::array<GLuint, 208> environmentTextures_{};
