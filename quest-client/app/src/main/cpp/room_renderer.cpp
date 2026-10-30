@@ -1808,8 +1808,8 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floor
     const float windowY=floorY+2.4f;
     // A broad window with warm wooden frame rails. The photo becomes the outside view; all nearby surfaces are real 3D geometry.
     drawPlane(pv,0,windowY,backZ+0.035f,windowW,windowH,tex,rgb(1,1,1));
-    const auto frame=rgb(0.20f,0.14f,0.13f);
-    const float t=0.075f;
+    const auto frame=rgb(.018f,.025f,.045f);
+    const float t=0.062f;
     drawBox(pv,0,windowY+windowH*.5f+t*.5f,backZ+0.015f,windowW+2*t,t,0.12f,frame);
     drawBox(pv,0,windowY-windowH*.5f-t*.5f,backZ+0.015f,windowW+2*t,t,0.12f,frame);
     drawBox(pv,-windowW*.5f-t*.5f,windowY,backZ+0.015f,t,windowH,0.12f,frame);
@@ -1817,7 +1817,7 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floor
     drawBox(pv,0,windowY,backZ+0.005f,0.035f,windowH,0.10f,frame);
 
     // Divided-light sash, deep interior sill, apron and small brass window catches.
-    const auto sash=rgb(.31f,.22f,.16f);
+    const auto sash=rgb(.052f,.068f,.11f);
     const float sashZ=backZ+.092f;
     for(int pane=-1;pane<=1;++pane) {
         if(pane==0) continue;
@@ -1827,8 +1827,15 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floor
     drawRoundedBox(pv,0,windowY+windowH*.12f,sashZ,
                    windowW-.045f,.026f,.065f,sash,0.0f,1);
     const float sillY=windowY-windowH*.5f-.065f;
-    drawRoundedBox(pv,0,sillY,backZ+.12f,windowW+.24f,.085f,.25f,frame,0.0f,1);
-    drawRoundedBox(pv,0,sillY-.10f,backZ+.075f,windowW+.12f,.13f,.09f,sash,0.0f,1);
+    drawRoundedBox(pv,0,sillY,backZ+.12f,windowW+.24f,.085f,.25f,frame,0.0f,5);
+    drawRoundedBox(pv,0,sillY-.10f,backZ+.075f,windowW+.12f,.13f,.09f,sash,0.0f,5);
+    // Thin emissive reveals make the dark aluminium glazing legible without looking like neon tubes.
+    if(activeEnvironmentIndex_==29) {
+        drawBox(pv,0,windowY+windowH*.5f+.018f,backZ+.086f,windowW*.96f,.009f,.012f,
+                rgb(.12f,.30f,1.0f),0.0f,7);
+        drawBox(pv,0,windowY-windowH*.5f-.018f,backZ+.086f,windowW*.96f,.008f,.010f,
+                rgb(.58f,.10f,1.0f),0.0f,7);
+    }
     const auto brass=rgb(.62f,.47f,.23f);
     for(int side : {-1,1}) {
         drawSphere(pv,side*(windowW*.5f-.10f),sillY+.075f,backZ+.225f,
@@ -1862,7 +1869,13 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     const bool hitsDesk=overlaps(moveX_,moveZ_,deskX,deskZ,1.45f,.70f);
     const bool hitsChair=settings_.showChair && overlaps(moveX_,moveZ_,deskX-.25f,deskZ+1.20f,.55f,.55f);
     const bool hitsCouch=settings_.showCouch && overlaps(moveX_,moveZ_,couchX,couchZ,.65f,1.20f);
-    if (hitsDesk || hitsChair || hitsCouch) { moveX_ = oldMoveX; moveZ_ = oldMoveZ; }
+    const float bedX=.05f, bedZ=-halfD+2.02f;
+    const bool hitsBed=overlaps(moveX_,moveZ_,bedX,bedZ,1.22f,1.55f);
+    const bool hitsLeftNightstand=overlaps(moveX_,moveZ_,bedX-1.53f,bedZ-.94f,.34f,.34f);
+    const bool hitsRightNightstand=overlaps(moveX_,moveZ_,bedX+1.53f,bedZ-.94f,.34f,.34f);
+    if (hitsDesk || hitsChair || hitsCouch || hitsBed || hitsLeftNightstand || hitsRightNightstand) {
+        moveX_ = oldMoveX; moveZ_ = oldMoveZ;
+    }
     snapCooldown_=std::max(0.0f,snapCooldown_-dt);
     if(settings_.smoothTurn){
         const bool turning = std::fabs(rightStickX) > 0.18f;
