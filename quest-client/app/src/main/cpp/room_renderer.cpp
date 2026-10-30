@@ -1344,7 +1344,38 @@ void RoomRenderer::createGeometry() {
     glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(3*sizeof(float)));
     glBindVertexArray(0);
 
-    // Smooth UV sphere mesh used for rounded cushions, chair details and PC cooling fans.
+    // Pleated cloth panel mesh: repeated vertical folds are part of the surface,
+    // not stacked primitive ellipsoids. The wave amplitude eases near the hems.
+    std::vector<Vertex> curtainVertices;
+    constexpr int curtainColumns=48,curtainRows=18;
+    auto curtainPoint=[](float u,float v) {
+        const float hemFade=0.78f+0.22f*std::sin(kPi*v);
+        const float pleat=std::cos(u*2.0f*kPi*8.0f);
+        const float secondary=std::sin(u*2.0f*kPi*3.0f+0.45f);
+        const float z=0.034f*pleat*hemFade+0.008f*secondary*std::sin(kPi*v);
+        return Vertex{u-0.5f,v-0.5f,z,u*1.8f,v};
+    };
+    curtainVertices.reserve(static_cast<size_t>(curtainColumns)*curtainRows*6u);
+    for(int row=0;row<curtainRows;++row) for(int col=0;col<curtainColumns;++col) {
+        const float u0=float(col)/curtainColumns,u1=float(col+1)/curtainColumns;
+        const float v0=float(row)/curtainRows,v1=float(row+1)/curtainRows;
+        const Vertex a=curtainPoint(u0,v0),b=curtainPoint(u1,v0);
+        const Vertex c=curtainPoint(u1,v1),d=curtainPoint(u0,v1);
+        curtainVertices.insert(curtainVertices.end(),{a,b,c,a,c,d});
+    }
+    curtainVertexCount_=static_cast<GLsizei>(curtainVertices.size());
+    glGenVertexArrays(1,&curtainVao_);
+    glGenBuffers(1,&curtainVbo_);
+    glBindVertexArray(curtainVao_);
+    glBindBuffer(GL_ARRAY_BUFFER,curtainVbo_);
+    glBufferData(GL_ARRAY_BUFFER,static_cast<GLsizeiptr>(curtainVertices.size()*sizeof(Vertex)),curtainVertices.data(),GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(Vertex),nullptr);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(3*sizeof(float)));
+    glBindVertexArray(0);
+
+    // Smooth UV sphere mesh used for chair hardware and PC cooling fans.
     // It is generated once and shared by every room object to keep draw overhead low.
     std::vector<float> sphere;
     constexpr int rings = 24, segments = 32;
@@ -1502,6 +1533,21 @@ void RoomRenderer::drawPillow(const float* pv,float x,float y,float z,float sx,f
     glUniform2f(locUvScale_,std::max(1.0f,sx*2.8f),std::max(1.0f,sz*2.8f));
     glBindVertexArray(pillowVao_);
     glDrawArrays(GL_TRIANGLES,0,pillowVertexCount_);
+    glBindVertexArray(0);
+}
+
+void RoomRenderer::drawCurtainPanel(const float* pv,float x,float y,float z,float width,float height,
+                                      const std::array<float,4>& color) {
+    Mat4 projectionView{};std::copy(pv,pv+projectionView.size(),projectionView.begin());
+    const Mat4 model=mul(translation(x,y,z),scaling(width,height,1.0f));
+    const Mat4 mvp=mul(projectionView,model);
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
+    glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
+    glUniform4fv(locColor_,1,color.data());
+    glUniform1i(locTextured_,0);glUniform1i(locMaterial_,3);glUniform1i(locRounded_,0);
+    glUniform2f(locUvScale_,std::max(1.0f,width*3.2f),std::max(1.0f,height*1.4f));
+    glBindVertexArray(curtainVao_);
+    glDrawArrays(GL_TRIANGLES,0,curtainVertexCount_);
     glBindVertexArray(0);
 }
 
@@ -1968,14 +2014,15 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const auto curtainFabric=rgb(.43f,.40f,.37f);
     for(int side : {-1,1}) {
         const float curtainCenter=side*(roomWindowWidth*.5f+curtainWidth*.36f);
-        for(int fold=0;fold<5;++fold) {
-            const float fx=curtainCenter+side*(fold-2)*curtainWidth*.075f;
-            const float foldScale=fold==0||fold==4?0.78f:1.0f;
-            drawSphere(pv.data(),fx,curtainY,curtainZ,
-                       .050f*foldScale,roomWindowHeight*.59f,.045f,curtainFabric,3);
-            drawSphere(pv.data(),fx,curtainY-roomWindowHeight*.55f,curtainZ,
-                       .058f*foldScale,.045f,.050f,curtainFabric,3);
-        }
+        const float curtainPanelWidth=curtainWidth*.76f;
+        const float curtainHeight=roomWindowHeight*1.18f;
+        drawCurtainPanel(pv.data(),curtainCenter,curtainY,curtainZ,
+                         curtainPanelWidth,curtainHeight,curtainFabric);
+        // Weighted hems and a narrow leading-edge welt hold the drape's tailored outline.
+        drawRoundedBox(pv.data(),curtainCenter,curtainY-curtainHeight*.49f,curtainZ,
+                       curtainPanelWidth,.028f,.060f,curtainFabric,0.0f,3);
+        drawRoundedBox(pv.data(),curtainCenter-side*curtainPanelWidth*.49f,curtainY,curtainZ,
+                       .018f,curtainHeight*.96f,.045f,curtainFabric,0.0f,3);
     }
     drawRoundedBox(pv.data(),0,curtainY+roomWindowHeight*.59f,curtainZ,
                    roomWindowWidth+curtainWidth*.9f,.065f,.12f,wood,0.0f,1);
@@ -2477,11 +2524,12 @@ void RoomRenderer::release() {
     if(sphereVao_)glDeleteVertexArrays(1,&sphereVao_);if(sphereVbo_)glDeleteBuffers(1,&sphereVbo_);
     if(roundedVao_)glDeleteVertexArrays(1,&roundedVao_);if(roundedVbo_)glDeleteBuffers(1,&roundedVbo_);
     if(pillowVao_)glDeleteVertexArrays(1,&pillowVao_);if(pillowVbo_)glDeleteBuffers(1,&pillowVbo_);
+    if(curtainVao_)glDeleteVertexArrays(1,&curtainVao_);if(curtainVbo_)glDeleteBuffers(1,&curtainVbo_);
     if(cylinderVao_)glDeleteVertexArrays(1,&cylinderVao_);if(cylinderVbo_)glDeleteBuffers(1,&cylinderVbo_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
     if(groundShadowTexture_)glDeleteTextures(1,&groundShadowTexture_);
     if(materialAtlasTexture_)glDeleteTextures(1,&materialAtlasTexture_);
     if(normalAtlasTexture_)glDeleteTextures(1,&normalAtlasTexture_);
     if(roughnessAtlasTexture_)glDeleteTextures(1,&roughnessAtlasTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=pillowVao_=pillowVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=pillowVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=pillowVao_=pillowVbo_=curtainVao_=curtainVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=pillowVertexCount_=curtainVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
