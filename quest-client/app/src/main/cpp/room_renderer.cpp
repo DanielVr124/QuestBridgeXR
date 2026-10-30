@@ -368,6 +368,29 @@ float fbm(vec2 p) {
   for(int i=0;i<4;++i){value+=noise2(p)*amplitude;p*=2.03;amplitude*=0.5;}
   return value;
 }
+const float kMaterialPi=3.14159265359;
+vec3 evaluatePbrLight(vec3 n,vec3 v,vec3 l,vec3 albedo,float roughness,float metallic,vec3 radiance) {
+  float nDotL=max(dot(n,l),0.0);
+  float nDotV=max(dot(n,v),0.001);
+  if(nDotL<=0.0) return vec3(0.0);
+  vec3 h=normalize(v+l);
+  float nDotH=max(dot(n,h),0.0);
+  float vDotH=max(dot(v,h),0.0);
+  float alpha=roughness*roughness;
+  float alpha2=alpha*alpha;
+  float denom=nDotH*nDotH*(alpha2-1.0)+1.0;
+  float distribution=alpha2/max(kMaterialPi*denom*denom,0.0001);
+  float k=pow(roughness+1.0,2.0)*0.125;
+  float geometryV=nDotV/(nDotV*(1.0-k)+k);
+  float geometryL=nDotL/(nDotL*(1.0-k)+k);
+  vec3 f0=mix(vec3(0.04),albedo,metallic);
+  vec3 fresnel=f0+(1.0-f0)*pow(1.0-vDotH,5.0);
+  vec3 specular=(distribution*geometryV*geometryL*fresnel)/
+                max(4.0*nDotV*nDotL,0.001);
+  vec3 diffuseWeight=(1.0-fresnel)*(1.0-metallic);
+  vec3 diffuse=diffuseWeight*albedo/kMaterialPi;
+  return (diffuse+specular)*radiance*nDotL;
+}
 void main(){
   vec4 tex = uTextured != 0 ? texture(uTexture, vUv) : vec4(1.0);
   vec4 base = tex * uColor;
@@ -447,27 +470,25 @@ void main(){
     tangentNormal=normalize(tangentNormal);
     normal=normalize(mat3(tangent,bitangent,normal)*tangentNormal);
   }
-  vec3 lightDir=normalize(vec3(-0.42,0.78,0.46));
   vec3 viewDir=normalize(-vWorldPosition+vec3(0.0,0.12,0.0));
-  vec3 halfDir=normalize(lightDir+viewDir);
-  float diffuse=max(dot(normal,lightDir),0.0);
-  float nDotH=max(dot(normal,halfDir),0.0);
-  float specular=pow(nDotH,mix(12.0,110.0,1.0-roughness));
+  roughness=clamp(roughness,0.045,1.0);
+  vec3 directional= evaluatePbrLight(normal,viewDir,normalize(vec3(-0.42,0.78,0.46)),
+                                     base.rgb,roughness,metallic,vec3(.58,.60,.62));
   vec3 ceilingVector=uCeilingLightPosition-vWorldPosition;
   float ceilingDistance=max(length(ceilingVector),0.001);
   vec3 ceilingDirection=ceilingVector/ceilingDistance;
   float ceilingAttenuation=1.0/(1.0+0.12*ceilingDistance+0.055*ceilingDistance*ceilingDistance);
-  float ceilingDiffuse=max(dot(normal,ceilingDirection),0.0)*ceilingAttenuation*uCeilingLightIntensity;
+  vec3 ceiling=evaluatePbrLight(normal,viewDir,ceilingDirection,base.rgb,roughness,metallic,
+                                uCeilingLightColor*(ceilingAttenuation*uCeilingLightIntensity*.72));
   vec3 practicalVector=uPracticalLightPosition-vWorldPosition;
   float practicalDistance=max(length(practicalVector),0.001);
   vec3 practicalDirection=practicalVector/practicalDistance;
   float practicalAttenuation=1.0/(1.0+0.16*practicalDistance+0.085*practicalDistance*practicalDistance);
-  float practicalDiffuse=max(dot(normal,practicalDirection),0.0)*practicalAttenuation*uPracticalLightIntensity;
-  float ambient=0.27+max(normal.y,0.0)*0.08;
-  vec3 f0=mix(vec3(0.04),base.rgb,metallic);
-  vec3 highlights=f0*(specular*(1.0-roughness)*0.75);
-  vec3 lightEnergy=vec3(ambient+diffuse*0.36)+uCeilingLightColor*(ceilingDiffuse*0.38)+uPracticalLightColor*(practicalDiffuse*0.30);
-  vec3 lit=base.rgb*lightEnergy+highlights;
+  vec3 practical=evaluatePbrLight(normal,viewDir,practicalDirection,base.rgb,roughness,metallic,
+                                  uPracticalLightColor*(practicalAttenuation*uPracticalLightIntensity*.58));
+  float ambientOcclusion=0.90+max(normal.y,0.0)*0.10;
+  vec3 ambient=base.rgb*(0.22+max(normal.y,0.0)*0.055)*ambientOcclusion;
+  vec3 lit=ambient+directional+ceiling+practical;
   outColor=vec4(max(lit,vec3(0.0)),base.a);
 }
 )GLSL";
