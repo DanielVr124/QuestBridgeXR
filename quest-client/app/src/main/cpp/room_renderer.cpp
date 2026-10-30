@@ -1722,15 +1722,19 @@ void RoomRenderer::handleRoomControlInput(const XrPosef& controllerPose, uint32_
     // Five-button LED remote on the right bedside table. Aim down and press one
     // of the tactile buttons to choose cyan, blue, violet, magenta or amber.
     if (dy < -0.10f) {
-        const float remoteTopY = floorY + 1.146f;
+        // The remote sits on the open centre of the media console at the foot
+        // of the bed, clear of the controller and streaming-box props.
+        constexpr float remoteX = -0.92f;
+        constexpr float remoteZ = -0.26f;
+        const float remoteTopY = floorY + 1.001f;
         const float t = (remoteTopY - oy) / dy;
         if (t > 0.05f && t < 2.5f) {
             const float hitX = ox + dx * t;
             const float hitZ = oz + dz * t;
-            if (std::fabs(hitX - 0.63f) < 0.115f &&
-                std::fabs(hitZ + 3.98f) < 0.205f) {
-                const float firstButtonZ = -3.98f - 0.14f;
-                const int button = static_cast<int>(std::lround((hitZ - firstButtonZ) / 0.07f));
+            if (std::fabs(hitX - remoteX) < 0.105f &&
+                std::fabs(hitZ - remoteZ) < 0.175f) {
+                const float firstButtonZ = remoteZ - 0.12f;
+                const int button = static_cast<int>(std::lround((hitZ - firstButtonZ) / 0.06f));
                 if (button >= 0 && button < 5) {
                     ledPreset_ = button;
                     LOGI("Penthouse LED preset changed to %d", ledPreset_);
@@ -3205,14 +3209,14 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                    .018f,.018f,.018f,
                    roomLightsOn_ ? rgb(0.12f,0.92f,0.40f) : rgb(0.95f,0.08f,0.08f),7);
         for (int button=0;button<5;++button) {
-            const float buttonZ=-3.98f-.14f+button*.07f;
-            const float radius=button==ledPreset_?.027f:.018f;
+            const float buttonZ=-.26f-.12f+button*.06f;
+            const float radius=button==ledPreset_?.025f:.017f;
             auto buttonColor=presetColors[static_cast<size_t>(button)];
             if (!roomLightsOn_) {
                 buttonColor[0]*=.30f; buttonColor[1]*=.30f; buttonColor[2]*=.30f;
             }
-            drawSphere(pv.data(),.63f,floorY+1.151f,buttonZ,
-                       radius,.012f,radius,buttonColor,7);
+            drawSphere(pv.data(),-.92f,floorY+1.005f,buttonZ,
+                       radius,.010f,radius,buttonColor,7);
         }
 
         const bool monitorStream = settings_.screenDestination == "monitor" ||
