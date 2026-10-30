@@ -1503,7 +1503,63 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             drawBox(pv.data(),legX,deskSurface+.035f,monitorZ+.075f,.044f,.008f,.29f,silver,side*.10f);
             // Small blue inlays are recessed into the two low-profile feet.
             drawBox(pv.data(),legX,deskSurface+.040f,monitorZ+.025f,.026f,.004f,.045f,accentBlue,side*.10f);
+            // Sculpted toe caps soften the otherwise machined twin-foot profile.
+            drawSphere(pv.data(),legX,deskSurface+.018f,monitorZ+.235f,.039f,.015f,.030f,trimDark);
+            drawSphere(pv.data(),legX,deskSurface+.018f,monitorZ-.085f,.039f,.015f,.030f,trimDark);
         }
+
+        // Front-facing hardware details: a centered camera window, paired microphone
+        // apertures, a discrete power key and fine speaker perforations in the chin.
+        const float screenTop=monitorY+monitorH*.5f;
+        const float screenBottom=monitorY-monitorH*.5f;
+        drawSphere(pv.data(),x,screenTop+.014f,monitorZ+.080f,.012f,.006f,.004f,trimDark);
+        drawSphere(pv.data(),x-.024f,screenTop+.014f,monitorZ+.080f,.0035f,.0035f,.0025f,silver);
+        drawSphere(pv.data(),x+.024f,screenTop+.014f,monitorZ+.080f,.0035f,.0035f,.0025f,silver);
+        drawSphere(pv.data(),x+monitorW*.455f,screenBottom+.006f,monitorZ+.079f,.010f,.010f,.004f,trimDark);
+        drawSphere(pv.data(),x+monitorW*.455f,screenBottom+.006f,monitorZ+.083f,.004f,.004f,.002f,accentBlue);
+        for(int grille=0;grille<2;++grille) {
+            const float side=grille==0?-1.0f:1.0f;
+            for(int hole=0;hole<9;++hole) {
+                const float hx=x+side*(monitorW*.23f+hole*.018f);
+                drawSphere(pv.data(),hx,screenBottom-.014f,monitorZ+.079f,
+                           .0024f,.0024f,.0018f,rgb(.20f,.23f,.29f));
+            }
+        }
+
+        // Two banks of individually modeled rear cooling louvers flank the spine.
+        // The repeated slats create readable depth instead of a single painted vent stripe.
+        for(int bank=-1;bank<=1;bank+=2) {
+            for(int row=0;row<4;++row) {
+                const float ventY=rearSpineY+.075f-row*.032f;
+                for(int slot=0;slot<7;++slot) {
+                    const float ventX=x+bank*(.17f+slot*.021f);
+                    drawBox(pv.data(),ventX,ventY,monitorZ+.052f,.010f,.0045f,.004f,
+                            rgb(.18f,.22f,.29f),bank*.035f);
+                }
+            }
+        }
+        // Recessed connector bay and individual I/O sockets on the lower rear edge.
+        drawBox(pv.data(),x+shellW*.5f-.008f,monitorY-monitorH*.18f,monitorZ-.004f,
+                .012f,.105f,.030f,trimDark);
+        for(int port=0;port<3;++port) {
+            const float portY=monitorY-monitorH*.18f+.032f-port*.030f;
+            drawBox(pv.data(),x+shellW*.5f-.001f,portY,monitorZ-.004f,
+                    .004f,.012f,.020f,rgb(.10f,.13f,.19f));
+            drawBox(pv.data(),x+shellW*.5f+.001f,portY,monitorZ-.004f,
+                    .002f,.004f,.010f,silver);
+        }
+        // Four metallic fastener heads make the VESA mount read as assembled hardware.
+        for(int sx : {-1,1}) for(int sy : {-1,1}) {
+            drawSphere(pv.data(),x+sx*.092f,monitorY-monitorH*.5f+.055f+sy*.045f,
+                       monitorZ-.030f,.006f,.006f,.003f,silver);
+        }
+        // A fine perimeter seam on the rear cover and a small raised model badge.
+        drawBox(pv.data(),x,monitorY+shellH*.5f-.018f,monitorZ+.040f,
+                shellW*.72f,.003f,.004f,rgb(.11f,.14f,.20f));
+        drawBox(pv.data(),x,monitorY-monitorH*.5f+.12f,monitorZ+.044f,
+                .082f,.020f,.006f,trimDark);
+        drawSphere(pv.data(),x,monitorY-monitorH*.5f+.12f,monitorZ+.049f,
+                   .006f,.006f,.002f,accentBlue);
     }
 
     // A compact white gaming PC with a glass side panel, ventilation detail and three illuminated fans.
