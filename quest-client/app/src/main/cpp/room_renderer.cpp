@@ -1611,7 +1611,7 @@ void RoomRenderer::createGeometry() {
     glBindVertexArray(0);
 }
 
-void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; chooseEnvironment(); }
+void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; menuTextureDirty_=true; chooseEnvironment(); }
 void RoomRenderer::chooseEnvironment() {
     const int previousIndex = activeEnvironmentIndex_;
     const int selectedIndex = environmentIndex(settings_.environment);
@@ -1634,6 +1634,7 @@ void RoomRenderer::cycleScreenDestination() {
     if (settings_.screenDestination == "monitor") settings_.screenDestination = "tv";
     else if (settings_.screenDestination == "tv") settings_.screenDestination = "both";
     else settings_.screenDestination = "monitor";
+    menuTextureDirty_ = true;
     LOGI("Room screen destination changed to %s", settings_.screenDestination.c_str());
 }
 void RoomRenderer::cycleEnvironment() {
@@ -1641,6 +1642,7 @@ void RoomRenderer::cycleEnvironment() {
     const int nextIndex = (activeEnvironmentIndex_ + 1) % static_cast<int>(kEnvironmentNames.size());
     settings_.environment = kEnvironmentNames[nextIndex];
     chooseEnvironment();
+    menuTextureDirty_ = true;
     LOGI("Room scenery changed to %s", settings_.environment.c_str());
 }
 
@@ -1648,6 +1650,7 @@ void RoomRenderer::toggleMenu() {
     menuVisible_ = !menuVisible_;
     previousMenuNavigation_ = false;
     if (menuVisible_) menuSelection_ = 0;
+    menuTextureDirty_ = true;
 }
 
 void RoomRenderer::handleMenuInput(float vertical, bool selectPressed) {
@@ -1655,6 +1658,7 @@ void RoomRenderer::handleMenuInput(float vertical, bool selectPressed) {
     const bool navigating = std::fabs(vertical) > 0.55f;
     if (navigating && !previousMenuNavigation_) {
         menuSelection_ = (menuSelection_ + (vertical > 0.0f ? 4 : 1)) % 5;
+        menuTextureDirty_ = true;
     }
     previousMenuNavigation_ = navigating;
     if (!selectPressed) return;
@@ -1666,6 +1670,7 @@ void RoomRenderer::handleMenuInput(float vertical, bool selectPressed) {
     case 4: menuVisible_ = false; break;
     default: break;
     }
+    menuTextureDirty_ = true;
 }
 
 void RoomRenderer::toggleSitting(const XrPosef& headPose) {
@@ -2088,6 +2093,164 @@ void RoomRenderer::rebaseYawPivot(const XrPosef& headPose) {
     yawPivotY_ = headPose.position.y;
     yawPivotZ_ = headPose.position.z + moveZ_ + worldOffsetZ_;
     yawPivotInitialized_ = true;
+}
+
+void RoomRenderer::updateMenuTexture() {
+    if (menuTexture_ && !menuTextureDirty_) return;
+
+    constexpr int kWidth = 1024;
+    constexpr int kHeight = 576;
+    using Color = std::array<uint8_t, 4>;
+    std::vector<uint8_t> pixels(static_cast<size_t>(kWidth) * kHeight * 4u, 255u);
+
+    // The menu is rasterized into one 2D texture. There are no extruded buttons,
+    // floating panels, or separate 3D UI objects in front of the physical display.
+    auto fillRect = [&](int x, int y, int width, int height, const Color& color) {
+        const int x0 = std::clamp(x, 0, kWidth);
+        const int y0 = std::clamp(y, 0, kHeight);
+        const int x1 = std::clamp(x + width, 0, kWidth);
+        const int y1 = std::clamp(y + height, 0, kHeight);
+        for (int py = y0; py < y1; ++py) {
+            const size_t row = static_cast<size_t>(kHeight - 1 - py) * kWidth * 4u;
+            for (int px = x0; px < x1; ++px) {
+                const size_t offset = row + static_cast<size_t>(px) * 4u;
+                pixels[offset + 0] = color[0];
+                pixels[offset + 1] = color[1];
+                pixels[offset + 2] = color[2];
+                pixels[offset + 3] = color[3];
+            }
+        }
+    };
+    auto glyph = [](char c) -> std::array<uint8_t, 7> {
+        switch (c) {
+        case 'A': return {14,17,17,31,17,17,17}; case 'B': return {30,17,17,30,17,17,30};
+        case 'C': return {14,17,16,16,16,17,14}; case 'D': return {30,17,17,17,17,17,30};
+        case 'E': return {31,16,16,30,16,16,31}; case 'F': return {31,16,16,30,16,16,16};
+        case 'G': return {14,17,16,23,17,17,15}; case 'H': return {17,17,17,31,17,17,17};
+        case 'I': return {14,4,4,4,4,4,14}; case 'J': return {7,2,2,2,18,18,12};
+        case 'K': return {17,18,20,24,20,18,17}; case 'L': return {16,16,16,16,16,16,31};
+        case 'M': return {17,27,21,21,17,17,17}; case 'N': return {17,25,21,19,17,17,17};
+        case 'O': return {14,17,17,17,17,17,14}; case 'P': return {30,17,17,30,16,16,16};
+        case 'Q': return {14,17,17,17,21,18,13}; case 'R': return {30,17,17,30,20,18,17};
+        case 'S': return {15,16,16,14,1,1,30}; case 'T': return {31,4,4,4,4,4,4};
+        case 'U': return {17,17,17,17,17,17,14}; case 'V': return {17,17,17,17,17,10,4};
+        case 'W': return {17,17,17,21,21,21,10}; case 'X': return {17,17,10,4,10,17,17};
+        case 'Y': return {17,17,10,4,4,4,4}; case 'Z': return {31,1,2,4,8,16,31};
+        case '0': return {14,17,19,21,25,17,14}; case '1': return {4,12,4,4,4,4,14};
+        case '2': return {14,17,1,2,4,8,31}; case '3': return {30,1,1,14,1,1,30};
+        case '4': return {2,6,10,18,31,2,2}; case '5': return {31,16,16,30,1,1,30};
+        case '6': return {14,16,16,30,17,17,14}; case '7': return {31,1,2,4,8,8,8};
+        case '8': return {14,17,17,14,17,17,14}; case '9': return {14,17,17,15,1,1,14};
+        case ':': return {0,4,4,0,4,4,0}; case '-': return {0,0,0,31,0,0,0};
+        case '/': return {1,2,2,4,8,8,16}; case '>': return {16,8,4,2,4,8,16};
+        case '.': return {0,0,0,0,0,12,12}; case '_': return {0,0,0,0,0,0,31};
+        default: return {0,0,0,0,0,0,0};
+        }
+    };
+    auto drawText = [&](const std::string& value, int x, int y, int scale, const Color& color) {
+        int cursor = x;
+        for (unsigned char raw : value) {
+            const char c = static_cast<char>(std::toupper(raw));
+            const auto rows = glyph(c);
+            for (int row = 0; row < 7; ++row) {
+                for (int column = 0; column < 5; ++column) {
+                    if ((rows[row] & (1u << (4 - column))) != 0) {
+                        fillRect(cursor + column * scale, y + row * scale, scale, scale, color);
+                    }
+                }
+            }
+            cursor += 6 * scale;
+        }
+    };
+    auto rightText = [&](const std::string& value, int right, int y, int scale, const Color& color) {
+        const int width = static_cast<int>(value.size()) * 6 * scale;
+        drawText(value, right - width, y, scale, color);
+    };
+
+    const Color white{230, 237, 250, 255};
+    const Color muted{112, 131, 160, 255};
+    const Color cyan{55, 190, 255, 255};
+    const Color violet{151, 105, 255, 255};
+    const Color panel{17, 27, 46, 255};
+    const Color selectedPanel{22, 48, 78, 255};
+    const Color border{35, 57, 84, 255};
+    const Color valueColor{126, 190, 255, 255};
+
+    // Deep midnight background with a very subtle vertical tonal shift.
+    for (int y = 0; y < kHeight; ++y) {
+        const float t = static_cast<float>(y) / static_cast<float>(kHeight - 1);
+        const Color shade{
+            static_cast<uint8_t>(8 + t * 3.0f),
+            static_cast<uint8_t>(13 + t * 5.0f),
+            static_cast<uint8_t>(25 + t * 10.0f),
+            255
+        };
+        fillRect(0, y, kWidth, 1, shade);
+    }
+    // A thin cyan-to-violet top rule is a 2D accent, not a 3D object.
+    for (int x = 0; x < kWidth; ++x) {
+        const float t = static_cast<float>(x) / static_cast<float>(kWidth - 1);
+        const Color accent{
+            static_cast<uint8_t>(35 + t * 155.0f),
+            static_cast<uint8_t>(165 - t * 105.0f),
+            static_cast<uint8_t>(255 - t * 8.0f),
+            255
+        };
+        fillRect(x, 0, 1, 5, accent);
+    }
+
+    drawText("QUESTBRIDGE XR", 52, 43, 4, white);
+    drawText("ROOM CONTROL", 54, 86, 2, muted);
+    fillRect(786, 55, 8, 8, Color{62, 218, 157, 255});
+    drawText("CONNECTED", 807, 54, 2, Color{132, 221, 184, 255});
+    fillRect(48, 119, 928, 1, border);
+
+    drawText("ACTIVE ENVIRONMENT", 54, 145, 2, muted);
+    std::string environment = settings_.environment;
+    std::replace(environment.begin(), environment.end(), '_', ' ');
+    drawText(environment, 54, 171, 3, white);
+    rightText("QUEST 3 / MEDIUM", 970, 174, 2, muted);
+
+    const char* labels[5] = {
+        "ENVIRONMENT", "DISPLAY MODE", "TV VISIBILITY", "COUCH VISIBILITY", "CLOSE MENU"
+    };
+    const char* mode = settings_.screenDestination == "monitor" ? "MONITOR" :
+        (settings_.screenDestination == "tv" ? "TV" : "BOTH");
+    const char* values[5] = {
+        "NEXT", mode, settings_.showTv ? "ON" : "OFF",
+        settings_.showCouch ? "ON" : "OFF", "BACK"
+    };
+    const int selected = std::clamp(menuSelection_, 0, 4);
+    constexpr int rowX = 48;
+    constexpr int rowWidth = 928;
+    constexpr int rowHeight = 46;
+    constexpr int rowGap = 8;
+    constexpr int firstRowY = 232;
+    for (int i = 0; i < 5; ++i) {
+        const int y = firstRowY + i * (rowHeight + rowGap);
+        const bool active = i == selected;
+        fillRect(rowX, y, rowWidth, rowHeight, active ? selectedPanel : panel);
+        fillRect(rowX, y, active ? 4 : 2, rowHeight, active ? cyan : border);
+        fillRect(rowX + 2, y, rowWidth - 4, 1, active ? Color{55, 117, 176, 255} : border);
+        fillRect(rowX + 2, y + rowHeight - 1, rowWidth - 4, 1, border);
+        drawText(labels[i], 78, y + 13, 3, active ? white : Color{190, 202, 220, 255});
+        rightText(values[i], 946, y + 15, 2, active ? cyan : valueColor);
+    }
+
+    fillRect(48, 510, 928, 1, border);
+    drawText("UP / DOWN: SELECT", 54, 532, 2, muted);
+    drawText("TRIGGER: APPLY", 640, 532, 2, cyan);
+
+    if (!menuTexture_) glGenTextures(1, &menuTexture_);
+    glBindTexture(GL_TEXTURE_2D, menuTexture_);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, kWidth, kHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
+    menuTextureDirty_ = false;
 }
 
 void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,GLuint videoTexture,bool hasVideo) {
@@ -2958,57 +3121,29 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         glUseProgram(vignetteProgram_);glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);
         glUseProgram(0);glDisable(GL_BLEND);glEnable(GL_DEPTH_TEST);
     }
-    // Monitor-anchored menu: world coordinates place it on the virtual display, not in the user's face.
+    // The complete menu is one flat 2D texture on the active monitor glass.
+    // Closing the menu removes this overlay and leaves the live PC stream visible.
     if (menuVisible_) {
+        updateMenuTexture();
         const bool importedPenthouse = activeEnvironmentIndex_ == 29 && penthouseVao_ != 0 &&
-                                        settings_.roomSize == "medium" && settings_.monitorCount == 1 && settings_.showTv && settings_.showCouch && settings_.showChair;
-        const float deskZ = -halfD + 1.35f;
-        const float deskX = halfW - 1.48f;
-        const float monitorX = importedPenthouse ? 0.0f : deskX - 0.36f;
-        const float monitorY = importedPenthouse ? floorY + 1.73f : floorY + 1.43f;
-        const float monitorZ = importedPenthouse ? 0.0f : deskZ - 0.34f;
-        const float menuZ = importedPenthouse ? 0.0f : monitorZ + 0.132f;
-        const auto menuBox = [&](float localX, float y, float localZ,
-                                 float sx, float sy, float sz, const std::array<float,4>& color) {
-            if (importedPenthouse) {
-                // Map the menu's local screen plane onto the monitor facing inward (+X).
-                drawBox(pv.data(), -3.82f + localZ, y, 0.42f - localX,
-                        sx, sy, sz, color, kPi * 0.5f, 0);
-            } else {
-                drawBox(pv.data(), monitorX + localX, y, menuZ + localZ,
-                        sx, sy, sz, color);
-            }
-        };
-        const auto panel = rgb(0.025f, 0.032f, 0.065f, 0.98f);
-        const auto row = rgb(0.075f, 0.090f, 0.145f, 0.98f);
-        const auto selected = rgb(0.10f, 0.22f, 0.39f, 1.0f);
-        const auto blue = rgb(0.16f, 0.58f, 1.0f, 1.0f);
-        const auto violet = rgb(0.48f, 0.25f, 1.0f, 1.0f);
-        const auto text = rgb(0.88f, 0.92f, 1.0f, 1.0f);
+                                        settings_.roomSize == "medium" && settings_.monitorCount == 1 &&
+                                        settings_.showTv && settings_.showCouch && settings_.showChair;
         glDisable(GL_DEPTH_TEST);
-        glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(program_);
-        menuBox(0.0f, monitorY, 0.0f, 1.02f, 0.60f, 0.008f, panel);
-        menuBox(0.0f, monitorY + 0.278f, 0.006f, 0.96f, 0.012f, 0.006f, blue);
-        menuBox(-0.43f, monitorY + 0.225f, 0.008f, 0.035f, 0.035f, 0.006f, violet);
-        drawText(pv.data(), "QUESTBRIDGE", monitorX - 0.37f, monitorY + 0.218f, menuZ + 0.012f, 0.0060f, text);
-        drawText(pv.data(), kEnvironmentNames[activeEnvironmentIndex_], monitorX + 0.08f, monitorY + 0.218f,
-                 menuZ + 0.012f, 0.0035f, blue);
-        const char* labels[5] = {"ENVIRONMENT", "DISPLAY MODE", "TV VISIBILITY", "COUCH VISIBILITY", "CLOSE MENU"};
-        for (int i = 0; i < 5; ++i) {
-            const float y = monitorY + 0.135f - static_cast<float>(i) * 0.091f;
-            menuBox(0.0f, y - 0.015f, 0.006f, 0.94f, 0.073f, 0.006f,
-                    i == menuSelection_ ? selected : row);
-            menuBox(-0.415f, y - 0.015f, 0.008f, 0.018f, 0.043f, 0.004f,
-                    i == menuSelection_ ? blue : violet);
-            drawText(pv.data(), labels[i], monitorX - 0.37f, y + 0.015f, menuZ + 0.012f, 0.0052f, text);
-            if (i == 0) drawText(pv.data(), "NEXT", monitorX + 0.24f, y + 0.015f, menuZ + 0.012f, 0.0043f, blue);
-            else if (i == 1) {
-                const char* mode = settings_.screenDestination == "monitor" ? "MONITOR" :
-                    (settings_.screenDestination == "tv" ? "TV" : "BOTH");
-                drawText(pv.data(), mode, monitorX + 0.20f, y + 0.015f, menuZ + 0.012f, 0.0043f, blue);
-            } else if (i == 2) drawText(pv.data(), settings_.showTv ? "ON" : "OFF", monitorX + 0.32f, y + 0.015f, menuZ + 0.012f, 0.0043f, blue);
-            else if (i == 3) drawText(pv.data(), settings_.showCouch ? "ON" : "OFF", monitorX + 0.32f, y + 0.015f, menuZ + 0.012f, 0.0043f, blue);
+        if (importedPenthouse) {
+            // Match the 27-inch curved monitor: 16:9 active area, facing into the room (+X).
+            drawPlane(pv.data(), -3.838f, floorY + 1.73f, 0.42f,
+                      0.584f, 0.329f, menuTexture_, rgb(1,1,1), kPi * 0.5f);
+        } else {
+            const float deskZ = -halfD + 1.35f;
+            const float deskX = halfW - 1.48f;
+            const float monitorX = deskX - 0.36f;
+            const float monitorY = floorY + 1.43f;
+            const float monitorZ = deskZ - 0.34f;
+            drawPlane(pv.data(), monitorX, monitorY, monitorZ + 0.133f,
+                      1.30f, 0.73f, menuTexture_, rgb(1,1,1));
         }
         glDisable(GL_BLEND);
     }
@@ -3028,10 +3163,11 @@ void RoomRenderer::release() {
     if(cylinderVao_)glDeleteVertexArrays(1,&cylinderVao_);if(cylinderVbo_)glDeleteBuffers(1,&cylinderVbo_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
     if(groundShadowTexture_)glDeleteTextures(1,&groundShadowTexture_);
+    if(menuTexture_)glDeleteTextures(1,&menuTexture_);
     if(penthouseVao_)glDeleteVertexArrays(1,&penthouseVao_);
     if(penthouseVbo_)glDeleteBuffers(1,&penthouseVbo_);
     if(materialAtlasTexture_)glDeleteTextures(1,&materialAtlasTexture_);
     if(normalAtlasTexture_)glDeleteTextures(1,&normalAtlasTexture_);
     if(roughnessAtlasTexture_)glDeleteTextures(1,&roughnessAtlasTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=pillowVao_=pillowVbo_=curtainVao_=curtainVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=pillowVertexCount_=curtainVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);penthouseVao_=penthouseVbo_=0;penthouseVertexCount_=0;penthouseBatches_.clear();skipProceduralDraws_=false;initialized_=false;
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=menuTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=pillowVao_=pillowVbo_=curtainVao_=curtainVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=pillowVertexCount_=curtainVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);penthouseVao_=penthouseVbo_=0;penthouseVertexCount_=0;penthouseBatches_.clear();skipProceduralDraws_=false;menuTextureDirty_=true;initialized_=false;
 }
