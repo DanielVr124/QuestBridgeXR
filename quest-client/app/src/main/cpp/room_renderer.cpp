@@ -2112,17 +2112,13 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floor
         glBindTexture(GL_TEXTURE_2D,0);
     };
 
-    // Back, right, front and left perimeter sections form one continuous 360° city panorama.
+    // Panoramic glazing is confined to actual window openings. The front wall stays
+    // opaque for the wall-mounted TV; solid wall remains visible above/below every pane.
+    const float sideWindowLength=std::min(halfD*1.45f,5.2f);
     drawPanoramaSegment(0.0f,windowY,backZ+0.035f,windowW,windowH,0.0f,0.00f,0.25f,rgb(1,1,1));
-    drawPanoramaSegment(halfW-0.035f,windowY,0.0f,2.0f*halfD-0.18f,windowH,-kPi*.5f,
+    drawPanoramaSegment(halfW-0.035f,windowY,0.0f,sideWindowLength,windowH,-kPi*.5f,
                         0.25f,0.50f,rgb(1,1,1));
-    const float frontPaneWidth=std::max(0.25f,halfW-0.70f);
-    const float frontPaneCenter=(halfW+0.70f)*.5f;
-    drawPanoramaSegment(frontPaneCenter,windowY,frontZ-0.035f,frontPaneWidth,windowH,kPi,
-                        0.50f,0.625f,rgb(1,1,1));
-    drawPanoramaSegment(-frontPaneCenter,windowY,frontZ-0.035f,frontPaneWidth,windowH,kPi,
-                        0.625f,0.75f,rgb(1,1,1));
-    drawPanoramaSegment(-halfW+0.035f,windowY,0.0f,2.0f*halfD-0.18f,windowH,kPi*.5f,
+    drawPanoramaSegment(-halfW+0.035f,windowY,0.0f,sideWindowLength,windowH,kPi*.5f,
                         0.75f,1.00f,rgb(1,1,1));
 
     // A very light neutral glass pass supplies a restrained glazing sheen without obscuring
@@ -2405,10 +2401,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawSphere(pv.data(),knob[0],knob[1],knob[2],.045f,.045f,.045f,brass,4);
 
     // The penthouse gets a near-wall-to-wall glazing system instead of a small picture window.
-    const float roomWindowWidth=std::min(halfW*1.78f,
-        settings_.roomSize=="small"?3.7f:(settings_.roomSize=="large"?10.5f:7.35f));
-    const float roomWindowHeight=activeEnvironmentIndex_==29?3.72f:
-        (activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f);
+    const float roomWindowWidth=std::min(halfW*1.52f,
+        settings_.roomSize=="small"?3.2f:(settings_.roomSize=="large"?7.2f:5.8f));
+    const float roomWindowHeight=activeEnvironmentIndex_==29?2.45f:
+        (activeEnvironmentIndex_==1?2.35f:activeEnvironmentIndex_>=3?2.15f:1.8f);
     drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,roomWindowWidth,roomWindowHeight);
 
     // Tailored drapery softens the window opening: repeated fabric folds and a weighted hem.
@@ -2792,7 +2788,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     if(settings_.showTv) {
         // Wall-mounted television is on the front wall, directly opposite and centered
         // on the corner bed. Its back is flush to the wall and its screen faces the bed.
-        const float tvX=bedX, tvY=floorY+2.04f, tvZ=frontZ-.12f;
+        const float tvX=0.0f, tvY=floorY+2.04f, tvZ=frontZ-.12f;
         const float tvW=std::min(2.35f,halfW*.62f), tvH=tvW*9.0f/16.0f;
         const bool tvStream=settings_.screenDestination=="tv"||settings_.screenDestination=="both";
         const GLuint tvTex=(tvStream&&hasVideo)?videoTexture:env;
