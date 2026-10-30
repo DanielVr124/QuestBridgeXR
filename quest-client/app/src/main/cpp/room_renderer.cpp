@@ -1421,6 +1421,56 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawBox(pv.data(),panelX+side*.12f,panelY,panelZ+.035f,.018f,.68f,.018f,rgb(.12f,.17f,.28f));
     }
 
+    // Architectural finish pass: layered skirting, wall reveals, ceiling coffers,
+    // and repeated floor inlays give the room real scale and construction detail.
+    const auto wallTrim=rgb(.12f,.14f,.20f);
+    const auto wallHighlight=rgb(.22f,.25f,.33f);
+    const auto floorInlay=rgb(.10f,.12f,.17f);
+    const float roomHeight=ceilingY-floorY;
+    for(int side : {-1,1}) {
+        const float wx=side*(halfW-.105f);
+        drawBox(pv.data(),wx,floorY+.075f,0,.045f,.15f,halfD*1.92f,wallTrim);
+        drawBox(pv.data(),wx,floorY+.158f,0,.012f,.012f,halfD*1.92f,wallHighlight);
+        drawBox(pv.data(),wx,ceilingY-.13f,0,.035f,.16f,halfD*1.90f,wallTrim);
+        drawBox(pv.data(),wx,ceilingY-.215f,0,.012f,.010f,halfD*1.90f,wallHighlight);
+        for(int bay=0;bay<5;++bay) {
+            const float z=-halfD*.78f+bay*(halfD*1.56f/4.0f);
+            drawBox(pv.data(),wx-side*.027f,floorY+roomHeight*.48f,z,
+                    .012f,roomHeight*.58f,.012f,wallHighlight);
+            drawBox(pv.data(),wx-side*.028f,floorY+roomHeight*.48f,z+.035f,
+                    .008f,roomHeight*.54f,.006f,wallTrim);
+        }
+    }
+    // Rear-wall picture-frame moulding and a broad lower wainscot band.
+    drawBox(pv.data(),0,floorY+.56f,backZ+.018f,halfW*1.88f,.025f,.035f,wallTrim);
+    drawBox(pv.data(),0,floorY+.59f,backZ+.018f,halfW*1.88f,.009f,.038f,wallHighlight);
+    drawBox(pv.data(),0,ceilingY-.20f,backZ+.018f,halfW*1.88f,.035f,.045f,wallTrim);
+    for(int panel=0;panel<7;++panel) {
+        const float px=-halfW*.82f+panel*(halfW*1.64f/6.0f);
+        drawBox(pv.data(),px,floorY+.31f,backZ+.012f,.018f,.43f,.025f,wallHighlight);
+    }
+    // Recessed ceiling coffers and warm downlight apertures.
+    for(int side : {-1,1}) {
+        drawBox(pv.data(),side*halfW*.46f,ceilingY-.035f,0,.018f,.025f,halfD*1.72f,wallTrim);
+        drawBox(pv.data(),side*halfW*.46f,ceilingY-.052f,0,.010f,.008f,halfD*1.66f,wallHighlight);
+    }
+    for(int row=0;row<2;++row) for(int col=0;col<3;++col) {
+        const float lx=(col-1)*halfW*.62f;
+        const float lz=(row==0?-1.0f:1.0f)*halfD*.42f;
+        drawBox(pv.data(),lx,ceilingY-.012f,lz,.34f,.012f,.12f,trimDark);
+        drawBox(pv.data(),lx,ceilingY-.020f,lz,.25f,.006f,.075f,
+                row==0?rgb(.92f,.78f,.60f):rgb(.68f,.78f,1.0f));
+    }
+    // Individual floorboard seams, with alternating lengths and subtle tonal variation.
+    for(int row=0;row<11;++row) {
+        const float z=-halfD*.88f+row*(halfD*1.76f/10.0f);
+        drawBox(pv.data(),0,floorY+.006f,z,halfW*1.94f,.006f,.008f,floorInlay);
+        for(int seam=0;seam<4;++seam) {
+            const float x=-halfW*.72f+(seam+(row%2)*.5f)*(halfW*1.44f/4.0f);
+            drawBox(pv.data(),x,floorY+.007f,z+.04f,.006f,.006f,.075f,floorInlay);
+        }
+    }
+
     // Gaming desk occupies the back-right corner, leaving the center of the room open.
     const float deskX=halfW-1.48f;
     const float deskWidth=std::min(2.65f,halfW*1.02f);
@@ -1430,6 +1480,19 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(),deskX-deskWidth*.42f,floorY+.39f,deskZ,.075f,.70f,.78f,trimDark);
     drawBox(pv.data(),deskX+deskWidth*.42f,floorY+.39f,deskZ,.075f,.70f,.78f,trimDark);
     drawBox(pv.data(),deskX,deskTopY+.055f,deskZ,deskWidth-.08f,.018f,.80f,rgb(.10f,.12f,.17f));
+    // Finished desk apron, inset drawer fronts, pulls, and cable tray.
+    drawBox(pv.data(),deskX,deskTopY-.105f,deskZ-.365f,deskWidth*.82f,.12f,.035f,trimDark);
+    for(int drawer=0;drawer<3;++drawer) {
+        const float dx=deskX+(drawer-1)*.31f;
+        drawBox(pv.data(),dx,deskTopY-.105f,deskZ-.386f,.285f,.082f,.010f,wood);
+        drawBox(pv.data(),dx,deskTopY-.105f,deskZ-.394f,.065f,.006f,.008f,silver);
+    }
+    drawBox(pv.data(),deskX,deskTopY-.19f,deskZ+.34f,deskWidth*.72f,.035f,.12f,trimDark);
+    drawBox(pv.data(),deskX,deskTopY-.215f,deskZ+.34f,deskWidth*.64f,.012f,.08f,wallHighlight);
+    // Cable raceway drops discreetly behind the right pedestal.
+    drawBox(pv.data(),deskX+deskWidth*.39f,deskTopY-.32f,deskZ+.34f,.045f,.24f,.055f,trimDark);
+    drawBox(pv.data(),deskX+deskWidth*.39f,deskTopY-.45f,deskZ+.31f,.075f,.025f,.09f,silver);
+
     // Slim under-desk light, softly reflected by the floor.
     drawBox(pv.data(),deskX,deskTopY-.10f,deskFrontZ,.95f,.018f,.025f,accentBlue);
 
@@ -1577,6 +1640,17 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawSphere(pv.data(),pcX,fy,pcZ+.315f,.060f,.060f,.012f,fan==1?accentViolet:accentBlue);
         drawSphere(pv.data(),pcX,fy,pcZ+.329f,.027f,.027f,.009f,rgb(.88f,.92f,1.0f));
     }
+    // Individual front I/O sockets, feet, and side-panel fasteners.
+    for(int port=0;port<2;++port) {
+        drawBox(pv.data(),pcX-.095f+port*.065f,pcY-.285f,pcZ+.322f,.032f,.012f,.006f,silver);
+    }
+    for(int foot : {-1,1}) {
+        drawBox(pv.data(),pcX-.15f,pcY-.345f,pcZ+foot*.21f,.09f,.035f,.10f,trimDark);
+        drawBox(pv.data(),pcX+.15f,pcY-.345f,pcZ+foot*.21f,.09f,.035f,.10f,trimDark);
+    }
+    for(int fastener : {-1,1}) {
+        drawSphere(pv.data(),pcX+fastener*.17f,pcY+.27f,pcZ+.310f,.008f,.008f,.004f,silver);
+    }
     // Discreet top vent and power button.
     for(int vent=0;vent<5;++vent)
         drawBox(pv.data(),pcX-.12f+vent*.06f,pcY+.337f,pcZ,.035f,.006f,.24f,pcEdge);
@@ -1605,6 +1679,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawSphere(pv.data(),cx+.22f,floorY+.68f,couchZ+.48f,.25f,.28f,.39f,sofa);
         drawSphere(pv.data(),cx-.12f,floorY+.75f,couchZ-.23f,.22f,.15f,.35f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
         drawSphere(pv.data(),cx-.12f,floorY+.75f,couchZ+.23f,.22f,.15f,.35f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
+        // Separate seat and back cushions with stitched piping and panel seams.
+        drawSphere(pv.data(),cx-.13f,floorY+.49f,couchZ-.28f,.30f,.10f,.34f,rgb(sofa[0]*1.12f,sofa[1]*1.12f,sofa[2]*1.12f));
+        drawSphere(pv.data(),cx-.13f,floorY+.49f,couchZ+.28f,.30f,.10f,.34f,rgb(sofa[0]*1.12f,sofa[1]*1.12f,sofa[2]*1.12f));
+        drawBox(pv.data(),cx-.18f,floorY+.51f,couchZ,.012f,.006f,.78f,wallHighlight,couchYaw);
         // Rounded arm pads and short dark feet.
         drawSphere(pv.data(),cx,floorY+.61f,couchZ-.88f,.48f,.27f,.16f,sofa);
         drawSphere(pv.data(),cx,floorY+.61f,couchZ+.88f,.48f,.27f,.16f,sofa);
@@ -1625,6 +1703,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         }
         drawSphere(pv.data(),chairX-.25f,floorY+.57f,chairZ,.10f,.06f,.26f,trimDark);
         drawSphere(pv.data(),chairX+.25f,floorY+.57f,chairZ,.10f,.06f,.26f,trimDark);
+        // Padded arm caps, lumbar insert, and segmented backrest stitching.
+        drawSphere(pv.data(),chairX,floorY+.91f,chairZ-.105f,.24f,.20f,.035f,rgb(sofa[0]*1.18f,sofa[1]*1.18f,sofa[2]*1.18f));
+        drawSphere(pv.data(),chairX-.25f,floorY+.63f,chairZ,.13f,.055f,.25f,sofa);
+        drawSphere(pv.data(),chairX+.25f,floorY+.63f,chairZ,.13f,.055f,.25f,sofa);
+        for(int seam=0;seam<3;++seam)
+            drawBox(pv.data(),chairX,floorY+.82f+seam*.09f,chairZ-.115f,.34f,.004f,.008f,wallHighlight);
     }
 
     // Warm practical lamp and a restrained light accent near the PC setup.
