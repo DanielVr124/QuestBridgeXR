@@ -63,8 +63,8 @@ M["stone"]=mat("Obsidian marble | honed black",(.026,.034,.060),.20,.19,8,5,.16)
 M["stone_light"]=mat("Smoked quartz stone",(.075,.090,.132),.24,.12,8,4,.11)
 M["wall"]=mat("Graphite limewash plaster",(.044,.052,.080),.88,0,2,75,.11)
 M["felt"]=mat("Midnight acoustic felt",(.055,.064,.103),.95,0,3,210,.17)
-M["fabric"]=mat("Midnight blue woven upholstery",(.045,.066,.120),.93,0,3,260,.20)
-M["fabric_light"]=mat("Slate woven upholstery",(.105,.125,.190),.92,0,3,310,.17)
+M["fabric"]=mat("Midnight blue woven upholstery",(.060,.082,.145),.90,0,3,260,.24)
+M["fabric_light"]=mat("Slate woven upholstery",(.135,.158,.225),.90,0,3,310,.20)
 M["duvet"]=mat("Charcoal brushed cotton duvet",(.085,.096,.142),.91,0,3,340,.12)
 M["leather"]=mat("Black aniline leather",(.025,.033,.050),.35,.02,5,85,.07)
 M["wood"]=mat("Smoked walnut veneer",(.085,.050,.032),.34,.03,1,8,.11)
@@ -72,10 +72,10 @@ M["wood_dark"]=mat("Black stained oak",(.025,.028,.040),.31,.06,1,13,.08)
 M["metal"]=mat("Black anodized aluminium",(.055,.070,.090),.27,.82,4,150,.04)
 M["chrome"]=mat("Brushed titanium",(.36,.40,.47),.25,.88,4,180,.035)
 M["brass"]=mat("Champagne brushed brass",(.38,.25,.12),.29,.78,4,210,.025)
-M["glass"]=mat("Low-iron architectural glazing",(.012,.022,.043),.10,.08,9,None,0,transmission=.78)
+M["glass"]=mat("Low-iron architectural glazing",(.006,.014,.030),.045,.02,9,None,0,transmission=.96)
 M["screen"]=mat("OLED black glass",(.004,.009,.020),.12,.22,-1)
 M["screen_glow"]=mat("Dim OLED midnight blue",(.010,.018,.048),.22,.08,7,None,0,(.018,.065,.22),.75)
-M["coffee_glass"]=mat("Smoked blue-grey glass tabletop",(.035,.052,.078),.14,.42,5,95,.018,transmission=.42)
+M["coffee_glass"]=mat("Deep smoked satin glass tabletop",(.010,.017,.030),.28,.12,5,120,.012,transmission=0.0)
 M["blue"]=mat("Electric blue LED diffuser",(.04,.35,1.),.24,0,7,None,0,(.015,.22,1.),4.)
 M["violet"]=mat("Violet LED diffuser",(.38,.08,1.),.22,0,7,None,0,(.32,.045,1.),3.5)
 M["pink"]=mat("Magenta LED diffuser",(1.,.035,.38),.22,0,7,None,0,(1.,.015,.28),3.)
@@ -86,9 +86,9 @@ M["rug"]=mat("Plush graphite wool rug",(.065,.075,.102),.98,0,3,500,.25)
 M["ceramic"]=mat("Matte charcoal ceramic",(.025,.032,.047),.32,.05,5,38,.04)
 M["white"]=mat("Warm porcelain",(.46,.43,.38),.26,.03,5,95,.025)
 M["city"]=mat("City tower concrete",(.018,.028,.052),.8,.08,2,12,.04)
-M["city_cyan"]=mat("Tower windows cyan",(.06,.35,.72),.25,0,7,None,0,(.035,.22,.78),2.1)
-M["city_warm"]=mat("Tower windows warm",(.8,.43,.18),.25,0,7,None,0,(1.,.36,.09),1.8)
-M["city_pink"]=mat("Tower windows pink",(.62,.045,.30),.25,0,7,None,0,(.7,.02,.22),1.9)
+M["city_cyan"]=mat("Tower windows cyan",(.06,.35,.72),.25,0,7,None,0,(.035,.22,.78),3.0)
+M["city_warm"]=mat("Tower windows warm",(.8,.43,.18),.25,0,7,None,0,(1.,.36,.09),2.6)
+M["city_pink"]=mat("Tower windows pink",(.62,.045,.30),.25,0,7,None,0,(.7,.02,.22),2.7)
 
 def cube(name,loc,scale,material,edge=.02):
     bpy.ops.mesh.primitive_cube_add(size=1,location=loc); o=bpy.context.object; o.name=name
@@ -389,33 +389,41 @@ for side in (-1,1):
 uv_sphere("Chair lumbar pillow",(chair_x+.15,chair_y-.02,1.06),(.085,.24,.13),M["fabric_light"])
 
 # --- Lounge sectional, rug, glass coffee table and styling ---
-sx,sy=1.55,2.20
-cube("Sectional upholstered base",(sx,sy,.42),(1.45,2.75,.42),M["leather"],.16)
-cube("Sectional chaise return",(sx-.18,sy-1.07,.42),(1.80,.70,.42),M["leather"],.14)
+# Align the lounge opposite the media wall and keep the rear sleeping zone open.
+sx,sy=1.68,.28
+cube("Sectional upholstered base",(sx,sy,.39),(1.40,2.62,.38),M["leather"],.18)
+cube("Sectional chaise return",(sx-.16,sy-1.00,.39),(1.68,.68,.38),M["leather"],.16)
 for i in range(3):
-    y=sy-.91+i*.91
-    cube("Sectional tailored seat cushion",(sx+.20,y,.69),(.98,.82,.31),M["fabric"],.135)
-    curve_obj("Seat cushion welt",[(sx-.25,y-.38,.73),(sx+.20,y-.42,.73),(sx+.65,y-.38,.73)],.006,M["fabric_light"])
+    y=sy-.88+i*.88
+    seat=uv_sphere("Sectional soft sculpted seat cushion",(sx+.19,y,.665),(.52,.405,.17),M["fabric"],32,20)
+    seat.rotation_euler[2]=random.uniform(-.018,.018)
+    curve_obj("Seat cushion front welt",[(sx-.18,y-.34,.70),(sx+.05,y-.395,.71),(sx+.42,y-.34,.70)],.0055,M["fabric_light"])
 for i in range(3):
-    y=sy-.90+i*.91
-    p=cube("Sectional tailored back cushion",(sx-.42,y,1.03),(.43,.82,.78),M["fabric_light"],.145)
-    p.rotation_euler[1]=-.10
-    curve_obj("Back cushion seam",[(sx-.64,y-.33,1.02),(sx-.66,y,1.34),(sx-.64,y+.33,1.02)],.006,M["fabric"])
-cube("Folded lounge throw",(sx+.18,sy+1.10,.89),(.76,.64,.18),M["duvet"],.075)
-cube("Large woven area rug",(1.05,1.25,.035),(3.25,3.40,.055),M["rug"],.05)
+    y=sy-.88+i*.88
+    back=uv_sphere("Sectional overfilled back cushion",(sx-.39,y,.99),(.245,.405,.37),M["fabric_light"],32,24)
+    back.rotation_euler[1]=-.09
+    curve_obj("Back cushion tailored seam",[(sx-.60,y-.30,.92),(sx-.63,y,1.22),(sx-.60,y+.30,.92)],.005,M["fabric"])
+for i in range(2):
+    y=sy-.47+i*.94
+    lum=uv_sphere("Sectional lumbar accent pillow",(sx-.12,y,1.12),(.15,.25,.13),M["duvet"],24,16)
+    lum.rotation_euler[1]=-.14
+cube("Folded lounge throw",(sx+.13,sy+.96,.80),(.62,.52,.13),M["duvet"],.12)
+cube("Large woven area rug",(1.95,.12,.035),(3.25,3.30,.055),M["rug"],.055)
 for i in range(6):
-    yy=-.30+i*.62; curve_obj("Rug woven border line",[(-.50,yy,.067),(2.65,yy,.067)],.003,M["fabric_light"])
-cube("Floating smoked glass coffee table top",(1.05,1.50,.47),(1.02,1.48,.052),M["coffee_glass"],.055)
-cube("Coffee table lower shelf",(1.05,1.50,.24),(.92,1.43,.055),M["wood_dark"],.025)
-for x in (.62,1.48):
-    for y in (.88,2.12): cylinder("Coffee table brushed leg",(x,y,.32),.027,.28,M["brass"])
-for j in range(3): cube("Coffee table design book",(.80+j*.035,1.10+j*.02,.535+j*.035),(.42,.28,.035),M["fabric_light"] if j%2 else M["wood_dark"],.008)
-cube("Black stone catchall tray",(1.35,1.67,.53),(.34,.48,.035),M["ceramic"],.03)
-cylinder("Scented candle glass",(1.36,1.72,.62),.07,.15,M["glass"])
-cylinder("Candle wax",(1.36,1.72,.70),.055,.012,M["white"])
-uv_sphere("Candle flame",(1.36,1.72,.73),(.014,.014,.035),M["warm"],16,12)
-point_light("Candle glow",(1.36,1.72,.76),(1.,.35,.10),4,.12)
-plant("Coffee table succulent",.70,1.95,.54,.26,.13)
+    yy=-1.18+i*.52; curve_obj("Rug woven border line",[(.35,yy,.067),(3.55,yy,.067)],.003,M["fabric_light"])
+table_x,table_y=2.90,-.10
+cube("Floating smoked glass coffee table top",(table_x,table_y,.47),(.78,1.24,.045),M["coffee_glass"],.045)
+cube("Coffee table lower shelf",(table_x,table_y,.245),(.69,1.15,.045),M["wood_dark"],.03)
+for x in (table_x-.29,table_x+.29):
+    for y in (table_y-.48,table_y+.48): cylinder("Coffee table brushed leg",(x,y,.34),.023,.25,M["brass"])
+for j in range(2):
+    cube("Coffee table design book",(table_x-.12+j*.025,table_y-.31+j*.035,.505+j*.025),(.31,.22,.028),M["fabric_light"] if j%2 else M["wood_dark"],.012)
+cube("Black stone catchall tray",(table_x+.13,table_y+.28,.51),(.25,.31,.026),M["ceramic"],.035)
+cylinder("Scented candle glass",(table_x+.13,table_y+.28,.585),.052,.12,M["glass"])
+cylinder("Candle wax",(table_x+.13,table_y+.28,.65),.041,.010,M["white"])
+uv_sphere("Candle flame",(table_x+.13,table_y+.28,.68),(.010,.010,.026),M["warm"],16,12)
+point_light("Candle glow",(table_x+.13,table_y+.28,.71),(1.,.35,.10),2,.10)
+plant("Coffee table succulent",table_x-.20,table_y-.30,.52,.20,.10)
 
 # --- Right-wall OLED/media console ---
 tvx,tvy=3.88,-.12
@@ -473,13 +481,13 @@ def look_at(obj,point): obj.rotation_euler=(Vector(point)-obj.location).to_track
 def camera(name,loc,target,lens=27):
     data=bpy.data.cameras.new(name); data.lens=lens; data.sensor_width=36
     o=bpy.data.objects.new(name,data); CAM_COL.objects.link(o); o.location=loc; look_at(o,target); return o
-cam_wide=camera("01 | Full penthouse hero",(.20,7.35,2.35),(0.,-.55,1.82),24)
+cam_wide=camera("01 | Full penthouse hero",(.20,8.20,2.55),(0.,-.72,1.78),23)
 cam_desk=camera("02 | Gaming studio detail",(-.75,-.80,1.78),(-3.18,.42,1.57),34)
 cam_lounge=camera("03 | Lounge and bedroom",(3.20,5.85,2.05),(.85,-.45,1.40),32)
 
 scene=bpy.context.scene
-scene.render.engine='CYCLES'; scene.cycles.samples=32; scene.cycles.use_denoising=True; scene.cycles.use_adaptive_sampling=True; scene.cycles.adaptive_threshold=0.02; scene.cycles.max_bounces=6; scene.cycles.preview_samples=16
-scene.render.resolution_x=1600; scene.render.resolution_y=1000; scene.render.resolution_percentage=100
+scene.render.engine='CYCLES'; scene.cycles.samples=48; scene.cycles.use_denoising=True; scene.cycles.use_adaptive_sampling=True; scene.cycles.adaptive_threshold=0.02; scene.cycles.max_bounces=6; scene.cycles.preview_samples=16
+scene.render.resolution_x=1800; scene.render.resolution_y=1125; scene.render.resolution_percentage=100
 scene.render.image_settings.file_format='PNG'; scene.render.image_settings.color_mode='RGBA'; scene.render.image_settings.color_depth='8'
 scene.view_settings.view_transform='AgX'; scene.view_settings.look='AgX - Medium High Contrast'
 scene.view_settings.exposure=.35; scene.view_settings.gamma=1.
