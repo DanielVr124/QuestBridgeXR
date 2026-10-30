@@ -66,7 +66,7 @@ private:
                           float width, float height, const std::array<float, 4>& color);
     void drawCylinder(const float* projectionView, float x, float y, float z,
                       float diameter, float height, const std::array<float, 4>& color,
-                      int material = 0);
+                      int material = 0, float pitch = 0.0f);
     void drawText(const float* projectionView, const char* text, float x, float y, float z,
                   float pixelSize, const std::array<float, 4>& color);
     void drawSphere(const float* projectionView, float x, float y, float z,
