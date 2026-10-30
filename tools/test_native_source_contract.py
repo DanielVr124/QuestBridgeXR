@@ -172,6 +172,17 @@ class NativeSourceContractTests(unittest.TestCase):
         blender_builder = (ROOT / "tools/blender/build_skyline_penthouse.py").read_text(encoding="utf-8")
         self.assertIn("bpy.ops.render.render(write_still=True)", blender_builder)
         self.assertIn("skyline_penthouse.qbxmesh", blender_builder)
+        self.assertIn("RGB lighting remote aluminium shell", blender_builder)
+        self.assertIn("Smart lighting switch brushed backplate", blender_builder)
+        self.assertIn('qbx_shader_id', blender_builder)
+        self.assertIn("void RoomRenderer::handleRoomControlInput", renderer)
+        self.assertIn("roomLightsOn_", renderer)
+        self.assertIn("ledPreset_", renderer)
+        self.assertIn("uRoomLightLevel", renderer)
+        self.assertIn("batch.material == 70", renderer)
+        self.assertIn("batch.material == 73", renderer)
+        self.assertIn("room_.handleRoomControlInput(roomControlPose", main_source)
+        self.assertIn("previousRoomControlTrigger_", main_source)
 
     def test_fake_vr_bridge_is_connected_and_default_off(self):
         host = (ROOT / "host/src/main.cpp").read_text(encoding="utf-8")
