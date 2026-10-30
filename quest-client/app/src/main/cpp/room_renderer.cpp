@@ -1552,9 +1552,9 @@ void RoomRenderer::drawCurtainPanel(const float* pv,float x,float y,float z,floa
 }
 
 void RoomRenderer::drawCylinder(const float* pv,float x,float y,float z,float diameter,float height,
-                                const std::array<float,4>& color,int material) {
+                                const std::array<float,4>& color,int material,float pitch) {
     Mat4 projectionView{};std::copy(pv,pv+projectionView.size(),projectionView.begin());
-    const Mat4 model=mul(translation(x,y,z),scaling(diameter,height,diameter));
+    const Mat4 model=mul(translation(x,y,z),mul(rotateX(pitch),scaling(diameter,height,diameter)));
     const Mat4 mvp=mul(projectionView,model);
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
     glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
@@ -2164,9 +2164,27 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float deskFrontZ=deskZ+.45f;
     const float deskTopY=floorY+.78f;
     drawRoundedBox(pv.data(),deskX,deskTopY,deskZ,deskWidth,.085f,.88f,wood,0.0f,1);
-    drawBox(pv.data(),deskX-deskWidth*.42f,floorY+.39f,deskZ,.075f,.70f,.78f,trimDark);
-    drawBox(pv.data(),deskX+deskWidth*.42f,floorY+.39f,deskZ,.075f,.70f,.78f,trimDark);
-    drawBox(pv.data(),deskX,deskTopY+.055f,deskZ,deskWidth-.08f,.018f,.80f,rgb(.10f,.12f,.17f));
+    // The desktop rests on two finished drawer pedestals, not bare rectangular slab supports.
+    for(int side : {-1,1}) {
+        const float cabinetX=deskX+side*deskWidth*.405f;
+        drawRoundedBox(pv.data(),cabinetX,floorY+.39f,deskZ,.43f,.68f,.74f,
+                       rgb(wood[0]*.76f,wood[1]*.74f,wood[2]*.72f),0.0f,1);
+        drawRoundedBox(pv.data(),cabinetX,floorY+.075f,deskZ,.45f,.11f,.76f,trimDark,0.0f,5);
+        // Three inset drawer fronts have a fine reveal and satin pull.
+        for(int drawer=0;drawer<3;++drawer) {
+            const float drawerY=floorY+.20f+drawer*.20f;
+            drawRoundedBox(pv.data(),cabinetX,drawerY,deskZ+.379f,.355f,.172f,.026f,
+                           rgb(wood[0]*.92f,wood[1]*.89f,wood[2]*.86f),0.0f,1);
+            drawRoundedBox(pv.data(),cabinetX,drawerY+.035f,deskZ+.397f,.095f,.012f,.018f,silver,0.0f,4);
+        }
+        // Four low-profile adjustable feet lift the cabinet off the floor.
+        for(int zSide : {-1,1}) for(int xSide : {-1,1}) {
+            drawCylinder(pv.data(),cabinetX+xSide*.15f,floorY+.035f,deskZ+zSide*.27f,
+                         .045f,.055f,silver,4);
+        }
+    }
+    drawRoundedBox(pv.data(),deskX,deskTopY+.055f,deskZ,deskWidth-.08f,.018f,.80f,
+                   rgb(.10f,.12f,.17f),0.0f,5);
     // Finished desk apron, inset drawer fronts, pulls, and cable tray.
     drawBox(pv.data(),deskX,deskTopY-.105f,deskZ-.365f,deskWidth*.82f,.12f,.035f,trimDark);
     for(int drawer=0;drawer<3;++drawer) {
@@ -2478,13 +2496,22 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         }
     }
 
-    // Warm practical lamp and a restrained light accent near the PC setup.
-    drawBox(pv.data(),-halfW+.30f,floorY+1.35f,-1.45f,.09f,.90f,.09f,wood);
+    // A finished floor lamp: weighted base, slender stem, turned collar, tapered textile shade and diffuser.
+    const float lampX=-halfW+.30f,lampZ=-1.45f;
+    drawCylinder(pv.data(),lampX,floorY+.055f,lampZ,.34f,.11f,trimDark,5);
+    drawCylinder(pv.data(),lampX,floorY+.88f,lampZ,.038f,1.60f,silver,4);
+    drawCylinder(pv.data(),lampX,floorY+1.70f,lampZ,.105f,.11f,wood,1);
     const auto lampGlow=activeEnvironmentIndex_==0?rgb(.98f,.72f,.82f):
         (activeEnvironmentIndex_==3||activeEnvironmentIndex_==26)?rgb(.30f,1.0f,.70f):
         (activeEnvironmentIndex_==4||activeEnvironmentIndex_==10||activeEnvironmentIndex_==24)?rgb(.25f,.72f,1.0f):
         (activeEnvironmentIndex_==16||activeEnvironmentIndex_==19||activeEnvironmentIndex_==25)?rgb(1.0f,.53f,.82f):rgb(1.0f,.63f,.30f);
-    drawSphere(pv.data(),-halfW+.30f,floorY+1.92f,-1.45f,.20f,.15f,.20f,lampGlow);
+    drawCylinder(pv.data(),lampX,floorY+1.91f,lampZ,.43f,.42f,
+                 rgb(.72f,.68f,.60f),3,kPi);
+    drawCylinder(pv.data(),lampX,floorY+1.70f,lampZ,.255f,.035f,lampGlow,5);
+    drawCylinder(pv.data(),lampX,floorY+2.115f,lampZ,.18f,.035f,wood,1);
+    drawSphere(pv.data(),lampX,floorY+1.84f,lampZ,.12f,.09f,.12f,lampGlow);
+    // A fine pull cord gives the shade a scale reference and subtle vertical detail.
+    drawCylinder(pv.data(),lampX+.17f,floorY+1.90f,lampZ,.009f,.30f,brass,4);
     if(settings_.comfortVignette && vignetteProgram_){
         glDisable(GL_DEPTH_TEST);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(vignetteProgram_);glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);
