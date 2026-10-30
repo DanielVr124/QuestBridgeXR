@@ -388,61 +388,62 @@ for side in (-1,1):
     uv_sphere("Chair arm pad",(chair_x+.20,chair_y+side*.39,.93),(.26,.09,.065),M["leather"])
 uv_sphere("Chair lumbar pillow",(chair_x+.15,chair_y-.02,1.06),(.085,.24,.13),M["fabric_light"])
 
-# --- Lounge sectional, rug, glass coffee table and styling ---
-# Align the lounge opposite the media wall and keep the rear sleeping zone open.
-sx,sy=1.68,.28
-cube("Sectional upholstered base",(sx,sy,.39),(1.40,2.62,.38),M["leather"],.18)
-cube("Sectional chaise return",(sx-.16,sy-1.00,.39),(1.68,.68,.38),M["leather"],.16)
-for i in range(3):
-    y=sy-.88+i*.88
-    seat=uv_sphere("Sectional soft sculpted seat cushion",(sx+.19,y,.665),(.52,.405,.17),M["fabric"],32,20)
-    seat.rotation_euler[2]=random.uniform(-.018,.018)
-    curve_obj("Seat cushion front welt",[(sx-.18,y-.34,.70),(sx+.05,y-.395,.71),(sx+.42,y-.34,.70)],.0055,M["fabric_light"])
-for i in range(3):
-    y=sy-.88+i*.88
-    back=uv_sphere("Sectional overfilled back cushion",(sx-.39,y,.99),(.245,.405,.37),M["fabric_light"],32,24)
-    back.rotation_euler[1]=-.09
-    curve_obj("Back cushion tailored seam",[(sx-.60,y-.30,.92),(sx-.63,y,1.22),(sx-.60,y+.30,.92)],.005,M["fabric"])
-for i in range(2):
-    y=sy-.47+i*.94
-    lum=uv_sphere("Sectional lumbar accent pillow",(sx-.12,y,1.12),(.15,.25,.13),M["duvet"],24,16)
-    lum.rotation_euler[1]=-.14
-cube("Folded lounge throw",(sx+.13,sy+.96,.80),(.62,.52,.13),M["duvet"],.12)
-cube("Large woven area rug",(1.95,.12,.035),(3.25,3.30,.055),M["rug"],.055)
-for i in range(6):
-    yy=-1.18+i*.52; curve_obj("Rug woven border line",[(.35,yy,.067),(3.55,yy,.067)],.003,M["fabric_light"])
-table_x,table_y=2.90,-.10
-cube("Floating smoked glass coffee table top",(table_x,table_y,.47),(.78,1.24,.045),M["coffee_glass"],.045)
-cube("Coffee table lower shelf",(table_x,table_y,.245),(.69,1.15,.045),M["wood_dark"],.03)
-for x in (table_x-.29,table_x+.29):
-    for y in (table_y-.48,table_y+.48): cylinder("Coffee table brushed leg",(x,y,.34),.023,.25,M["brass"])
-for j in range(2):
-    cube("Coffee table design book",(table_x-.12+j*.025,table_y-.31+j*.035,.505+j*.025),(.31,.22,.028),M["fabric_light"] if j%2 else M["wood_dark"],.012)
-cube("Black stone catchall tray",(table_x+.13,table_y+.28,.51),(.25,.31,.026),M["ceramic"],.035)
-cylinder("Scented candle glass",(table_x+.13,table_y+.28,.585),.052,.12,M["glass"])
-cylinder("Candle wax",(table_x+.13,table_y+.28,.65),.041,.010,M["white"])
-uv_sphere("Candle flame",(table_x+.13,table_y+.28,.68),(.010,.010,.026),M["warm"],16,12)
-point_light("Candle glow",(table_x+.13,table_y+.28,.71),(1.,.35,.10),2,.10)
-plant("Coffee table succulent",table_x-.20,table_y-.30,.52,.20,.10)
+# --- Open bedroom / media layout based on the neon gaming-room reference ---
+# The couch and coffee table are intentionally omitted. Keep a generous
+# textured rug and a single low beanbag, with the TV centered at the foot
+# of the bed and facing the bed directly.
+cube("Large plush graphite bedroom rug",(0.35,2.15,.035),(4.10,4.85,.055),M["rug"],.07)
+for i in range(8):
+    yy=.05+i*.56
+    curve_obj("Rug woven border line",[(-1.67,yy,.067),(2.37,yy,.067)],.003,M["fabric_light"])
 
-# --- Right-wall OLED/media console ---
-tvx,tvy=3.88,-.12
-cube("85 inch OLED TV chassis",(tvx,tvy,2.08),(.12,2.42,1.46),M["metal"],.045)
-cube("TV black glass bezel",(tvx-.071,tvy,2.08),(.018,2.34,1.38),M["screen"],.025)
-cube("OLED cinematic display",(tvx-.083,tvy,2.08),(.008,2.25,1.29),M["screen_glow"],.012)
-cube("TV bottom status bar",(tvx-.09,tvy,1.36),(.009,.58,.018),M["blue"],.004)
-curve_obj("TV bias lighting",[(3.79,tvy-1.13,1.28),(3.79,tvy+1.13,1.28),(3.79,tvy+1.13,2.88),(3.79,tvy-1.13,2.88)],.014,M["blue"],True)
-cube("Floating media console cabinet",(3.72,tvy,.62),(.54,3.05,.52),M["wood_dark"],.055)
-cube("Media console walnut top",(3.68,tvy,.90),(.66,3.12,.07),M["wood"],.025)
+# Soft beanbag chair at the bed's right side, like the small lounge seat in
+# the reference image; this is deliberately not a couch or sectional.
+bean=uv_sphere("Single midnight fabric beanbag",(1.48,-2.10,.43),(.50,.55,.38),M["fabric"],40,24)
+bean.rotation_euler[1]=-.08
+uv_sphere("Beanbag top cushion",(1.47,-2.13,.70),(.31,.34,.12),M["fabric_light"],32,20)
+
+# --- OLED media console directly opposite the bed ---
+# Bed foot is at approximately y=-1.70. The screen front is at y=-0.69,
+# facing toward -Y so it is directly in the bed's line of sight.
+tvx,tvy=bx,-.60
+cube("Freestanding media feature panel",(tvx,tvy+.15,2.00),(3.00,.14,2.18),M["wood_dark"],.045)
+for side in (-1,1):
+    px=tvx+side*1.38
+    cube("Media panel vertical walnut fin",(px,tvy+.065,2.00),(.055,.035,1.92),M["wood"],.012)
+    curve_obj("Media panel cyan violet edge light",
+              [(px-side*.12,tvy+.035,1.02),(px-side*.12,tvy+.035,2.98)],
+              .010,M["blue"] if side<0 else M["violet"])
+cube("85 inch OLED TV chassis",(tvx,tvy,2.08),(2.42,.12,1.46),M["metal"],.045)
+cube("TV black glass bezel",(tvx,tvy-.071,2.08),(2.34,.018,1.38),M["screen"],.025)
+cube("OLED cinematic display",(tvx,tvy-.083,2.08),(2.25,.008,1.29),M["screen_glow"],.012)
+cube("TV bottom status bar",(tvx,tvy-.090,1.36),(.58,.009,.018),M["blue"],.004)
+# Two slim metal feet sit on the console top, with a low VESA support behind.
+for side in (-1,1):
+    leg_x=tvx+side*.72
+    cube("OLED TV metal stand neck",(leg_x,tvy+.015,1.18),(.065,.11,.40),M["metal"],.018)
+    cube("OLED TV low pedestal foot",(leg_x,tvy+.02,.965),(.42,.31,.045),M["metal"],.018)
+curve_obj("TV bias lighting",
+          [(tvx-1.13,tvy+.080,1.40),(tvx+1.13,tvy+.080,1.40),
+           (tvx+1.13,tvy+.080,2.76),(tvx-1.13,tvy+.080,2.76)],
+          .012,M["blue"],True)
+
+# Low wide walnut cabinet below the screen, aligned to the bed and TV.
+console_y=tvy+.34
+cube("Floating media console cabinet",(tvx,console_y,.62),(.54,3.05,.52),M["wood_dark"],.055)
+cube("Media console walnut top",(tvx,console_y,.90),(.66,3.12,.07),M["wood"],.025)
 for i in range(4):
-    y=tvy-1.13+i*.75
-    cube("Media console drawer",(3.433,y,.60),(.025,.69,.36),M["wood"],.025)
-    cube("Media drawer brass pull",(3.414,y,.60),(.012,.12,.018),M["brass"],.005)
-cube("Atmos soundbar",(3.77,tvy,1.06),(.20,1.62,.09),M["metal"],.025)
-for i in range(18): cylinder("Soundbar perforation",(3.66,tvy-.75+i*.088,1.06),.009,.014,M["chrome"],12,(0,pi/2,0))
-cube("Console streaming box",(3.55,tvy-.95,1.02),(.30,.34,.08),M["wood_dark"],.018)
-uv_sphere("Wireless controller",(3.45,tvy+.96,1.04),(.16,.25,.055),M["leather"])
-for side in (-1,1): cylinder("Controller thumbstick",(3.39,tvy+.96+side*.07,1.095),.025,.018,M["chrome"])
+    x=tvx-1.13+i*.75
+    cube("Media console drawer",(x,console_y-.283,.60),(.69,.025,.36),M["wood"],.025)
+    cube("Media drawer brass pull",(x,console_y-.303,.60),(.12,.012,.018),M["brass"],.005)
+cube("Atmos soundbar",(tvx,tvy-.145,1.06),(1.62,.12,.09),M["metal"],.025)
+for i in range(18):
+    x=tvx-.75+i*.088
+    cylinder("Soundbar perforation",(x,tvy-.210,1.06),.009,.014,M["chrome"],12,(pi/2,0,0))
+cube("Console streaming box",(tvx-.95,console_y,1.00),(.30,.34,.08),M["wood_dark"],.018)
+uv_sphere("Wireless controller",(tvx+.96,console_y,1.04),(.16,.25,.055),M["leather"])
+for side in (-1,1):
+    cylinder("Controller thumbstick",(tvx+.96+side*.07,console_y,1.095),.025,.018,M["chrome"],24,(pi/2,0,0))
 
 # --- Decor, shelves, abstract artwork and indoor greenery ---
 cube("Framed abstract artwork body",(-3.63,-4.98,2.34),(.06,.70,1.15),M["metal"],.025)
@@ -471,7 +472,7 @@ cylinder("Entry sculptural vase",(2.9,4.50,1.45),.10,.32,M["ceramic"])
 # --- Room lighting: soft key + controlled colored bounce ---
 area_light("Large soft ceiling key",(0,1.,4.15),(0,-1.,.6),(.52,.62,1.),370,5.)
 area_light("Blue desk-side wash",(-3.65,.45,3.40),(-1.5,.7,1.),(.12,.30,1.),220,2.2)
-area_light("Violet lounge-side wash",(3.60,1.5,3.45),(1.4,1.4,.9),(.46,.12,1.),200,2.3)
+area_light("Violet media-wall wash",(3.60,1.0,3.45),(1.2,-.4,1.2),(.46,.12,1.),175,2.3)
 area_light("Warm bedroom bounce",(-.9,-4.3,3.5),(-.9,-2.8,.9),(1.,.56,.31),95,1.8)
 area_light("Cool window fill",(0,-5.1,3.55),(0,0,1.25),(.20,.34,1.),240,4.5)
 area_light("Soft camera-side fill",(0,4.5,3.),(0,0,1.3),(.38,.44,.72),120,4.)
