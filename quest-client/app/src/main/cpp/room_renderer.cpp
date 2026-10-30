@@ -2439,8 +2439,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     if(settings_.showCouch) {
         const float couchX=halfW-1.25f, couchZ=.05f, couchYaw=-kPi*.5f;
         const float cx=couchX;
-        drawRoundedBox(pv.data(),cx,floorY+.38f,couchZ,.88f,.25f,1.92f,trimDark,couchYaw,5);
-        drawRoundedBox(pv.data(),cx+.20f,floorY+.66f,couchZ,.24f,.47f,1.82f,trimDark,couchYaw,5);
+        // Sofa frame axes follow the room: width across X, full seat length along Z.
+        drawRoundedBox(pv.data(),cx,floorY+.38f,couchZ,.88f,.25f,1.92f,trimDark,0.0f,5);
+        // Back shell is on +X, directly behind the two cushions that face the TV at -X.
+        drawRoundedBox(pv.data(),cx+.20f,floorY+.66f,couchZ,.24f,.47f,1.82f,trimDark,0.0f,5);
         // Separate seat cushions sit proud of the upholstered deck with a visible center split.
         for(int seat=-1;seat<=1;seat+=2) {
             drawPillow(pv.data(),cx-.10f,floorY+.535f,couchZ+seat*.34f,
@@ -2456,7 +2458,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             drawPillow(pv.data(),cx+.02f,floorY+.625f,couchZ+end*.86f,
                        .40f,.17f,.27f,sofa,couchYaw,0.0f,3);
             drawBox(pv.data(),cx-.10f,floorY+.62f,couchZ+end*.86f,
-                    .010f,.008f,.28f,wallHighlight,couchYaw);
+                    .010f,.008f,.28f,wallHighlight);
         }
         // Four recessed legs are set in from the corners.
         for(int side : {-1,1}) for(int end : {-1,1}) {
