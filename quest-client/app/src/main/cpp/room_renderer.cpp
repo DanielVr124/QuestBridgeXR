@@ -344,6 +344,7 @@ uniform int uHasRoughnessAtlas;
 uniform int uTextured;
 uniform int uMaterial;
 uniform vec2 uUvScale;
+uniform vec3 uCameraPosition;
 uniform vec3 uCeilingLightPosition;
 uniform vec3 uCeilingLightColor;
 uniform float uCeilingLightIntensity;
@@ -473,7 +474,7 @@ void main(){
     tangentNormal=normalize(tangentNormal);
     normal=normalize(mat3(tangent,bitangent,normal)*tangentNormal);
   }
-  vec3 viewDir=normalize(-vWorldPosition+vec3(0.0,0.12,0.0));
+  vec3 viewDir=normalize(uCameraPosition-vWorldPosition);
   roughness=clamp(roughness,0.045,1.0);
   vec3 directional= evaluatePbrLight(normal,viewDir,normalize(vec3(-0.42,0.78,0.46)),
                                      base.rgb,roughness,metallic,vec3(.58,.60,.62));
@@ -1080,6 +1081,7 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     locUvScale_=glGetUniformLocation(program_,"uUvScale");locMaterial_=glGetUniformLocation(program_,"uMaterial");
     locModel_=glGetUniformLocation(program_,"uModel");locRounded_=glGetUniformLocation(program_,"uRounded");
     locBevel_=glGetUniformLocation(program_,"uBevel");
+    locCameraPosition_=glGetUniformLocation(program_,"uCameraPosition");
     locCeilingLightPosition_=glGetUniformLocation(program_,"uCeilingLightPosition");
     locCeilingLightColor_=glGetUniformLocation(program_,"uCeilingLightColor");
     locCeilingLightIntensity_=glGetUniformLocation(program_,"uCeilingLightIntensity");
@@ -1714,6 +1716,11 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const Mat4 inverseVirtualWorld = mul(inverseVirtualTranslation, inverseVirtualRotation);
     Mat4 camera = mul(physicalView, inverseVirtualWorld);
     Mat4 pv=mul(projection,camera);
+    // Recover the camera position from the exact view matrix already used for this eye.
+    // This only feeds material view-dependent highlights; it does not alter the view transform.
+    const float cameraX=-(camera[0]*camera[12]+camera[1]*camera[13]+camera[2]*camera[14]);
+    const float cameraY=-(camera[4]*camera[12]+camera[5]*camera[13]+camera[6]*camera[14]);
+    const float cameraZ=-(camera[8]*camera[12]+camera[9]*camera[13]+camera[10]*camera[14]);
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
     std::array<float,4> floor = rgb(.09f,.12f,.18f);
@@ -1767,6 +1774,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     sofa=rgb(.20f,.24f,.30f);
     glUseProgram(program_);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDisable(GL_CULL_FACE);
     glUniform1i(locTexture_,0);
+    glUniform3f(locCameraPosition_,cameraX,cameraY,cameraZ);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D,materialAtlasTexture_);
     glUniform1i(locMaterialAtlas_,1);

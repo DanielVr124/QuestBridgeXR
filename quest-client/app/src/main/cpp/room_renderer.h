@@ -99,6 +99,7 @@ private:
     GLint locUvScale_ = -1;
     GLint locMaterial_ = -1;
     GLint locModel_ = -1;
+    GLint locCameraPosition_ = -1;
     GLint locRounded_ = -1;
     GLint locBevel_ = -1;
     GLint locMaterialAtlas_ = -1;
