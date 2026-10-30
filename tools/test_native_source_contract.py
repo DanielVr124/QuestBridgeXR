@@ -55,6 +55,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("config_.invertThumbstickY ? -move.y : move.y", source)
         self.assertIn("room_.handleMenuInput(move.y, menuSelectEdge)", source)
         renderer = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
+        header = (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8")
         self.assertIn("void RoomRenderer::toggleMenu()", renderer)
         self.assertIn("if (menuVisible_)", renderer)
         self.assertIn("Monitor-anchored menu", renderer)
