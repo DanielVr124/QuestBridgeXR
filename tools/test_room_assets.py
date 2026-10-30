@@ -26,9 +26,9 @@ class RoomAssetTests(unittest.TestCase):
 
     def test_room_material_atlases_have_valid_rgb_headers_and_dimensions(self):
         expected = {
-            "room_surface_atlas.rgb": (256, 256),
-            "room_normal_atlas.rgb": (256, 256),
-            "room_roughness_atlas.rgb": (128, 128),
+            "room_surface_atlas.rgb": (512, 512),
+            "room_normal_atlas.rgb": (512, 512),
+            "room_roughness_atlas.rgb": (512, 512),
         }
         self.assertEqual({p.name for p in MATERIAL_DIR.glob("*.rgb")}, set(expected))
         for name, dimensions in expected.items():
