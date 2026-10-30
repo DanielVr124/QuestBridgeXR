@@ -1,0 +1,89 @@
+name: Build Blender Skyline Penthouse
+
+on:
+  push:
+    branches: [feature/blender-penthouse-base]
+    paths:
+      - "tools/blender/**"
+      - ".github/workflows/build-blender-penthouse.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-penthouse:
+    name: Blender model, Quest mesh and renders
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Blender 4.5 LTS
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /opt/blender
+          curl --fail --location --retry 3 \
+            https://download.blender.org/release/Blender4.5/blender-4.5.15-linux-x64.tar.xz \
+            --output /tmp/blender.tar.xz
+          curl --fail --location --retry 3 \
+            https://download.blender.org/release/Blender4.5/blender-4.5.15.sha256 \
+            --output /tmp/blender.sha256
+          grep 'blender-4.5.15-linux-x64.tar.xz' /tmp/blender.sha256 | \
+            sed 's#  .*#  /tmp/blender.tar.xz#' | sha256sum --check
+          tar -xJf /tmp/blender.tar.xz --strip-components=1 -C /opt/blender
+          /opt/blender/blender --version
+
+      - name: Build Blender scene, exports and renders
+        shell: bash
+        run: |
+          set -euo pipefail
+          /opt/blender/blender --background --factory-startup --threads 4 \
+            --python tools/blender/build_skyline_penthouse.py -- \
+            --output-dir "$GITHUB_WORKSPACE/dist/skyline-penthouse"
+          test -s dist/skyline-penthouse/skyline_penthouse.blend
+          test -s dist/skyline-penthouse/skyline_penthouse.glb
+          test -s dist/skyline-penthouse/skyline_penthouse.qbxmesh
+          test -s dist/skyline-penthouse/renders/01_penthouse_wide.png
+          test -s dist/skyline-penthouse/renders/02_gaming_desk_detail.png
+          test -s dist/skyline-penthouse/renders/03_lounge_bedroom_detail.png
+          file dist/skyline-penthouse/*
+
+      - name: Install generated model into the Quest project
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p quest-client/app/src/main/assets/models tools/blender/projects
+          cp dist/skyline-penthouse/skyline_penthouse.qbxmesh \
+            quest-client/app/src/main/assets/models/skyline_penthouse.qbxmesh
+          cp dist/skyline-penthouse/skyline_penthouse.glb \
+            quest-client/app/src/main/assets/models/skyline_penthouse.glb
+          cp dist/skyline-penthouse/skyline_penthouse.blend \
+            tools/blender/projects/skyline_penthouse.blend
+
+      - name: Commit the generated 3D source and runtime assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            quest-client/app/src/main/assets/models/skyline_penthouse.qbxmesh \
+            quest-client/app/src/main/assets/models/skyline_penthouse.glb \
+            tools/blender/projects/skyline_penthouse.blend
+          if ! git diff --cached --quiet; then
+            git commit -m "Add Blender-built skyline penthouse model assets"
+            git push origin "HEAD:\${GITHUB_REF_NAME}"
+          fi
+
+      - name: Upload Blender project, GLB and all camera renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: skyline-penthouse-blender-model
+          path: dist/skyline-penthouse/
+          if-no-files-found: error
+          retention-days: 30
