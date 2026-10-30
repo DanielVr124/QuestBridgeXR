@@ -2942,5 +2942,18 @@ void RoomRenderer::release() {
     if(materialAtlasTexture_)glDeleteTextures(1,&materialAtlasTexture_);
     if(normalAtlasTexture_)glDeleteTextures(1,&normalAtlasTexture_);
     if(roughnessAtlasTexture_)glDeleteTextures(1,&roughnessAtlasTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=pillowVao_=pillowVbo_=curtainVao_=curtainVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=pillowVertexCount_=curtainVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    if(deskSurfaceTexture_)glDeleteTextures(1,&deskSurfaceTexture_);
+    for(auto& mesh:deskModel_) {
+        if(mesh.vao)glDeleteVertexArrays(1,&mesh.vao);
+        if(mesh.vbo)glDeleteBuffers(1,&mesh.vbo);
+        if(mesh.ebo)glDeleteBuffers(1,&mesh.ebo);
+    }
+    for(auto& mesh:monitorModel_) {
+        if(mesh.vao)glDeleteVertexArrays(1,&mesh.vao);
+        if(mesh.vbo)glDeleteBuffers(1,&mesh.vbo);
+        if(mesh.ebo)glDeleteBuffers(1,&mesh.ebo);
+    }
+    deskModel_.clear();
+    monitorModel_.clear();
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=deskSurfaceTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=pillowVao_=pillowVbo_=curtainVao_=curtainVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=pillowVertexCount_=curtainVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
