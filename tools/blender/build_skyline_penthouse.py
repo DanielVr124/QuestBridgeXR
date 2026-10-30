@@ -5,6 +5,7 @@ Produces an editable .blend, a GLB interchange model, the compact QBX runtime me
 and three PNG renders from this exact scene. Room footprint matches the Quest
 renderer medium preset: 8.4m x 10.8m x 4.4m.
 """
+# Versioned scene source; Blender binary is cached to speed subsequent rebuilds.
 import bpy, math, os, sys, struct, random
 from mathutils import Vector
 from math import sin, cos, pi
