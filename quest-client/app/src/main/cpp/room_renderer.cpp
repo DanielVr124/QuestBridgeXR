@@ -1773,6 +1773,25 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floor
     drawBox(pv,-windowW*.5f-t*.5f,windowY,backZ+0.015f,t,windowH,0.12f,frame);
     drawBox(pv,windowW*.5f+t*.5f,windowY,backZ+0.015f,t,windowH,0.12f,frame);
     drawBox(pv,0,windowY,backZ+0.005f,0.035f,windowH,0.10f,frame);
+
+    // Divided-light sash, deep interior sill, apron and small brass window catches.
+    const auto sash=rgb(.31f,.22f,.16f);
+    const float sashZ=backZ+.092f;
+    for(int pane=-1;pane<=1;++pane) {
+        if(pane==0) continue;
+        drawRoundedBox(pv, pane*windowW*.25f,windowY,sashZ,
+                       .026f,windowH-.055f,.065f,sash,0.0f,1);
+    }
+    drawRoundedBox(pv,0,windowY+windowH*.12f,sashZ,
+                   windowW-.045f,.026f,.065f,sash,0.0f,1);
+    const float sillY=windowY-windowH*.5f-.065f;
+    drawRoundedBox(pv,0,sillY,backZ+.12f,windowW+.24f,.085f,.25f,frame,0.0f,1);
+    drawRoundedBox(pv,0,sillY-.10f,backZ+.075f,windowW+.12f,.13f,.09f,sash,0.0f,1);
+    const auto brass=rgb(.62f,.47f,.23f);
+    for(int side : {-1,1}) {
+        drawSphere(pv,side*(windowW*.5f-.10f),sillY+.075f,backZ+.225f,
+                   .018f,.018f,.010f,brass,4);
+    }
 }
 
 void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
