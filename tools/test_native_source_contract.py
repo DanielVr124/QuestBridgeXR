@@ -73,6 +73,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("materials/room_normal_atlas.rgb", renderer)
         self.assertIn("uniform sampler2D uNormalAtlas", renderer)
         self.assertIn("mat3(tangent,bitangent,normal)", renderer)
+        self.assertIn("if(uHasMaterialAtlas==0)", renderer)
+        self.assertIn("bitangent*=sign(dot(cross(tangent,bitangent),normal))", renderer)
         self.assertIn("tangentNormal.xy*=0.38", renderer)
         self.assertIn("glGenerateMipmap(GL_TEXTURE_2D)", renderer)
         self.assertIn("atlasTile=fract(uv*0.42)", renderer)
