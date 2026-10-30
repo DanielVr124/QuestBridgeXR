@@ -1677,7 +1677,48 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(), (halfW+0.7f)*0.5f,(floorY+ceilingY)*0.5f,frontZ+0.02f,
             sidePanelWidth,ceilingY-floorY,0.10f,wall,0.0f,2);
     drawBox(pv.data(),0,ceilingY-1.05f,frontZ+0.02f,1.4f,2.1f,0.10f,wall,0.0f,2);
-    drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,std::min(halfW*1.35f,settings_.roomSize=="small"?3.4f:6.2f),activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f);
+    const float roomWindowWidth=std::min(halfW*1.35f,settings_.roomSize=="small"?3.4f:6.2f);
+    const float roomWindowHeight=activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f;
+    drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,roomWindowWidth,roomWindowHeight);
+
+    // Tailored drapery softens the window opening: repeated fabric folds and a weighted hem.
+    const float curtainY=floorY+2.40f;
+    const float curtainZ=backZ+0.13f;
+    const float curtainWidth=std::max(0.18f,roomWindowWidth*0.18f);
+    const auto curtainFabric=rgb(.43f,.40f,.37f);
+    for(int side : {-1,1}) {
+        const float curtainCenter=side*(roomWindowWidth*.5f+curtainWidth*.36f);
+        for(int fold=0;fold<5;++fold) {
+            const float fx=curtainCenter+side*(fold-2)*curtainWidth*.075f;
+            const float foldScale=fold==0||fold==4?0.78f:1.0f;
+            drawSphere(pv.data(),fx,curtainY,curtainZ,
+                       .050f*foldScale,roomWindowHeight*.59f,.045f,curtainFabric,3);
+            drawSphere(pv.data(),fx,curtainY-roomWindowHeight*.55f,curtainZ,
+                       .058f*foldScale,.045f,.050f,curtainFabric,3);
+        }
+    }
+    drawRoundedBox(pv.data(),0,curtainY+roomWindowHeight*.59f,curtainZ,
+                   roomWindowWidth+curtainWidth*.9f,.065f,.12f,wood,0.0f,1);
+
+    // A leafy floor plant and ceramic planter bring a natural material break to the back corner.
+    const float plantX=-halfW+.62f, plantZ=backZ+.44f;
+    const auto potColor=rgb(.47f,.43f,.37f);
+    const auto leafColor=rgb(.12f,.25f,.17f);
+    drawRoundedBox(pv.data(),plantX,floorY+.25f,plantZ,.38f,.48f,.38f,potColor,0.0f,5);
+    drawRoundedBox(pv.data(),plantX,floorY+.49f,plantZ,.42f,.055f,.42f,rgb(.57f,.51f,.42f),0.0f,5);
+    drawSphere(pv.data(),plantX,floorY+.53f,plantZ,.16f,.035f,.16f,rgb(.16f,.12f,.08f));
+    for(int stem=0;stem<5;++stem) {
+        const float a=2.0f*kPi*stem/5.0f;
+        const float dx=std::cos(a)*(.12f+.025f*(stem%2));
+        const float dz=std::sin(a)*(.12f+.025f*(stem%2));
+        drawBox(pv.data(),plantX+dx*.45f,floorY+.83f,plantZ+dz*.45f,
+                .018f,.62f,.018f,rgb(.16f,.31f,.20f),a);
+        drawSphere(pv.data(),plantX+dx,floorY+1.04f,plantZ+dz,.14f,.22f,.075f,leafColor);
+        drawSphere(pv.data(),plantX+dx*1.35f,floorY+.87f,plantZ+dz*1.35f,.18f,.085f,.075f,leafColor);
+    }
+    drawSphere(pv.data(),plantX,floorY+1.34f,plantZ,.20f,.19f,.10f,leafColor);
+    drawSphere(pv.data(),plantX+.12f,floorY+1.26f,plantZ-.08f,.18f,.14f,.08f,leafColor);
+    drawSphere(pv.data(),plantX-.12f,floorY+1.28f,plantZ+.06f,.17f,.16f,.08f,leafColor);
 
     const float deskZ=-halfD+1.35f;
     // Soft contact shadows ground the desk, seating and chair without expensive shadow maps.
@@ -1687,6 +1728,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawGroundShadow(pv.data(),shadowDeskX,floorY+0.004f,shadowDeskZ+0.02f,shadowDeskWidth*.82f,1.10f,.42f);
     drawGroundShadow(pv.data(),halfW-1.25f,floorY+0.004f,.05f,1.55f,2.35f,.40f);
     drawGroundShadow(pv.data(),shadowDeskX-.25f,floorY+0.004f,shadowDeskZ+1.20f,.92f,1.02f,.34f);
+    drawGroundShadow(pv.data(),1.12f,floorY+0.004f,.08f,1.55f,1.78f,.30f);
+    drawGroundShadow(pv.data(),-halfW+.62f,floorY+0.004f,backZ+.44f,.62f,.64f,.24f);
 
     const auto accentBlue = rgb(.16f,.58f,1.0f);
     const auto accentViolet = rgb(.48f,.25f,1.0f);
@@ -1943,6 +1986,51 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawSphere(pv.data(),pcX+.13f,pcY+.337f,pcZ+.18f,.018f,.012f,.018f,accentBlue);
 
     // TV on the left wall, facing into the room; the couch across from it faces the TV.
+    // Layered living-area rug with a woven pile, stitched perimeter and inset geometric border.
+    const float rugX=.40f, rugZ=.12f;
+    drawRoundedBox(pv.data(),rugX,floorY+.024f,rugZ,4.00f,.045f,3.72f,
+                   rgb(.17f,.20f,.24f),0.0f,3);
+    drawRoundedBox(pv.data(),rugX,floorY+.048f,rugZ,3.80f,.009f,3.52f,
+                   rgb(.25f,.27f,.29f),0.0f,3);
+    for(int line=-1;line<=1;++line) {
+        drawBox(pv.data(),rugX+line*.19f,floorY+.054f,rugZ, .012f,.004f,2.98f,
+                rgb(.36f,.34f,.29f),0.0f,3);
+        drawBox(pv.data(),rugX,floorY+.054f,rugZ+line*.19f,3.24f,.004f,.012f,
+                rgb(.36f,.34f,.29f),0.0f,3);
+    }
+
+    // Low coffee table with a softly bevelled walnut top, recessed shelf and satin legs.
+    const float coffeeX=1.10f, coffeeZ=.08f, coffeeY=floorY+.39f;
+    drawRoundedBox(pv.data(),coffeeX,coffeeY,coffeeZ,1.20f,.075f,1.40f,wood,0.0f,1);
+    drawRoundedBox(pv.data(),coffeeX,coffeeY-.15f,coffeeZ,1.00f,.045f,1.18f,
+                   rgb(.23f,.16f,.11f),0.0f,1);
+    for(int side : {-1,1}) for(int end : {-1,1}) {
+        drawRoundedBox(pv.data(),coffeeX+side*.48f,coffeeY-.22f,coffeeZ+end*.57f,
+                       .055f,.36f,.055f,silver,0.0f,4);
+    }
+    // A pair of stacked hardback books and a small ceramic cup on a coaster.
+    drawRoundedBox(pv.data(),coffeeX-.20f,coffeeY+.052f,coffeeZ-.20f,.39f,.045f,.29f,
+                   rgb(.20f,.25f,.31f),-.08f,5);
+    drawRoundedBox(pv.data(),coffeeX-.17f,coffeeY+.105f,coffeeZ-.19f,.34f,.045f,.27f,
+                   rgb(.49f,.26f,.18f),.06f,5);
+    drawBox(pv.data(),coffeeX-.17f,coffeeY+.107f,coffeeZ-.19f,.29f,.003f,.23f,
+            rgb(.80f,.76f,.66f),.06f);
+    drawSphere(pv.data(),coffeeX+.30f,coffeeY+.085f,coffeeZ+.27f,.075f,.095f,.075f,
+               rgb(.76f,.72f,.64f),5);
+    drawSphere(pv.data(),coffeeX+.30f,coffeeY+.172f,coffeeZ+.27f,.060f,.014f,.060f,
+               rgb(.14f,.09f,.055f));
+    drawSphere(pv.data(),coffeeX+.38f,coffeeY+.08f,coffeeZ+.27f,.040f,.045f,.015f,
+               rgb(.76f,.72f,.64f),5);
+    // A compact controller rests beside the books on the desk.
+    drawRoundedBox(pv.data(),deskX-.90f,deskSurface+.035f,deskZ+.25f,.23f,.055f,.15f,
+                   rgb(.12f,.15f,.20f),0.0f,5);
+    drawSphere(pv.data(),deskX-.99f,deskSurface+.058f,deskZ+.25f,.055f,.035f,.060f,
+               rgb(.12f,.15f,.20f),5);
+    drawSphere(pv.data(),deskX-.81f,deskSurface+.058f,deskZ+.25f,.055f,.035f,.060f,
+               rgb(.12f,.15f,.20f),5);
+    drawSphere(pv.data(),deskX-.90f,deskSurface+.068f,deskZ+.25f,.018f,.012f,.018f,accentBlue);
+
+
     if(settings_.showTv) {
         const float tvX=-halfW+.075f, tvY=floorY+2.02f, tvZ=.05f;
         const float tvW=std::min(2.0f,halfD*.58f), tvH=tvW*9.0f/16.0f;
