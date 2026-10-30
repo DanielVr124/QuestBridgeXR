@@ -76,10 +76,12 @@ M["glass"]=mat("Low-iron architectural glazing",(.006,.014,.030),.045,.02,9,None
 M["screen"]=mat("OLED black glass",(.004,.009,.020),.12,.22,-1)
 M["screen_glow"]=mat("Dim OLED midnight blue",(.010,.018,.048),.22,.08,7,None,0,(.018,.065,.22),.75)
 M["coffee_glass"]=mat("Deep smoked satin glass tabletop",(.010,.017,.030),.28,.12,5,120,.012,transmission=0.0)
-M["blue"]=mat("Electric blue LED diffuser",(.04,.35,1.),.24,0,7,None,0,(.015,.22,1.),4.)
-M["violet"]=mat("Violet LED diffuser",(.38,.08,1.),.22,0,7,None,0,(.32,.045,1.),3.5)
-M["pink"]=mat("Magenta LED diffuser",(1.,.035,.38),.22,0,7,None,0,(1.,.015,.28),3.)
-M["warm"]=mat("Warm opal practical light",(1.,.56,.26),.24,0,7,None,0,(1.,.43,.14),2.3)
+# Dedicated runtime material IDs let the in-room remote recolor every RGB
+# fixture without tinting the distant skyline windows.
+M["blue"]=mat("Electric blue LED diffuser",(.04,.35,1.),.24,0,70,None,0,(.015,.22,1.),4.)
+M["violet"]=mat("Violet LED diffuser",(.38,.08,1.),.22,0,71,None,0,(.32,.045,1.),3.5)
+M["pink"]=mat("Magenta LED diffuser",(1.,.035,.38),.22,0,72,None,0,(1.,.015,.28),3.)
+M["warm"]=mat("Warm opal practical light",(1.,.56,.26),.24,0,73,None,0,(1.,.43,.14),2.3)
 M["plant"]=mat("Deep emerald foliage",(.025,.16,.095),.68,0,2,42,.14)
 M["plant2"]=mat("Satin leaf highlights",(.055,.25,.14),.52,0,2,55,.09)
 M["rug"]=mat("Plush graphite wool rug",(.065,.075,.102),.98,0,3,500,.25)
@@ -312,6 +314,16 @@ for side in (-1,1):
     point_light("Bedside warm practical",(nx,ny,1.52),(1.,.46,.22),28,.28)
     cube("Nightstand book",(nx+side*.12,ny+.05,1.085),(.22,.32,.035),M["fabric"],.008)
 
+# A compact, tactile RGB remote lives on the right bedside table. The five
+# buttons are runtime-selectable presets; their Blender colours are preview art.
+remote_x,remote_y=bx+1.55,by-.83
+cube("RGB lighting remote aluminium shell",(remote_x,remote_y,1.085),(.205,.405,.052),M["metal"],.035)
+cube("RGB lighting remote glass face",(remote_x,remote_y,1.116),(.176,.372,.012),M["screen"],.024)
+for index,button_mat in enumerate((M["blue"],M["blue"],M["violet"],M["pink"],M["warm"])):
+    button_y=remote_y-.14+index*.07
+    cylinder("RGB remote tactile preset button",(remote_x,button_y,1.137),.022,.018,button_mat,24)
+cube("RGB remote status display",(remote_x,remote_y+.175,1.133),(.11,.035,.008),M["screen_glow"],.008)
+
 # --- Gaming setup on left: ultrawide, real keyboard, glass PC, chair and studio gear ---
 dx,dy=-3.12,.42
 cube("Gaming desk walnut slab",(-3.02,dy,.79),(1.72,2.48,.10),M["wood"],.045)
@@ -468,6 +480,17 @@ for x,material in ((-3.84,M["blue"]),(3.84,M["violet"])):
     curve_obj("Window vertical accent light",[(x,-5.45,.80),(x,-5.45,3.83)],.012,material)
 cube("Entry floating shelf",(2.9,4.50,1.25),(.75,.20,.09),M["wood"],.025)
 cylinder("Entry sculptural vase",(2.9,4.50,1.45),.10,.32,M["ceramic"])
+
+# --- Physical room-light controls ---
+# Entrance-mounted rocker switch on the slatted right wall, facing the room.
+switch_y=3.51
+cube("Smart lighting switch brushed backplate",(3.935,switch_y,1.35),(.085,.235,.35),M["metal"],.035)
+cube("Smart lighting switch inset porcelain",(3.884,switch_y,1.35),(.020,.185,.292),M["ceramic"],.025)
+cube("Smart lighting rocker",(3.858,switch_y,1.35),(.030,.112,.205),M["stone_light"],.018)
+cube("Smart switch upper indicator bezel",(3.838,switch_y-.055,1.445),(.012,.048,.028),M["metal"],.010)
+uv_sphere("Smart switch indicator LED",(3.829,switch_y-.055,1.445),(.010,.022,.010),M["blue"],16,10)
+curve_obj("Smart switch rocker centre seam",
+          [(3.831,switch_y-.055,1.35),(3.831,switch_y+.055,1.35)],.003,M["chrome"])
 
 # --- Room lighting: soft key + controlled colored bounce ---
 area_light("Large soft ceiling key",(0,1.,4.15),(0,-1.,.6),(.52,.62,1.),370,5.)
