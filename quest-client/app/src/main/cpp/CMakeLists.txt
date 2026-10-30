@@ -30,6 +30,6 @@ target_include_directories(qbxquest PRIVATE
 )
 target_link_libraries(qbxquest PRIVATE
     OpenXR::openxr_loader
-    android log EGL GLESv3 mediandk
+    android log EGL GLESv3 mediandk z
 )
 target_compile_options(qbxquest PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)
