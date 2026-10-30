@@ -1831,6 +1831,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         }
     }
 
+    // Framed abstract wall art on the open right wall, above the living-area sightline.
+    const float artX=halfW-.085f, artY=floorY+2.52f, artZ=1.75f;
+    drawRoundedBox(pv.data(),artX,artY,artZ,.065f,.92f,1.18f,
+                   rgb(.25f,.19f,.14f),0.0f,1);
+    drawBox(pv.data(),artX-.037f,artY,artZ,.012f,.80f,1.06f,rgb(.10f,.12f,.15f));
+    drawSphere(pv.data(),artX-.046f,artY+.10f,artZ-.12f,.010f,.23f,.28f,
+               rgb(.30f,.38f,.42f));
+    drawSphere(pv.data(),artX-.048f,artY-.12f,artZ+.20f,.010f,.17f,.18f,
+               rgb(.72f,.47f,.29f));
+    drawBox(pv.data(),artX-.050f,artY-.23f,artZ-.18f,.008f,.30f,.12f,
+            rgb(.25f,.39f,.31f),-.18f);
+
     // Gaming desk occupies the back-right corner, leaving the center of the room open.
     const float deskX=halfW-1.48f;
     const float deskWidth=std::min(2.65f,halfW*1.02f);
@@ -1879,23 +1891,14 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawCurvedPanel(pv.data(),x,monitorY,monitorZ+.018f,shellW,shellH,shellCurve,0,trimDark,32);
         drawCurvedPanel(pv.data(),x,monitorY,monitorZ+.032f,monitorW+.040f,monitorH+.040f,curve*.88f,0,silver,32);
         drawCurvedPanel(pv.data(),x,monitorY,monitorZ+.044f,monitorW,monitorH,curve*.76f,tex,rgb(1,1,1),32);
-        // Segmented edge rails follow the curvature and bridge the front and rear covers,
-        // giving the panel visible thickness instead of the appearance of three floating sheets.
-        constexpr int edgeSegments=32;
-        for(int segment=0;segment<edgeSegments;++segment) {
-            const float u=(static_cast<float>(segment)+.5f)/static_cast<float>(edgeSegments);
-            const float nx=2.0f*u-1.0f;
-            const float px=x+nx*shellW*.5f;
-            const float arc=shellCurve*(1.0f-nx*nx);
-            const float frontZ=monitorZ+.018f+arc;
-            const float railZ=frontZ-.020f;
-            const float railW=shellW/static_cast<float>(edgeSegments)+.003f;
-            const float yaw=std::atan(4.0f*shellCurve*nx/shellW);
-            drawBox(pv.data(),px,monitorY+shellH*.5f-.004f,railZ,railW,.028f,.042f,trimDark,yaw);
-            drawBox(pv.data(),px,monitorY-shellH*.5f+.004f,railZ,railW,.028f,.042f,trimDark,yaw);
-            // Fine satin highlights on the upper edge catch the room's ambient colors.
-            drawBox(pv.data(),px,monitorY+shellH*.5f-.003f,frontZ+.001f,railW,.004f,.004f,silver,yaw);
-        }
+        // The curved upper/lower rails are batched into a few curved surfaces
+        // rather than hundreds of tiny boxes, preserving detail at Quest frame rates.
+        drawCurvedPanel(pv.data(),x,monitorY+shellH*.5f-.004f,monitorZ+.018f,
+                        shellW,.028f,shellCurve,0,trimDark,32);
+        drawCurvedPanel(pv.data(),x,monitorY-shellH*.5f+.004f,monitorZ+.018f,
+                        shellW,.028f,shellCurve,0,trimDark,32);
+        drawCurvedPanel(pv.data(),x,monitorY+shellH*.5f-.002f,monitorZ+.023f,
+                        shellW*.98f,.004f,shellCurve,0,silver,32);
         for(int side : {-1,1}) {
             const float edgeX=x+side*shellW*.5f;
             drawBox(pv.data(),edgeX,monitorY,monitorZ+.018f-.020f,.028f,shellH-.035f,.042f,trimDark);
@@ -1983,6 +1986,31 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 .082f,.020f,.006f,trimDark);
         drawSphere(pv.data(),x,monitorY-monitorH*.5f+.12f,monitorZ+.049f,
                    .006f,.006f,.002f,accentBlue);
+    }
+
+    // Desk mat, sculpted compact keyboard, mouse and near-field monitor speakers.
+    drawRoundedBox(pv.data(),monitorX,deskSurface+.010f,deskZ+.30f,1.18f,.016f,.43f,
+                   rgb(.055f,.070f,.095f),0.0f,3);
+    drawRoundedBox(pv.data(),monitorX,deskSurface+.045f,deskZ+.30f,.83f,.052f,.205f,
+                   rgb(.14f,.16f,.19f),0.0f,5);
+    for(int row=0;row<4;++row) {
+        drawRoundedBox(pv.data(),monitorX,deskSurface+.074f,deskZ+.225f+row*.047f,
+                       .73f,.010f,.025f,rgb(.48f,.51f,.55f),0.0f,5);
+    }
+    drawRoundedBox(pv.data(),monitorX,deskSurface+.074f,deskZ+.405f,.28f,.010f,.025f,
+                   rgb(.48f,.51f,.55f),0.0f,5);
+    drawSphere(pv.data(),monitorX+.69f,deskSurface+.072f,deskZ+.31f,
+               .095f,.045f,.145f,rgb(.16f,.19f,.23f),5);
+    drawSphere(pv.data(),monitorX+.69f,deskSurface+.112f,deskZ+.285f,
+               .012f,.008f,.022f,silver,4);
+    for(int side : {-1,1}) {
+        const float speakerX=monitorX+side*.88f;
+        drawRoundedBox(pv.data(),speakerX,deskSurface+.16f,deskZ-.15f,.145f,.29f,.16f,
+                       rgb(.075f,.085f,.105f),0.0f,5);
+        drawSphere(pv.data(),speakerX,deskSurface+.20f,deskZ-.065f,.046f,.046f,.012f,
+                   rgb(.24f,.28f,.33f),5);
+        drawSphere(pv.data(),speakerX,deskSurface+.095f,deskZ-.065f,.027f,.027f,.012f,
+                   rgb(.36f,.39f,.43f),4);
     }
 
     // A compact white gaming PC with a glass side panel, ventilation detail and three illuminated fans.
