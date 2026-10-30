@@ -2260,6 +2260,14 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     }
 
     const float deskZ=-halfD+1.35f;
+    // Shared desk and monitor anchors are used by both the packaged GLB models
+    // and the procedural fallback, plus the accessories placed around them.
+    const float deskX=-halfW+1.48f;
+    const float deskWidth=std::min(2.65f,halfW*1.02f);
+    const float monitorX=deskX-.36f;
+    const float deskSurface=floorY+.83f;
+    const float monitorZ=deskZ-.34f;
+
     // Soft contact shadows ground the desk, seating and chair without expensive shadow maps.
     const float shadowDeskX=-halfW+1.48f;
     const float shadowDeskZ=-halfD+1.35f;
@@ -2359,15 +2367,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawSphere(pv.data(),artX-.052f,yy,zz-.25f,.012f,.034f,.034f,trace==1?neonMagenta:neonCyan,7);
     }
 
-    // Shared desk/monitor anchors are outside the fallback branch so the GLB path and desk accessories use identical placement.
-    const float monitorX=deskX-.36f;
-    const float deskSurface=floorY+.83f;
-
     // Retain procedural furniture as a fallback if either packaged model cannot be loaded.
     if (!deskModel_.loaded() || !monitorModel_.loaded()) {
     // Gaming desk occupies the back-right corner, leaving the center of the room open.
-    const float deskX=-halfW+1.48f;
-    const float deskWidth=std::min(2.65f,halfW*1.02f);
     const float deskFrontZ=deskZ+.45f;
     const float deskTopY=floorY+.78f;
     drawRoundedBox(pv.data(),deskX,deskTopY,deskZ,deskWidth,.085f,.88f,wood,0.0f,1);
@@ -2415,7 +2417,6 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float monitorW=monitorCount==1?1.30f:monitorCount==2?.82f:.64f;
     const float monitorH=monitorW*9.0f/16.0f;
     const float monitorY=floorY+1.43f;
-    const float monitorZ=deskZ-.34f;
     const float standHeight=std::max(.08f,monitorY-monitorH*.5f-deskSurface);
     const float monitorGap=.055f;
     const float curve=.082f;
