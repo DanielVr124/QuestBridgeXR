@@ -608,6 +608,115 @@ GLuint RoomRenderer::loadRgbAsset(AAssetManager* assets, const char* filename) {
     glBindTexture(GL_TEXTURE_2D,0); LOGI("loaded %s (%ux%u)",filename,w,h); return t;
 }
 
+bool RoomRenderer::loadPenthouseMesh(AAssetManager* assets) {
+    if (!assets) return false;
+    AAsset* asset = AAssetManager_open(assets, "models/skyline_penthouse.qbxmesh", AASSET_MODE_BUFFER);
+    if (!asset) { LOGW("Blender penthouse mesh not packaged; using procedural fallback"); return false; }
+    const off_t length = AAsset_getLength(asset);
+    if (length < 20 || length > 256 * 1024 * 1024) {
+        AAsset_close(asset);
+        LOGW("Blender penthouse mesh has invalid size: %lld", static_cast<long long>(length));
+        return false;
+    }
+    std::vector<uint8_t> bytes(static_cast<size_t>(length));
+    const int64_t read = AAsset_read(asset, bytes.data(), bytes.size());
+    AAsset_close(asset);
+    if (read != length || std::memcmp(bytes.data(), "QBXMSH1", 7) != 0 || bytes[7] != 0) {
+        LOGW("Blender penthouse mesh header or read is invalid");
+        return false;
+    }
+
+    size_t cursor = 8;
+    auto readBytes = [&](void* destination, size_t count) {
+        if (cursor > bytes.size() || count > bytes.size() - cursor) return false;
+        std::memcpy(destination, bytes.data() + cursor, count);
+        cursor += count;
+        return true;
+    };
+    uint32_t version = 0, batchCount = 0, totalVertices = 0;
+    if (!readBytes(&version, sizeof(version)) ||
+        !readBytes(&batchCount, sizeof(batchCount)) ||
+        !readBytes(&totalVertices, sizeof(totalVertices)) ||
+        version != 1 || batchCount == 0 || batchCount > 4096 ||
+        totalVertices < 3 || totalVertices > 8000000) {
+        LOGW("Blender penthouse mesh header values are invalid");
+        return false;
+    }
+
+    std::vector<Vertex> vertices;
+    vertices.reserve(totalVertices);
+    std::vector<PenthouseBatch> batches;
+    batches.reserve(batchCount);
+    for (uint32_t batchIndex = 0; batchIndex < batchCount; ++batchIndex) {
+        int32_t material = 0;
+        std::array<float, 4> color{};
+        uint32_t count = 0;
+        if (!readBytes(&material, sizeof(material)) ||
+            !readBytes(color.data(), sizeof(float) * color.size()) ||
+            !readBytes(&count, sizeof(count)) ||
+            count == 0 || count % 3 != 0 || count > totalVertices - vertices.size()) {
+            LOGW("Blender penthouse mesh batch %u is invalid", batchIndex);
+            return false;
+        }
+        PenthouseBatch batch{};
+        batch.material = material;
+        batch.color = color;
+        batch.first = static_cast<GLsizei>(vertices.size());
+        batch.count = static_cast<GLsizei>(count);
+        for (uint32_t vertexIndex = 0; vertexIndex < count; ++vertexIndex) {
+            Vertex vertex{};
+            if (!readBytes(&vertex, sizeof(Vertex))) {
+                LOGW("Blender penthouse mesh ended inside batch %u", batchIndex);
+                return false;
+            }
+            vertices.push_back(vertex);
+        }
+        batches.push_back(batch);
+    }
+    if (vertices.size() != totalVertices || cursor != bytes.size()) {
+        LOGW("Blender penthouse mesh vertex count or payload size does not match");
+        return false;
+    }
+
+    glGenVertexArrays(1, &penthouseVao_);
+    glGenBuffers(1, &penthouseVbo_);
+    glBindVertexArray(penthouseVao_);
+    glBindBuffer(GL_ARRAY_BUFFER, penthouseVbo_);
+    glBufferData(GL_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)),
+                 vertices.data(), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                          reinterpret_cast<void*>(3 * sizeof(float)));
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    penthouseVertexCount_ = static_cast<GLsizei>(vertices.size());
+    penthouseBatches_ = std::move(batches);
+    LOGI("loaded Blender penthouse mesh: %u batches, %u vertices", batchCount, totalVertices);
+    return true;
+}
+
+void RoomRenderer::drawPenthouseMesh(const float* projectionView, float floorY) {
+    if (!penthouseVao_ || penthouseBatches_.empty()) return;
+    Mat4 pv{};
+    std::copy(projectionView, projectionView + pv.size(), pv.begin());
+    const Mat4 model = translation(0.0f, floorY, 0.0f);
+    const Mat4 mvp = mul(pv, model);
+    glUniformMatrix4fv(locMvp_, 1, GL_FALSE, mvp.data());
+    glUniformMatrix4fv(locModel_, 1, GL_FALSE, model.data());
+    glUniform1i(locTextured_, 0);
+    glUniform1i(locRounded_, 0);
+    glUniform2f(locUvScale_, 1.0f, 1.0f);
+    glBindVertexArray(penthouseVao_);
+    for (const auto& batch : penthouseBatches_) {
+        glUniform4fv(locColor_, 1, batch.color.data());
+        glUniform1i(locMaterial_, batch.material);
+        glDrawArrays(GL_TRIANGLES, batch.first, batch.count);
+    }
+    glBindVertexArray(0);
+}
 
 GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
     // Procedural window scenery is generated on demand. The first three scenes use bundled assets.
@@ -1177,6 +1286,7 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     materialAtlasTexture_=loadRgbAsset(assets,"materials/room_surface_atlas.rgb");
     normalAtlasTexture_=loadRgbAsset(assets,"materials/room_normal_atlas.rgb");
     roughnessAtlasTexture_=loadRgbAsset(assets,"materials/room_roughness_atlas.rgb");
+    loadPenthouseMesh(assets);
     if(roughnessAtlasTexture_) {
         glBindTexture(GL_TEXTURE_2D,roughnessAtlasTexture_);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
@@ -1583,6 +1693,7 @@ void RoomRenderer::toggleSitting(const XrPosef& headPose) {
 }
 
 void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,float yaw,int material) {
+    if (skipProceduralDraws_) return;
     Mat4 projectionView{}; std::copy(pv, pv + projectionView.size(), projectionView.begin());
     Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,sz))); Mat4 mvp=mul(projectionView,model);
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
@@ -1595,6 +1706,7 @@ void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,floa
 }
 void RoomRenderer::drawPillow(const float* pv,float x,float y,float z,float sx,float sy,float sz,
                                const std::array<float,4>& color,float yaw,float pitch,int material) {
+    if (skipProceduralDraws_) return;
     Mat4 projectionView{};std::copy(pv,pv+projectionView.size(),projectionView.begin());
     const Mat4 orientation=mul(rotateY(yaw),rotateX(pitch));
     const Mat4 model=mul(translation(x,y,z),mul(orientation,scaling(sx,sy,sz)));
@@ -1611,6 +1723,7 @@ void RoomRenderer::drawPillow(const float* pv,float x,float y,float z,float sx,f
 
 void RoomRenderer::drawCurtainPanel(const float* pv,float x,float y,float z,float width,float height,
                                       const std::array<float,4>& color) {
+    if (skipProceduralDraws_) return;
     Mat4 projectionView{};std::copy(pv,pv+projectionView.size(),projectionView.begin());
     const Mat4 model=mul(translation(x,y,z),scaling(width,height,1.0f));
     const Mat4 mvp=mul(projectionView,model);
@@ -1626,6 +1739,7 @@ void RoomRenderer::drawCurtainPanel(const float* pv,float x,float y,float z,floa
 
 void RoomRenderer::drawCylinder(const float* pv,float x,float y,float z,float diameter,float height,
                                 const std::array<float,4>& color,int material,float pitch) {
+    if (skipProceduralDraws_) return;
     Mat4 projectionView{};std::copy(pv,pv+projectionView.size(),projectionView.begin());
     const Mat4 model=mul(translation(x,y,z),mul(rotateX(pitch),scaling(diameter,height,diameter)));
     const Mat4 mvp=mul(projectionView,model);
@@ -1641,6 +1755,7 @@ void RoomRenderer::drawCylinder(const float* pv,float x,float y,float z,float di
 
 void RoomRenderer::drawRoundedBox(const float* pv,float x,float y,float z,float sx,float sy,float sz,
                                       const std::array<float,4>& color,float yaw,int material) {
+    if (skipProceduralDraws_) return;
     Mat4 projectionView{}; std::copy(pv,pv+projectionView.size(),projectionView.begin());
     const Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,sz)));
     const Mat4 mvp=mul(projectionView,model);
@@ -1661,6 +1776,7 @@ void RoomRenderer::drawRoundedBox(const float* pv,float x,float y,float z,float 
 }
 void RoomRenderer::drawText(const float* pv, const char* text, float x, float y, float z,
                             float pixelSize, const std::array<float,4>& color) {
+    if (skipProceduralDraws_) return;
     if (!text) return;
     auto glyph = [](char c) {
         switch (c) {
@@ -1740,6 +1856,7 @@ void RoomRenderer::drawText(const float* pv, const char* text, float x, float y,
 }
 
 void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,int material) {
+    if (skipProceduralDraws_) return;
     Mat4 projectionView{}; std::copy(pv,pv+projectionView.size(),projectionView.begin());
     const Mat4 model=mul(translation(x,y,z),scaling(sx,sy,sz));
     const Mat4 mvp=mul(projectionView,model);
@@ -1752,6 +1869,7 @@ void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,f
     glBindVertexArray(0);
 }
 void RoomRenderer::drawPlane(const float* pv,float x,float y,float z,float sx,float sy,GLuint texture,const std::array<float,4>& color,float yaw) {
+    if (skipProceduralDraws_) return;
     Mat4 projectionView{}; std::copy(pv, pv + projectionView.size(), projectionView.begin());
     Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,1)));Mat4 mvp=mul(projectionView,model);
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
@@ -1763,6 +1881,7 @@ void RoomRenderer::drawPlane(const float* pv,float x,float y,float z,float sx,fl
 void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
                                     float width, float height, float curveDepth, GLuint texture,
                                     const std::array<float,4>& color, int segments) {
+    if (skipProceduralDraws_) return;
     segments = std::clamp(segments, 8, 48);
     std::vector<Vertex> vertices;
     vertices.reserve(static_cast<size_t>(segments) * 6u);
@@ -1816,6 +1935,7 @@ void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
 
 void RoomRenderer::drawGroundShadow(const float* pv,float x,float y,float z,
                                      float width,float depth,float opacity) {
+    if (skipProceduralDraws_) return;
     if(!groundShadowTexture_) return;
     Mat4 projectionView{};std::copy(pv,pv+projectionView.size(),projectionView.begin());
     const Mat4 model=mul(translation(x,y,z),mul(rotateX(-kPi*0.5f),scaling(width,depth,1.0f)));
@@ -2051,6 +2171,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform3f(locNeonPinkPosition_,0.0f,floorY+2.25f,backZ+0.58f);
     glUniform3f(locNeonPinkColor_,1.0f,0.075f,0.38f);
     glUniform1f(locNeonPinkIntensity_,1.55f);
+    // Use the Blender-authored mesh for the base penthouse when all model visibility
+    // toggles are in their default state. Preserve the procedural fallback for variants.
+    skipProceduralDraws_ = activeEnvironmentIndex_ == 29 && penthouseVao_ != 0 &&
+                           settings_.showTv && settings_.showCouch && settings_.showChair;
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
     // Deep polished stone replaces the old matte plank floor and picks up colored light.
     drawBox(pv.data(),0,floorY-0.08f,0,halfW*2+0.1f,0.16f,halfD*2+0.1f,floor,0.0f,8);
@@ -2771,6 +2895,34 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawSphere(pv.data(),lampX,floorY+1.84f,lampZ,.12f,.09f,.12f,lampGlow);
     // A fine pull cord gives the shade a scale reference and subtle vertical detail.
     drawCylinder(pv.data(),lampX+.17f,floorY+1.90f,lampZ,.009f,.30f,brass,4);
+
+    // The Blender mesh includes the complete static penthouse. Re-enable draw helpers
+    // only after the old procedural room has been skipped, then place live stream images
+    // on the modeled monitor and TV glass surfaces.
+    if (skipProceduralDraws_) {
+        skipProceduralDraws_ = false;
+        drawPenthouseMesh(pv.data(), floorY);
+        const bool monitorStream = settings_.screenDestination == "monitor" ||
+                                   settings_.screenDestination == "both";
+        if (monitorStream && hasVideo) {
+            for (int i = 0; i < std::clamp(settings_.monitorCount, 1, 3); ++i) {
+                drawPlane(pv.data(), -3.844f, floorY + 1.73f,
+                          0.42f + (i - (std::clamp(settings_.monitorCount, 1, 3) - 1) * 0.5f) * 2.04f,
+                          1.94f, 0.95f, videoTexture, rgb(1,1,1), kPi * 0.5f);
+            }
+        }
+        if (settings_.showTv && hasVideo &&
+            (settings_.screenDestination == "tv" || settings_.screenDestination == "both")) {
+            const float tvX = 3.805f;
+            const float tvY = floorY + 2.08f;
+            const float tvZ = -0.12f;
+            const float tvW = 2.25f, tvH = tvW * 9.0f / 16.0f;
+            drawPlane(pv.data(), tvX, tvY, tvZ, tvW, tvH, videoTexture,
+                      rgb(1,1,1), -kPi * 0.5f);
+        }
+    } else {
+        skipProceduralDraws_ = false;
+    }
     if(settings_.comfortVignette && vignetteProgram_){
         glDisable(GL_DEPTH_TEST);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(vignetteProgram_);glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);
@@ -2833,8 +2985,10 @@ void RoomRenderer::release() {
     if(cylinderVao_)glDeleteVertexArrays(1,&cylinderVao_);if(cylinderVbo_)glDeleteBuffers(1,&cylinderVbo_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
     if(groundShadowTexture_)glDeleteTextures(1,&groundShadowTexture_);
+    if(penthouseVao_)glDeleteVertexArrays(1,&penthouseVao_);
+    if(penthouseVbo_)glDeleteBuffers(1,&penthouseVbo_);
     if(materialAtlasTexture_)glDeleteTextures(1,&materialAtlasTexture_);
     if(normalAtlasTexture_)glDeleteTextures(1,&normalAtlasTexture_);
     if(roughnessAtlasTexture_)glDeleteTextures(1,&roughnessAtlasTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=pillowVao_=pillowVbo_=curtainVao_=curtainVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=pillowVertexCount_=curtainVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=pillowVao_=pillowVbo_=curtainVao_=curtainVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=pillowVertexCount_=curtainVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);penthouseVao_=penthouseVbo_=0;penthouseVertexCount_=0;penthouseBatches_.clear();skipProceduralDraws_=false;initialized_=false;
 }
