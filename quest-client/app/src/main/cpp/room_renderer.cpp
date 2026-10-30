@@ -936,7 +936,12 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                     const int row = static_cast<int>((v - roof) * 360.0f) % 18;
                     const uint32_t windowSeed = hash32(static_cast<uint32_t>(building * 113 + row * 31 + sceneIndex));
                     if (localX >= 3 && localX <= 11 && row >= 3 && row <= 12 && windowSeed % 7U < 3U) {
-                        if (sceneIndex == 17) { r = 231.0f; g = 158.0f; b = 63.0f; }
+                        if (sceneIndex == 29) {
+                            const float warmth = 0.72f + static_cast<float>((windowSeed >> 9) & 7U) * 0.04f;
+                            r = 255.0f;
+                            g = 166.0f + 48.0f * warmth;
+                            b = 82.0f + 34.0f * warmth;
+                        } else if (sceneIndex == 17) { r = 231.0f; g = 158.0f; b = 63.0f; }
                         else if (sceneIndex == 18) { r = 32.0f; g = 211.0f; b = 255.0f; }
                         else if (windowSeed & 1U) { r = 240.0f; g = 43.0f; b = 165.0f; }
                         else { r = 24.0f; g = 216.0f; b = 255.0f; }
@@ -1090,11 +1095,11 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                 // Break the city lights into softened, vertically stretched reflections
                 // with horizontal ripples so the skyline reads as a waterfront at night.
                 const float depth = std::clamp((v - horizon) / (1.0f - horizon), 0.0f, 1.0f);
-                const float ripple = 0.5f + 0.5f * std::sin(v * 310.0f + u * 23.0f)
-                                            * std::sin(v * 91.0f - u * 13.0f);
-                r = 3.0f + depth * 3.0f + ripple * 2.0f;
-                g = 8.0f + depth * 6.0f + ripple * 4.0f;
-                b = 19.0f + depth * 13.0f + ripple * 8.0f;
+                const float ripple = 0.5f + 0.5f * std::sin(v * 310.0f + u * 81.6814f)
+                                            * std::sin(v * 91.0f - u * 43.9823f);
+                r = 5.0f + depth * 6.0f + ripple * 8.0f;
+                g = 7.0f + depth * 9.0f + ripple * 7.0f;
+                b = 16.0f + depth * 15.0f + ripple * 7.0f;
                 const int building = x / 16;
                 const uint32_t seed = hash32(static_cast<uint32_t>(building) * 7919U
                                            + static_cast<uint32_t>(sceneIndex) * 113U + 37U);
@@ -1103,8 +1108,8 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
                 const int reflectionRow = static_cast<int>(depth * 92.0f + static_cast<float>((seed >> 12) & 15U));
                 if (litColumn && (reflectionRow % 17) < 4) {
                     const float glow = (1.0f - depth * 0.72f) * (0.45f + ripple * 0.55f);
-                    if (seed & 1U) { r += 30.0f * glow; g += 105.0f * glow; b += 180.0f * glow; }
-                    else { r += 170.0f * glow; g += 35.0f * glow; b += 120.0f * glow; }
+                    if (seed & 1U) { r += 190.0f * glow; g += 124.0f * glow; b += 52.0f * glow; }
+                    else { r += 255.0f * glow; g += 177.0f * glow; b += 86.0f * glow; }
                 }
                 if ((noise % 97U) < 2U && depth < 0.75f) {
                     r += 4.0f; g += 8.0f; b += 13.0f;
@@ -1552,7 +1557,7 @@ void RoomRenderer::toggleSitting(const XrPosef& headPose) {
     const float playerX=headPose.position.x+moveX_;
     const float playerZ=headPose.position.z+moveZ_;
     struct Seat { float x,z,yaw; const char* name; bool enabled; };
-    const float deskX=-halfW+1.48f, deskZ=-halfD+1.35f;
+    const float deskX=-halfW+1.48f, deskZ=-halfD+0.55f;
     const Seat seats[] = {
         {deskX-.25f, deskZ+1.20f, 0.0f, "desk chair", settings_.showChair},
         {halfW-1.25f, .05f, -kPi*.5f, "couch", settings_.showCouch}
@@ -1834,44 +1839,97 @@ void RoomRenderer::drawGroundShadow(const float* pv,float x,float y,float z,
     glDisable(GL_BLEND);
     glBindTexture(GL_TEXTURE_2D,0);
 }
-void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floorY,float backZ,GLuint tex,float windowW,float windowH) {
-    (void)halfW;
-    const float windowY=floorY+2.4f;
-    // A broad window with warm wooden frame rails. The photo becomes the outside view; all nearby surfaces are real 3D geometry.
-    drawPlane(pv,0,windowY,backZ+0.035f,windowW,windowH,tex,rgb(1,1,1));
-    const auto frame=rgb(.018f,.025f,.045f);
-    const float t=0.062f;
-    drawBox(pv,0,windowY+windowH*.5f+t*.5f,backZ+0.015f,windowW+2*t,t,0.12f,frame);
-    drawBox(pv,0,windowY-windowH*.5f-t*.5f,backZ+0.015f,windowW+2*t,t,0.12f,frame);
-    drawBox(pv,-windowW*.5f-t*.5f,windowY,backZ+0.015f,t,windowH,0.12f,frame);
-    drawBox(pv,windowW*.5f+t*.5f,windowY,backZ+0.015f,t,windowH,0.12f,frame);
-    drawBox(pv,0,windowY,backZ+0.005f,0.035f,windowH,0.10f,frame);
+void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floorY,float backZ,
+                                                     GLuint tex,float windowW,float windowH) {
+    const float windowY=floorY+2.38f;
+    const float halfD=std::fabs(backZ);
+    const float frontZ=halfD;
+    const auto drawPanoramaSegment=[&](float x,float y,float z,float width,float height,
+                                       float yaw,float u0,float u1,const std::array<float,4>& tint) {
+        if(!curvedVao_) {
+            glGenVertexArrays(1,&curvedVao_);
+            glGenBuffers(1,&curvedVbo_);
+            glBindVertexArray(curvedVao_);
+            glBindBuffer(GL_ARRAY_BUFFER,curvedVbo_);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(Vertex),nullptr);
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),
+                                  reinterpret_cast<void*>(3*sizeof(float)));
+            glBindVertexArray(0);
+        }
+        const Vertex bl{-0.5f,-0.5f,0.0f,u0,1.0f};
+        const Vertex br{ 0.5f,-0.5f,0.0f,u1,1.0f};
+        const Vertex tr{ 0.5f, 0.5f,0.0f,u1,0.0f};
+        const Vertex tl{-0.5f, 0.5f,0.0f,u0,0.0f};
+        const Vertex vertices[6]={bl,br,tr,bl,tr,tl};
+        const Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(width,height,1.0f)));
+        Mat4 projectionView{};
+        std::copy(pv,pv+projectionView.size(),projectionView.begin());
+        const Mat4 mvp=mul(projectionView,model);
+        glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
+        glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
+        glUniform4fv(locColor_,1,tint.data());
+        glUniform1i(locTextured_,1);
+        glUniform1i(locMaterial_,-1);
+        glUniform1i(locRounded_,0);
+        glUniform2f(locUvScale_,1.0f,1.0f);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D,tex?tex:videoFallbackTexture_);
+        glUniform1i(locTexture_,0);
+        glBindVertexArray(curvedVao_);
+        glBindBuffer(GL_ARRAY_BUFFER,curvedVbo_);
+        glBufferData(GL_ARRAY_BUFFER,sizeof(vertices),vertices,GL_DYNAMIC_DRAW);
+        glDrawArrays(GL_TRIANGLES,0,6);
+        glBindVertexArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER,0);
+        glBindTexture(GL_TEXTURE_2D,0);
+    };
 
-    // Divided-light sash, deep interior sill, apron and small brass window catches.
-    const auto sash=rgb(.052f,.068f,.11f);
-    const float sashZ=backZ+.092f;
-    for(int pane=-1;pane<=1;++pane) {
-        if(pane==0) continue;
-        drawRoundedBox(pv, pane*windowW*.25f,windowY,sashZ,
-                       .026f,windowH-.055f,.065f,sash,0.0f,1);
-    }
-    drawRoundedBox(pv,0,windowY+windowH*.12f,sashZ,
-                   windowW-.045f,.026f,.065f,sash,0.0f,1);
-    const float sillY=windowY-windowH*.5f-.065f;
-    drawRoundedBox(pv,0,sillY,backZ+.12f,windowW+.24f,.085f,.25f,frame,0.0f,5);
-    drawRoundedBox(pv,0,sillY-.10f,backZ+.075f,windowW+.12f,.13f,.09f,sash,0.0f,5);
-    // Thin emissive reveals make the dark aluminium glazing legible without looking like neon tubes.
-    if(activeEnvironmentIndex_==29) {
-        drawBox(pv,0,windowY+windowH*.5f+.018f,backZ+.086f,windowW*.96f,.009f,.012f,
-                rgb(.12f,.30f,1.0f),0.0f,7);
-        drawBox(pv,0,windowY-windowH*.5f-.018f,backZ+.086f,windowW*.96f,.008f,.010f,
-                rgb(.58f,.10f,1.0f),0.0f,7);
-    }
-    const auto brass=rgb(.62f,.47f,.23f);
-    for(int side : {-1,1}) {
-        drawSphere(pv,side*(windowW*.5f-.10f),sillY+.075f,backZ+.225f,
-                   .018f,.018f,.010f,brass,4);
-    }
+    // Back, right, front and left perimeter sections form one continuous 360° city panorama.
+    drawPanoramaSegment(0.0f,windowY,backZ+0.035f,windowW,windowH,0.0f,0.00f,0.25f,rgb(1,1,1));
+    drawPanoramaSegment(halfW-0.035f,windowY,0.0f,2.0f*halfD-0.18f,windowH,-kPi*.5f,
+                        0.25f,0.50f,rgb(1,1,1));
+    const float frontPaneWidth=std::max(0.25f,halfW-0.70f);
+    const float frontPaneCenter=(halfW+0.70f)*.5f;
+    drawPanoramaSegment(frontPaneCenter,windowY,frontZ-0.035f,frontPaneWidth,windowH,kPi,
+                        0.50f,0.625f,rgb(1,1,1));
+    drawPanoramaSegment(-frontPaneCenter,windowY,frontZ-0.035f,frontPaneWidth,windowH,kPi,
+                        0.625f,0.75f,rgb(1,1,1));
+    drawPanoramaSegment(-halfW+0.035f,windowY,0.0f,2.0f*halfD-0.18f,windowH,kPi*.5f,
+                        0.75f,1.00f,rgb(1,1,1));
+
+    // A very light neutral glass pass supplies a restrained glazing sheen without obscuring
+    // the city view. The image remains visible through the window openings.
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    const auto glassTint=rgb(0.78f,0.88f,1.0f);
+    auto glass=glassTint;
+    glass[3]=0.045f;
+    drawPanoramaSegment(0.0f,windowY,backZ+0.028f,windowW,windowH,0.0f,0.00f,0.25f,glass);
+    drawPanoramaSegment(halfW-0.028f,windowY,0.0f,2.0f*halfD-0.16f,windowH,-kPi*.5f,
+                        0.25f,0.50f,glass);
+    drawPanoramaSegment(frontPaneCenter,windowY,frontZ-0.028f,frontPaneWidth,windowH,kPi,
+                        0.50f,0.625f,glass);
+    drawPanoramaSegment(-frontPaneCenter,windowY,frontZ-0.028f,frontPaneWidth,windowH,kPi,
+                        0.625f,0.75f,glass);
+    drawPanoramaSegment(-halfW+0.028f,windowY,0.0f,2.0f*halfD-0.16f,windowH,kPi*.5f,
+                        0.75f,1.00f,glass);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+
+    const auto frame=rgb(.018f,.025f,.045f);
+    const float t=0.045f;
+    // Minimal dark aluminium framing: clear glass dominates, no heavy center sash.
+    drawBox(pv,0.0f,windowY+windowH*.5f,backZ+0.012f,windowW,t,0.10f,frame);
+    drawBox(pv,0.0f,windowY-windowH*.5f,backZ+0.012f,windowW,t,0.10f,frame);
+    drawBox(pv,-windowW*.5f,windowY,backZ+0.012f,t,windowH,0.10f,frame);
+    drawBox(pv, windowW*.5f,windowY,backZ+0.012f,t,windowH,0.10f,frame);
+    // Fine corner posts keep the wraparound glazing structurally believable.
+    drawBox(pv,halfW-0.02f,windowY,backZ+0.012f,.055f,windowH,.10f,frame);
+    drawBox(pv,halfW-0.02f,windowY,frontZ-0.012f,.055f,windowH,.10f,frame);
+    drawBox(pv,-halfW+0.02f,windowY,backZ+0.012f,.055f,windowH,.10f,frame);
 }
 
 void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
@@ -1895,15 +1953,15 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
         return std::fabs(x-cx) < rx && std::fabs(z-cz) < rz;
     };
     // Simple non-physics collision boxes keep joystick movement from passing through furniture.
-    const float deskX=-halfW+1.48f, deskZ=-halfD+1.35f;
+    const float deskX=-halfW+1.48f, deskZ=-halfD+0.55f;
     const float couchX=halfW-2.15f, couchZ=.55f;
     const bool hitsDesk=overlaps(moveX_,moveZ_,deskX,deskZ,1.45f,.70f);
     const bool hitsChair=settings_.showChair && overlaps(moveX_,moveZ_,deskX-.25f,deskZ+1.20f,.55f,.55f);
     const bool hitsCouch=settings_.showCouch && overlaps(moveX_,moveZ_,couchX,couchZ,.65f,1.20f);
-    const float bedX=.05f, bedZ=-halfD+2.02f;
+    const float bedX=halfW-1.33f, bedZ=-halfD+1.60f;
     const bool hitsBed=overlaps(moveX_,moveZ_,bedX,bedZ,1.22f,1.55f);
     const bool hitsLeftNightstand=overlaps(moveX_,moveZ_,bedX-1.53f,bedZ-.94f,.34f,.34f);
-    const bool hitsRightNightstand=overlaps(moveX_,moveZ_,bedX+1.53f,bedZ-.94f,.34f,.34f);
+    const bool hitsRightNightstand=false;
     if (hitsDesk || hitsChair || hitsCouch || hitsBed || hitsLeftNightstand || hitsRightNightstand) {
         moveX_ = oldMoveX; moveZ_ = oldMoveZ;
     }
@@ -2148,7 +2206,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                    roomWindowWidth+curtainWidth*.9f,.065f,.12f,wood,0.0f,1);
 
     // A leafy floor plant and ceramic planter bring a natural material break to the back corner.
-    const float plantX=halfW-.62f, plantZ=backZ+.44f;
+    const float plantX=-halfW+.62f, plantZ=halfD-.62f;
     const auto potColor=rgb(.12f,.14f,.22f);
     const auto leafColor=rgb(.10f,.22f,.20f);
     drawCylinder(pv.data(),plantX,floorY+.24f,plantZ,.38f,.48f,potColor,5);
@@ -2179,8 +2237,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // separate pillows, tailored headboard, bedside storage and practical lamps.
     // Geometry stays inside the existing room bounds and is fully walkable around.
     // -------------------------------------------------------------------------
-    const float bedX=0.05f;
-    const float bedZ=backZ+2.02f;
+    const float bedX=halfW-1.33f;
+    const float bedZ=backZ+1.60f;
     const auto bedBase=rgb(.018f,.024f,.043f);
     const auto bedLinen=rgb(.11f,.125f,.19f);
     const auto duvet=rgb(.043f,.052f,.086f);
@@ -2237,6 +2295,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             accentViolet,0.0f,7);
     // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.
     for(int side : {-1,1}) {
+        if(side>0) continue;
         const float nx=bedX+side*1.53f, nz=bedZ-.94f;
         drawRoundedBox(pv.data(),nx,floorY+.405f,nz,.52f,.70f,.56f,bedBase,0.0f,5);
         drawRoundedBox(pv.data(),nx,floorY+.68f,nz,.56f,.055f,.60f,bedMetal,0.0f,4);
@@ -2256,10 +2315,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                    side<0?accentBlue:accentViolet,7);
     }
 
-    const float deskZ=-halfD+1.35f;
+    const float deskZ=-halfD+0.55f;
     // Soft contact shadows ground the desk, seating and chair without expensive shadow maps.
     const float shadowDeskX=-halfW+1.48f;
-    const float shadowDeskZ=-halfD+1.35f;
+    const float shadowDeskZ=-halfD+0.55f;
     const float shadowDeskWidth=std::min(2.65f,halfW*1.02f);
     drawGroundShadow(pv.data(),shadowDeskX,floorY+0.004f,shadowDeskZ+0.02f,shadowDeskWidth*.82f,1.10f,.42f);
     drawGroundShadow(pv.data(),halfW-1.25f,floorY+0.004f,.05f,1.55f,2.35f,.40f);
@@ -2650,45 +2709,37 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
 
     if(settings_.showTv) {
-        // Thin television and floating media cabinet are mounted to the right-hand feature wall.
-        const float tvX=halfW-.075f, tvY=floorY+2.02f, tvZ=.05f;
-        const float tvW=std::min(2.35f,halfD*.66f), tvH=tvW*9.0f/16.0f;
+        // Wall-mounted television is on the front wall, directly opposite and centered
+        // on the corner bed. Its back is flush to the wall and its screen faces the bed.
+        const float tvX=bedX, tvY=floorY+2.04f, tvZ=frontZ-.12f;
+        const float tvW=std::min(2.35f,halfW*.62f), tvH=tvW*9.0f/16.0f;
         const bool tvStream=settings_.screenDestination=="tv"||settings_.screenDestination=="both";
         const GLuint tvTex=(tvStream&&hasVideo)?videoTexture:env;
-        drawRoundedBox(pv.data(),tvX-.025f,tvY,tvZ,.105f,tvH+.16f,tvW+.16f,trimDark,0.0f,5);
-        drawBox(pv.data(),tvX-.078f,tvY,tvZ,.012f,tvH+.045f,tvW+.045f,silver);
-        drawPlane(pv.data(),tvX-.085f,tvY,tvZ,tvW,tvH,tvTex,rgb(1,1,1),-kPi*.5f);
-        drawBox(pv.data(),tvX-.094f,tvY-tvH*.5f-.075f,tvZ,.010f,.014f,.34f,accentBlue,0.0f,7);
+        drawGroundShadow(pv.data(),tvX,floorY+.004f,tvZ-.38f,2.10f,.72f,.25f);
+        drawRoundedBox(pv.data(),tvX,tvY,tvZ,tvW+.18f,tvH+.18f,.12f,trimDark,0.0f,5);
+        drawRoundedBox(pv.data(),tvX,tvY,tvZ-.064f,tvW+.045f,tvH+.045f,.012f,silver,0.0f,4);
+        drawPlane(pv.data(),tvX,tvY,tvZ-.073f,tvW,tvH,tvTex,rgb(1,1,1),kPi);
+        drawBox(pv.data(),tvX,tvY-tvH*.5f-.075f,tvZ-.080f,tvW*.34f,.010f,.006f,accentBlue,0.0f,7);
 
-        const float consoleX=tvX-.38f, consoleY=floorY+.39f;
-        drawGroundShadow(pv.data(),consoleX-.18f, floorY+.004f,tvZ,.82f,2.35f,.34f);
-        drawRoundedBox(pv.data(),consoleX,consoleY,tvZ,.58f,.62f,2.42f,trimDark,0.0f,5);
-        drawRoundedBox(pv.data(),consoleX-.292f,consoleY+.045f,tvZ,.018f,.43f,2.30f,
-                       rgb(.045f,.060f,.095f),0.0f,5);
-        // Three inset smoked-glass cabinet doors with narrow metal reveals and pulls.
+        // Low floating media console follows the same front-wall alignment as the TV.
+        const float consoleY=floorY+.42f, consoleZ=tvZ-.34f, consoleW=2.05f;
+        drawRoundedBox(pv.data(),tvX,consoleY,consoleZ,consoleW,.54f,.48f,trimDark,0.0f,5);
+        drawRoundedBox(pv.data(),tvX,consoleY+.255f,consoleZ,consoleW+.04f,.045f,.51f,silver,0.0f,4);
         for(int bay=0;bay<3;++bay) {
-            const float z=tvZ+(bay-1)*.73f;
-            drawRoundedBox(pv.data(),consoleX-.306f,consoleY+.055f,z,.012f,.38f,.68f,
-                           rgb(.055f,.070f,.115f),0.0f,5);
-            drawBox(pv.data(),consoleX-.315f,consoleY+.065f,z,.006f,.006f,.42f,silver);
-            drawBox(pv.data(),consoleX-.317f,consoleY+.065f,z,.004f,.004f,.30f,
+            const float panelX=tvX+(bay-1)*.66f;
+            drawRoundedBox(pv.data(),panelX,consoleY+.015f,consoleZ-.245f,.59f,.37f,.018f,
+                           rgb(.045f,.060f,.095f),0.0f,5);
+            drawBox(pv.data(),panelX,consoleY+.06f,consoleZ-.258f,.10f,.008f,.006f,
                     bay==1?accentViolet:accentBlue,0.0f,7);
         }
-        drawRoundedBox(pv.data(),consoleX-.30f,floorY+.075f,tvZ,.025f,.075f,2.28f,silver,0.0f,4);
-        drawBox(pv.data(),consoleX-.315f,floorY+.72f,tvZ,.018f,.016f,1.95f,accentBlue,0.0f,7);
-
-        // A vertical console, controller dock and discreet status lights sit on the cabinet.
-        const float consoleDeviceZ=tvZ+.88f;
-        drawRoundedBox(pv.data(),consoleX-.34f,floorY+.88f,consoleDeviceZ,.19f,.78f,.34f,
-                       rgb(.74f,.78f,.86f),0.0f,5);
-        drawBox(pv.data(),consoleX-.445f,floorY+.88f,consoleDeviceZ,.008f,.66f,.27f,
-                rgb(.88f,.91f,.96f));
-        drawBox(pv.data(),consoleX-.451f,floorY+.88f,consoleDeviceZ-.04f,.004f,.54f,.008f,
-                rgb(.20f,.24f,.32f));
-        drawSphere(pv.data(),consoleX-.456f,floorY+.57f,consoleDeviceZ+.11f,.010f,.010f,.010f,accentBlue,7);
-        drawRoundedBox(pv.data(),consoleX-.34f,floorY+.73f,tvZ-.73f,.24f,.09f,.18f,
-                       rgb(.09f,.12f,.18f),0.0f,5);
-        drawSphere(pv.data(),consoleX-.44f,floorY+.77f,tvZ-.73f,.018f,.018f,.018f,neonCyan,7);
+        drawBox(pv.data(),tvX, floorY+.135f,consoleZ-.10f,consoleW*.88f,.012f,.012f,accentBlue,0.0f,7);
+        // Compact vertical console and controller dock rest on the cabinet's right end.
+        drawRoundedBox(pv.data(),tvX+consoleW*.40f,floorY+.82f,consoleZ-.04f,
+                       .18f,.70f,.31f,rgb(.74f,.78f,.86f),0.0f,5);
+        drawBox(pv.data(),tvX+consoleW*.40f,floorY+.82f,consoleZ-.205f,
+                .008f,.58f,.008f,rgb(.20f,.24f,.32f));
+        drawSphere(pv.data(),tvX+consoleW*.40f,floorY+.55f,consoleZ-.215f,
+                   .010f,.010f,.010f,accentBlue,7);
     }
 
     // Tailored sofa: a rigid upholstered frame carries separate domed seat and back cushions.
