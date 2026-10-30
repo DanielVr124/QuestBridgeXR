@@ -1902,6 +1902,61 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawBox(pv.data(), (halfW+0.7f)*0.5f,(floorY+ceilingY)*0.5f,frontZ+0.02f,
             sidePanelWidth,ceilingY-floorY,0.10f,wall,0.0f,2);
     drawBox(pv.data(),0,ceilingY-1.05f,frontZ+0.02f,1.4f,2.1f,0.10f,wall,0.0f,2);
+
+    // Finished entry opening: a real casing, timber leaf, inset panels, threshold and metal hardware.
+    const float doorWidth=1.28f,doorHeight=2.24f,doorYaw=-0.70f;
+    const float doorHingeX=.66f;
+    const float doorX=doorHingeX-std::cos(doorYaw)*doorWidth*.5f;
+    const float doorZ=frontZ-std::sin(-doorYaw)*doorWidth*.5f;
+    const float doorY=floorY+doorHeight*.5f;
+    const float casingZ=frontZ+.085f;
+    const auto casingWood=rgb(wood[0]*1.18f,wood[1]*1.13f,wood[2]*1.08f);
+    for(int side : {-1,1}) {
+        drawRoundedBox(pv.data(),side*.765f,floorY+1.16f,casingZ,
+                       .115f,2.42f,.15f,casingWood,0.0f,1);
+        drawRoundedBox(pv.data(),side*.695f,floorY+1.14f,frontZ-.020f,
+                       .055f,2.30f,.11f,wallTrim);
+    }
+    drawRoundedBox(pv.data(),0,floorY+2.365f,casingZ,1.62f,.14f,.15f,casingWood,0.0f,1);
+    drawRoundedBox(pv.data(),0,floorY+.035f,frontZ-.045f,1.48f,.07f,.24f,
+                   rgb(.34f,.28f,.22f),0.0f,1);
+    // The leaf is deliberately ajar, so the opening still reads as a doorway rather than a blocked wall.
+    drawRoundedBox(pv.data(),doorX,doorY,doorZ,doorWidth,doorHeight,.078f,wood,doorYaw,1);
+    auto doorFacePoint=[&](float localX,float localY,float localZ) {
+        return std::array<float,3>{
+            doorX+std::cos(doorYaw)*localX+std::sin(doorYaw)*localZ,
+            localY,
+            doorZ-std::sin(doorYaw)*localX+std::cos(doorYaw)*localZ
+        };
+    };
+    // Raised stiles and rails create two deep, framed timber panels on the interior face.
+    const auto doorInset=rgb(wood[0]*.58f,wood[1]*.58f,wood[2]*.58f);
+    for(int panel=0;panel<2;++panel) {
+        const float panelY=floorY+(panel==0?1.68f:.61f);
+        const auto p=doorFacePoint(0.0f,panelY,-.050f);
+        drawRoundedBox(pv.data(),p[0],p[1],p[2],.80f,.76f,.018f,doorInset,doorYaw,1);
+        for(int edge : {-1,1}) {
+            const auto rail=doorFacePoint(edge*.455f,panelY,-.066f);
+            drawRoundedBox(pv.data(),rail[0],rail[1],rail[2],.045f,.88f,.020f,casingWood,doorYaw,1);
+        }
+        for(int edge : {-1,1}) {
+            const auto rail=doorFacePoint(0.0f,panelY+edge*.415f,-.066f);
+            drawRoundedBox(pv.data(),rail[0],rail[1],rail[2],.88f,.045f,.020f,casingWood,doorYaw,1);
+        }
+    }
+    // Three brass hinges and a backplate/lever set on the latch stile.
+    const auto brass=rgb(.62f,.47f,.23f);
+    for(int hinge=0;hinge<3;++hinge) {
+        const float hy=floorY+.36f+hinge*.75f;
+        const auto hp=doorFacePoint(.595f,hy,-.006f);
+        drawRoundedBox(pv.data(),hp[0],hp[1],hp[2],.075f,.17f,.025f,brass,doorYaw,4);
+        drawCylinder(pv.data(),hp[0],hp[1],hp[2]-.012f,.018f,.18f,brass,4);
+    }
+    const auto plate=doorFacePoint(-.48f,floorY+1.12f,-.067f);
+    drawRoundedBox(pv.data(),plate[0],plate[1],plate[2],.085f,.18f,.018f,brass,doorYaw,4);
+    const auto knob=doorFacePoint(-.48f,floorY+1.12f,-.105f);
+    drawSphere(pv.data(),knob[0],knob[1],knob[2],.045f,.045f,.045f,brass,4);
+
     const float roomWindowWidth=std::min(halfW*1.35f,settings_.roomSize=="small"?3.4f:6.2f);
     const float roomWindowHeight=activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f;
     drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,roomWindowWidth,roomWindowHeight);
