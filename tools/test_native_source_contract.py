@@ -111,7 +111,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("Individual floorboard seams", renderer)
         self.assertIn("Finished desk apron", renderer)
         self.assertIn("Tailored sofa: a rigid upholstered frame carries separate domed seat and back cushions", renderer)
-        self.assertIn("Padded arm caps", renderer)
+        self.assertIn("Padded armrests sit on swept metal supports", renderer)
         self.assertIn("Parametric upholstery mesh", renderer)
         self.assertIn("void RoomRenderer::drawPillow", renderer)
         self.assertIn("drawPillow(pv.data(),cx-.10f", renderer)
