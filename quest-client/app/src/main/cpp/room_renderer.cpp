@@ -1848,7 +1848,7 @@ void RoomRenderer::drawText(const float* pv, const char* text, float x, float y,
     }
     if (vertices.empty()) return;
     if (activeEnvironmentIndex_ == 29 && penthouseVao_ != 0 &&
-        settings_.showTv && settings_.showCouch && settings_.showChair) {
+        settings_.roomSize == "medium" && settings_.showTv && settings_.showCouch && settings_.showChair) {
         // The imported workstation display faces +X; rotate menu glyphs onto that plane.
         for (auto& vertex : vertices) {
             const float localX = vertex.x;
@@ -2203,7 +2203,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Use the Blender-authored mesh for the base penthouse when all model visibility
     // toggles are in their default state. Preserve the procedural fallback for variants.
     skipProceduralDraws_ = activeEnvironmentIndex_ == 29 && penthouseVao_ != 0 &&
-                           settings_.showTv && settings_.showCouch && settings_.showChair;
+                           settings_.roomSize == "medium" && settings_.showTv && settings_.showCouch && settings_.showChair;
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
     // Deep polished stone replaces the old matte plank floor and picks up colored light.
     drawBox(pv.data(),0,floorY-0.08f,0,halfW*2+0.1f,0.16f,halfD*2+0.1f,floor,0.0f,8);
@@ -2960,7 +2960,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Monitor-anchored menu: world coordinates place it on the virtual display, not in the user's face.
     if (menuVisible_) {
         const bool importedPenthouse = activeEnvironmentIndex_ == 29 && penthouseVao_ != 0 &&
-                                        settings_.showTv && settings_.showCouch && settings_.showChair;
+                                        settings_.roomSize == "medium" && settings_.showTv && settings_.showCouch && settings_.showChair;
         const float deskZ = -halfD + 1.35f;
         const float deskX = halfW - 1.48f;
         const float monitorX = importedPenthouse ? 0.0f : deskX - 0.36f;
