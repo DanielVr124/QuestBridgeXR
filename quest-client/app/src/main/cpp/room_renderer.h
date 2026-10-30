@@ -14,7 +14,7 @@ struct RoomSettings {
     std::string screenDestination = "monitor"; // monitor | tv | both
     int monitorCount = 1;                       // 1..3, replicated stream
     bool showTv = true;
-    bool showCouch = true;
+    bool showCouch = false; // Legacy config field; the bedroom renderer no longer draws a couch.
     bool showChair = true;
     bool roomControlsEnabled = true;
     bool sittingToggleEnabled = true;
