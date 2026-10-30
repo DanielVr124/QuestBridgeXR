@@ -14,6 +14,7 @@ add_library(qbxquest SHARED
     main.cpp
     video_decoder.cpp
     room_renderer.cpp
+    glb_model.cpp
     "${NATIVE_APP_GLUE}"
 )
 
