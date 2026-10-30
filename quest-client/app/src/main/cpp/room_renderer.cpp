@@ -600,17 +600,45 @@ namespace {
 bool readRoomAssetPayload(AAssetManager* assets,const char* filename,std::vector<uint8_t>& output) {
     output.clear();
     if(!assets||!filename) return false;
-    AAsset* asset=AAssetManager_open(assets,filename,AASSET_MODE_BUFFER);
-    if(!asset) { LOGW("room asset missing: %s",filename); return false; }
-    const int64_t length=AAsset_getLength(asset);
-    if(length<=0||length>64LL*1024LL*1024LL) { AAsset_close(asset); LOGW("invalid room asset size: %s",filename); return false; }
-    std::vector<uint8_t> input(static_cast<size_t>(length));
-    const int64_t read=AAsset_read(asset,input.data(),static_cast<size_t>(length));
-    AAsset_close(asset);
-    if(read!=length) { LOGW("short room asset read: %s",filename); return false; }
-
     const size_t nameLength=std::strlen(filename);
-    const bool isBase64=nameLength>=4&&std::strcmp(filename+nameLength-4,".b64")==0;
+    const bool isParts=nameLength>=6&&std::strcmp(filename+nameLength-6,".parts")==0;
+    const bool isBase64=isParts||(nameLength>=4&&std::strcmp(filename+nameLength-4,".b64")==0);
+    std::vector<uint8_t> input;
+    if(isParts) {
+        const std::string base(filename,nameLength-6);
+        for(int part=0;part<64;++part) {
+            char suffix[16]{};
+            std::snprintf(suffix,sizeof(suffix),".part%02d",part);
+            const std::string partName=base+suffix;
+            AAsset* asset=AAssetManager_open(assets,partName.c_str(),AASSET_MODE_BUFFER);
+            if(!asset) {
+                if(part==0) { LOGW("room asset parts missing: %s",filename); return false; }
+                break;
+            }
+            const int64_t length=AAsset_getLength(asset);
+            if(length<=0||length>20000||input.size()+static_cast<size_t>(length)>64u*1024u*1024u) {
+                AAsset_close(asset);
+                LOGW("invalid room asset part: %s",partName.c_str());
+                return false;
+            }
+            const size_t offset=input.size();
+            input.resize(offset+static_cast<size_t>(length));
+            const int64_t read=AAsset_read(asset,input.data()+offset,static_cast<size_t>(length));
+            AAsset_close(asset);
+            if(read!=length) { LOGW("short room asset part: %s",partName.c_str()); return false; }
+        }
+        if(input.empty()) return false;
+    } else {
+        AAsset* asset=AAssetManager_open(assets,filename,AASSET_MODE_BUFFER);
+        if(!asset) { LOGW("room asset missing: %s",filename); return false; }
+        const int64_t length=AAsset_getLength(asset);
+        if(length<=0||length>64LL*1024LL*1024LL) { AAsset_close(asset); LOGW("invalid room asset size: %s",filename); return false; }
+        input.resize(static_cast<size_t>(length));
+        const int64_t read=AAsset_read(asset,input.data(),static_cast<size_t>(length));
+        AAsset_close(asset);
+        if(read!=length) { LOGW("short room asset read: %s",filename); return false; }
+    }
+
     if(isBase64) {
         std::vector<uint8_t> decoded;
         decoded.reserve(input.size()*3u/4u);
@@ -638,7 +666,6 @@ bool readRoomAssetPayload(AAssetManager* assets,const char* filename,std::vector
         }
         input.swap(decoded);
     }
-
     if(input.size()>=8&&std::memcmp(input.data(),"QZB1",4)==0) {
         uint32_t expected=0;
         std::memcpy(&expected,input.data()+4,sizeof(expected));
@@ -655,7 +682,6 @@ bool readRoomAssetPayload(AAssetManager* assets,const char* filename,std::vector
     }
     output.swap(input);
     return true;
-}
 }
 
 GLuint RoomRenderer::loadRgbAsset(AAssetManager* assets,const char* filename) {
@@ -1378,9 +1404,9 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     roughnessAtlasTexture_=loadRgbAsset(assets,"materials/room_roughness_atlas.rgb");
     deskSurfaceTexture_=loadRgbAsset(assets,"models/arc_desk_texture.rgb.b64");
     environmentTextures_[29]=loadRgbAsset(assets,"environments/golden_city_360.rgb.b64");
-    if(!loadModelAsset(assets,"models/arc_gaming_desk.qbm.b64",deskModel_))
+    if(!loadModelAsset(assets,"models/arc_gaming_desk.qbm.parts",deskModel_))
         LOGW("Claude desk model failed to load; desk geometry will be unavailable.");
-    if(!loadModelAsset(assets,"models/arc27_curved_monitor.qbm.b64",monitorModel_))
+    if(!loadModelAsset(assets,"models/arc27_curved_monitor.qbm.parts",monitorModel_))
         LOGW("Claude ARC27 monitor failed to load; monitor geometry will be unavailable.");
     if(roughnessAtlasTexture_) {
         glBindTexture(GL_TEXTURE_2D,roughnessAtlasTexture_);
