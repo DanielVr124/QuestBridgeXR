@@ -1828,6 +1828,16 @@ void RoomRenderer::drawText(const float* pv, const char* text, float x, float y,
         }
     }
     if (vertices.empty()) return;
+    if (activeEnvironmentIndex_ == 29 && penthouseVao_ != 0 &&
+        settings_.showTv && settings_.showCouch && settings_.showChair) {
+        // The imported workstation display faces +X; rotate menu glyphs onto that plane.
+        for (auto& vertex : vertices) {
+            const float localX = vertex.x;
+            const float localZ = vertex.z;
+            vertex.x = -3.82f + localZ;
+            vertex.z = 0.42f - localX;
+        }
+    }
     if (!textVao_) {
         glGenVertexArrays(1, &textVao_);
         glGenBuffers(1, &textVbo_);
@@ -2930,12 +2940,25 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     }
     // Monitor-anchored menu: world coordinates place it on the virtual display, not in the user's face.
     if (menuVisible_) {
+        const bool importedPenthouse = activeEnvironmentIndex_ == 29 && penthouseVao_ != 0 &&
+                                        settings_.showTv && settings_.showCouch && settings_.showChair;
         const float deskZ = -halfD + 1.35f;
         const float deskX = halfW - 1.48f;
-        const float monitorX = deskX - 0.36f;
-        const float monitorY = floorY + 1.43f;
-        const float monitorZ = deskZ - 0.34f;
-        const float menuZ = monitorZ + 0.132f;
+        const float monitorX = importedPenthouse ? 0.0f : deskX - 0.36f;
+        const float monitorY = importedPenthouse ? floorY + 1.73f : floorY + 1.43f;
+        const float monitorZ = importedPenthouse ? 0.0f : deskZ - 0.34f;
+        const float menuZ = importedPenthouse ? 0.0f : monitorZ + 0.132f;
+        const auto menuBox = [&](float localX, float y, float localZ,
+                                 float sx, float sy, float sz, const std::array<float,4>& color) {
+            if (importedPenthouse) {
+                // Map the menu's local screen plane onto the monitor facing inward (+X).
+                drawBox(pv.data(), -3.82f + localZ, y, 0.42f - localX,
+                        sx, sy, sz, color, kPi * 0.5f, 0);
+            } else {
+                drawBox(pv.data(), monitorX + localX, y, menuZ + localZ,
+                        sx, sy, sz, color);
+            }
+        };
         const auto panel = rgb(0.025f, 0.032f, 0.065f, 0.98f);
         const auto row = rgb(0.075f, 0.090f, 0.145f, 0.98f);
         const auto selected = rgb(0.10f, 0.22f, 0.39f, 1.0f);
@@ -2945,18 +2968,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         glDisable(GL_DEPTH_TEST);
         glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(program_);
-        drawBox(pv.data(), monitorX, monitorY, menuZ, 1.02f, 0.60f, 0.008f, panel);
-        drawBox(pv.data(), monitorX, monitorY + 0.278f, menuZ + 0.006f, 0.96f, 0.012f, 0.006f, blue);
-        drawBox(pv.data(), monitorX - 0.43f, monitorY + 0.225f, menuZ + 0.008f, 0.035f, 0.035f, 0.006f, violet);
+        menuBox(0.0f, monitorY, 0.0f, 1.02f, 0.60f, 0.008f, panel);
+        menuBox(0.0f, monitorY + 0.278f, 0.006f, 0.96f, 0.012f, 0.006f, blue);
+        menuBox(-0.43f, monitorY + 0.225f, 0.008f, 0.035f, 0.035f, 0.006f, violet);
         drawText(pv.data(), "QUESTBRIDGE", monitorX - 0.37f, monitorY + 0.218f, menuZ + 0.012f, 0.0060f, text);
         drawText(pv.data(), kEnvironmentNames[activeEnvironmentIndex_], monitorX + 0.08f, monitorY + 0.218f,
                  menuZ + 0.012f, 0.0035f, blue);
         const char* labels[5] = {"ENVIRONMENT", "DISPLAY MODE", "TV VISIBILITY", "COUCH VISIBILITY", "CLOSE MENU"};
         for (int i = 0; i < 5; ++i) {
             const float y = monitorY + 0.135f - static_cast<float>(i) * 0.091f;
-            drawBox(pv.data(), monitorX, y - 0.015f, menuZ + 0.006f, 0.94f, 0.073f, 0.006f,
+            menuBox(0.0f, y - 0.015f, 0.006f, 0.94f, 0.073f, 0.006f,
                     i == menuSelection_ ? selected : row);
-            drawBox(pv.data(), monitorX - 0.415f, y - 0.015f, menuZ + 0.008f, 0.018f, 0.043f, 0.004f,
+            menuBox(-0.415f, y - 0.015f, 0.008f, 0.018f, 0.043f, 0.004f,
                     i == menuSelection_ ? blue : violet);
             drawText(pv.data(), labels[i], monitorX - 0.37f, y + 0.015f, menuZ + 0.012f, 0.0052f, text);
             if (i == 0) drawText(pv.data(), "NEXT", monitorX + 0.24f, y + 0.015f, menuZ + 0.012f, 0.0043f, blue);
