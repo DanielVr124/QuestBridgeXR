@@ -157,7 +157,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("const float menuZ = monitorZ + 0.132f", renderer)
         self.assertIn("void RoomRenderer::handleMenuInput", renderer)
         self.assertIn("drawText(pv.data(), labels[i]", renderer)
-        self.assertIn("BEDROOM TV centered beyond the foot of the bed", renderer)
+        self.assertIn("Bedroom TV centered beyond the foot of the bed", renderer)
         self.assertIn("const float cabinetZ=tvZ+.27f", renderer)
         self.assertIn("DESK CHAIR", renderer)
         self.assertIn("kEnvironmentNames[activeEnvironmentIndex_]", renderer)
