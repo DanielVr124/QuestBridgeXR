@@ -435,8 +435,8 @@ cam_desk=camera("02 | Gaming studio detail",(-.75,2.95,1.75),(-3.12,.35,1.55),34
 cam_lounge=camera("03 | Lounge and bedroom",(2.55,4.65,1.75),(1.65,-1.05,1.75),30)
 
 scene=bpy.context.scene
-scene.render.engine='CYCLES'; scene.cycles.samples=48; scene.cycles.use_denoising=True; scene.cycles.preview_samples=16
-scene.render.resolution_x=1920; scene.render.resolution_y=1200; scene.render.resolution_percentage=100
+scene.render.engine='CYCLES'; scene.cycles.samples=32; scene.cycles.use_denoising=True; scene.cycles.use_adaptive_sampling=True; scene.cycles.adaptive_threshold=0.02; scene.cycles.max_bounces=6; scene.cycles.preview_samples=16
+scene.render.resolution_x=1600; scene.render.resolution_y=1000; scene.render.resolution_percentage=100
 scene.render.image_settings.file_format='PNG'; scene.render.image_settings.color_mode='RGBA'; scene.render.image_settings.color_depth='8'
 scene.view_settings.view_transform='AgX'; scene.view_settings.look='AgX - Medium High Contrast'
 scene.view_settings.exposure=.35; scene.view_settings.gamma=1.
