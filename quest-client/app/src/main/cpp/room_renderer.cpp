@@ -2923,7 +2923,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         }
         if (settings_.showTv && hasVideo &&
             (settings_.screenDestination == "tv" || settings_.screenDestination == "both")) {
-            const float tvX = 3.805f;
+            const float tvX = 3.785f;
             const float tvY = floorY + 2.08f;
             const float tvZ = -0.12f;
             const float tvW = 2.25f, tvH = tvW * 9.0f / 16.0f;
