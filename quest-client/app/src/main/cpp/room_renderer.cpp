@@ -461,6 +461,10 @@ void main(){
       float vein=smoothstep(0.69,0.83,fbm(uv*vec2(3.8,8.2)+vec2(4.7,1.3)));
       surface += (cloud-0.48)*0.035 + (fine-0.5)*0.012 - vein*0.045;
     }
+  } else if(uMaterial==9) {
+    // Tinted architectural glazing is composited after opaque geometry by the mesh renderer.
+    roughness=0.10;
+    metallic=0.62;
   } else if(uHasMaterialAtlas==0) {
     surface += (noise2(uv*140.0)-0.5)*0.025;
   }
@@ -527,7 +531,7 @@ void main(){
   float ambientOcclusion=0.90+max(normal.y,0.0)*0.10;
   vec3 ambient=base.rgb*(0.15+max(normal.y,0.0)*0.035)*ambientOcclusion;
   vec3 lit=ambient+directional+ceiling+practical+blueBounce+violetBounce+pinkBounce;
-  outColor=vec4(max(lit,vec3(0.0)),base.a);
+  outColor=vec4(max(lit,vec3(0.0)),uMaterial==9?0.16:base.a);
 }
 )GLSL";
 
@@ -711,11 +715,25 @@ void RoomRenderer::drawPenthouseMesh(const float* projectionView, float floorY) 
     glUniform1i(locRounded_, 0);
     glUniform2f(locUvScale_, 1.0f, 1.0f);
     glBindVertexArray(penthouseVao_);
+    // Render all opaque room and skyline surfaces first.
     for (const auto& batch : penthouseBatches_) {
+        if (batch.material == 9) continue;
         glUniform4fv(locColor_, 1, batch.color.data());
         glUniform1i(locMaterial_, batch.material);
         glDrawArrays(GL_TRIANGLES, batch.first, batch.count);
     }
+    // Then softly tint the panoramic panes without occluding the city behind them.
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    for (const auto& batch : penthouseBatches_) {
+        if (batch.material != 9) continue;
+        glUniform4fv(locColor_, 1, batch.color.data());
+        glUniform1i(locMaterial_, batch.material);
+        glDrawArrays(GL_TRIANGLES, batch.first, batch.count);
+    }
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
     glBindVertexArray(0);
 }
 
