@@ -480,7 +480,9 @@ for ob in list(SCENE_COL.objects):
         for li in (tri.loops[0],tri.loops[2],tri.loops[1]):
             loop=mesh.loops[li]; v=ev.matrix_world @ mesh.vertices[loop.vertex_index].co
             uv=uv_layer[li].uv if uv_layer else (0.,0.)
-            batch.extend((float(v.x),float(v.z),float(v.y),float(uv.x),float(uv.y)))
+            # Blender UV values may be Vector-like or plain tuples (notably the no-UV fallback).
+            # Indexing supports both representations and avoids tuple.x/tuple.y failures.
+            batch.extend((float(v.x),float(v.z),float(v.y),float(uv[0]),float(uv[1])))
     ev.to_mesh_clear()
 
 batches=[]; total=0
