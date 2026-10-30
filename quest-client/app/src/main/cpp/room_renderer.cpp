@@ -1907,14 +1907,14 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floor
     const auto glassTint=rgb(0.78f,0.88f,1.0f);
     auto glass=glassTint;
     glass[3]=0.045f;
-    drawPanoramaSegment(0.0f,windowY,backZ+0.028f,windowW,windowH,0.0f,0.00f,0.25f,glass);
-    drawPanoramaSegment(halfW-0.028f,windowY,0.0f,2.0f*halfD-0.16f,windowH,-kPi*.5f,
+    drawPanoramaSegment(0.0f,windowY,backZ+0.042f,windowW,windowH,0.0f,0.00f,0.25f,glass);
+    drawPanoramaSegment(halfW-0.042f,windowY,0.0f,2.0f*halfD-0.16f,windowH,-kPi*.5f,
                         0.25f,0.50f,glass);
-    drawPanoramaSegment(frontPaneCenter,windowY,frontZ-0.028f,frontPaneWidth,windowH,kPi,
+    drawPanoramaSegment(frontPaneCenter,windowY,frontZ-0.042f,frontPaneWidth,windowH,kPi,
                         0.50f,0.625f,glass);
     drawPanoramaSegment(-frontPaneCenter,windowY,frontZ-0.028f,frontPaneWidth,windowH,kPi,
                         0.625f,0.75f,glass);
-    drawPanoramaSegment(-halfW+0.028f,windowY,0.0f,2.0f*halfD-0.16f,windowH,kPi*.5f,
+    drawPanoramaSegment(-halfW+0.042f,windowY,0.0f,2.0f*halfD-0.16f,windowH,kPi*.5f,
                         0.75f,1.00f,glass);
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
@@ -2662,7 +2662,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawBox(pv.data(),pcX-.12f+vent*.06f,pcY+.337f,pcZ,.035f,.006f,.24f,pcEdge);
     drawSphere(pv.data(),pcX+.13f,pcY+.337f,pcZ+.18f,.018f,.012f,.018f,accentBlue);
 
-    // TV on the right wall, facing into the room; the couch across from it faces the TV.
+    // Remaining living-area detailing stays independent of the new bed/TV wall alignment.
     // Layered living-area rug with a woven pile, stitched perimeter and inset geometric border.
     const float rugX=.40f, rugZ=.12f;
     drawRoundedBox(pv.data(),rugX,floorY+.024f,rugZ,4.00f,.045f,3.72f,
