@@ -185,7 +185,7 @@ jobs:
 
   publish-release:
     name: Publish downloadable GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/blender-penthouse-base'
     needs: [combined-package]
     runs-on: ubuntu-22.04
     permissions:
@@ -200,11 +200,11 @@ jobs:
       - name: Publish assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.ref == 'refs/heads/main' && 'QuestBridge XR Nightly' || format('QuestBridge XR {0}', github.ref_name) }}
-          tag_name: ${{ github.ref == 'refs/heads/main' && 'nightly' || github.ref_name }}
-          target_commitish: main
-          prerelease: ${{ github.ref == 'refs/heads/main' }}
-          make_latest: ${{ github.ref != 'refs/heads/main' }}
+          name: ${{ github.ref == 'refs/heads/main' && 'QuestBridge XR Nightly' || github.ref == 'refs/heads/feature/blender-penthouse-base' && format('QuestBridge XR Development Build {0}', github.run_number) || format('QuestBridge XR {0}', github.ref_name) }}
+          tag_name: ${{ github.ref == 'refs/heads/main' && 'nightly' || github.ref == 'refs/heads/feature/blender-penthouse-base' && format('feature-build-{0}', github.run_number) || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ github.ref_type == 'branch' }}
+          make_latest: ${{ github.ref_type == 'tag' }}
           generate_release_notes: true
           files: |
             release-assets/*.zip
