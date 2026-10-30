@@ -157,7 +157,7 @@ ClientConfig loadConfig(android_app* app) {
             << "max_frame_mib=16\n"
             << "incomplete_frame_timeout_ms=120\n"
             << "quest_receive_buffer_kib=4096\n"
-            << "environment=blossom\n"
+            << "environment=skyline_penthouse\n"
             << "room_size=medium\n"
             << "screen_destination=monitor\n"
             << "monitor_count=1\n"
