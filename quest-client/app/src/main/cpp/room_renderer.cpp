@@ -296,7 +296,12 @@ layout(location=0) in vec3 aPosition;
 layout(location=1) in vec2 aUv;
 uniform mat4 uMvp;
 out vec2 vUv;
-void main(){ gl_Position = uMvp * vec4(aPosition,1.0); vUv=aUv; }
+out vec3 vSurfacePosition;
+void main(){
+  gl_Position = uMvp * vec4(aPosition,1.0);
+  vUv=aUv;
+  vSurfacePosition=aPosition;
+}
 )GLSL";
 const char* kVignetteVertex = R"GLSL(#version 300 es
 precision highp float;
@@ -314,13 +319,42 @@ void main(){ vec2 p=(vUv-vec2(0.5))*vec2(1.5,1.0); float a=smoothstep(0.22,0.82,
 const char* kFragmentShader = R"GLSL(#version 300 es
 precision highp float;
 in vec2 vUv;
+in vec3 vSurfacePosition;
 uniform vec4 uColor;
 uniform sampler2D uTexture;
 uniform int uTextured;
 out vec4 outColor;
+
+float hash21(vec2 p) {
+  p=fract(p*vec2(123.34,456.21));
+  p+=dot(p,p+45.32);
+  return fract(p.x*p.y);
+}
 void main(){
   vec4 tex = uTextured != 0 ? texture(uTexture, vUv) : vec4(1.0);
-  outColor = tex * uColor;
+  vec4 base = tex * uColor;
+  if (uTextured == 0) {
+    // Derivative normals add per-fragment form shading without changing
+    // the established procedural mesh layouts or OpenXR view transforms.
+    vec3 dpdx=dFdx(vSurfacePosition);
+    vec3 dpdy=dFdy(vSurfacePosition);
+    vec3 normal=normalize(cross(dpdx,dpdy));
+    if (!gl_FrontFacing) normal=-normal;
+    vec3 lightDir=normalize(vec3(-0.42,0.78,0.46));
+    float diffuse=max(dot(normal,lightDir),0.0);
+    vec3 viewDir=normalize(vec3(0.0,0.15,1.0));
+    vec3 halfDir=normalize(lightDir+viewDir);
+    float facing=max(dot(normal,halfDir),0.0);
+    float specular=pow(facing,28.0);
+    float broadSpec=pow(facing,7.0);
+    float grain=hash21(floor(vSurfacePosition.xy*185.0))*0.035-0.0175;
+    float weave=sin(vUv.x*620.0)*sin(vUv.y*620.0)*0.006;
+    float lighting=0.48+diffuse*0.48;
+    vec3 lit=base.rgb*(lighting+grain+weave)+vec3(0.16,0.19,0.23)*(specular*0.20+broadSpec*0.035);
+    outColor=vec4(max(lit,vec3(0.0)),base.a);
+  } else {
+    outColor=base;
+  }
 }
 )GLSL";
 
