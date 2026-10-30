@@ -8,7 +8,7 @@
 #include <openxr/openxr.h>
 
 struct RoomSettings {
-    std::string environment = "blossom";       // 208 scenes; see Studio Virtual Room settings
+    std::string environment = "skyline_penthouse";       // 208 scenes; see Studio Virtual Room settings
     std::string roomSize = "medium";           // small | medium | large
     std::string screenDestination = "monitor"; // monitor | tv | both
     int monitorCount = 1;                       // 1..3, replicated stream

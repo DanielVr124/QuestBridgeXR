@@ -294,7 +294,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "quest_receive_buffer_kib": 4096,
     },
     "room": {
-        "environment": "blossom",
+        "environment": "skyline_penthouse",
         "room_size": "medium",
         "screen_destination": "monitor",
         "monitor_count": 1,
