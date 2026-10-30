@@ -70,6 +70,8 @@ private:
     void drawCurvedPanel(const float* projectionView, float x, float y, float z,
                          float width, float height, float curveDepth, GLuint texture,
                          const std::array<float, 4>& color, int segments = 24);
+    void drawGroundShadow(const float* projectionView, float x, float y, float z,
+                          float width, float depth, float opacity);
     void drawEnvironmentWindow(const float* projectionView, float halfW, float floorY, float backZ,
                                GLuint environmentTexture, float windowW, float windowH);
 
@@ -93,11 +95,18 @@ private:
     GLint locModel_ = -1;
     GLint locRounded_ = -1;
     GLint locBevel_ = -1;
+    GLint locCeilingLightPosition_ = -1;
+    GLint locCeilingLightColor_ = -1;
+    GLint locCeilingLightIntensity_ = -1;
+    GLint locPracticalLightPosition_ = -1;
+    GLint locPracticalLightColor_ = -1;
+    GLint locPracticalLightIntensity_ = -1;
     GLuint cubeTexture_ = 0;
     GLuint planeTexture_ = 0;
     std::array<GLuint, 208> environmentTextures_{};
     int activeEnvironmentIndex_ = 0;
     GLuint videoFallbackTexture_ = 0;
+    GLuint groundShadowTexture_ = 0;
     GLuint textVao_ = 0;
     GLuint textVbo_ = 0;
     GLuint curvedVao_ = 0;

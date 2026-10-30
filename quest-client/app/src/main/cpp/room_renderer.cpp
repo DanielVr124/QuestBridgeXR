@@ -338,6 +338,12 @@ uniform sampler2D uTexture;
 uniform int uTextured;
 uniform int uMaterial;
 uniform vec2 uUvScale;
+uniform vec3 uCeilingLightPosition;
+uniform vec3 uCeilingLightColor;
+uniform float uCeilingLightIntensity;
+uniform vec3 uPracticalLightPosition;
+uniform vec3 uPracticalLightColor;
+uniform float uPracticalLightIntensity;
 out vec4 outColor;
 
 float hash21(vec2 p) {
@@ -412,10 +418,21 @@ void main(){
   float diffuse=max(dot(normal,lightDir),0.0);
   float nDotH=max(dot(normal,halfDir),0.0);
   float specular=pow(nDotH,mix(12.0,110.0,1.0-roughness));
-  float ambient=0.30+max(normal.y,0.0)*0.10;
+  vec3 ceilingVector=uCeilingLightPosition-vWorldPosition;
+  float ceilingDistance=max(length(ceilingVector),0.001);
+  vec3 ceilingDirection=ceilingVector/ceilingDistance;
+  float ceilingAttenuation=1.0/(1.0+0.12*ceilingDistance+0.055*ceilingDistance*ceilingDistance);
+  float ceilingDiffuse=max(dot(normal,ceilingDirection),0.0)*ceilingAttenuation*uCeilingLightIntensity;
+  vec3 practicalVector=uPracticalLightPosition-vWorldPosition;
+  float practicalDistance=max(length(practicalVector),0.001);
+  vec3 practicalDirection=practicalVector/practicalDistance;
+  float practicalAttenuation=1.0/(1.0+0.16*practicalDistance+0.085*practicalDistance*practicalDistance);
+  float practicalDiffuse=max(dot(normal,practicalDirection),0.0)*practicalAttenuation*uPracticalLightIntensity;
+  float ambient=0.27+max(normal.y,0.0)*0.08;
   vec3 f0=mix(vec3(0.04),base.rgb,metallic);
   vec3 highlights=f0*(specular*(1.0-roughness)*0.75);
-  vec3 lit=base.rgb*(ambient+diffuse*0.62)+highlights;
+  vec3 lightEnergy=vec3(ambient+diffuse*0.36)+uCeilingLightColor*(ceilingDiffuse*0.38)+uPracticalLightColor*(practicalDiffuse*0.30);
+  vec3 lit=base.rgb*lightEnergy+highlights;
   outColor=vec4(max(lit,vec3(0.0)),base.a);
 }
 )GLSL";
@@ -431,6 +448,7 @@ Mat4 mul(const Mat4& a, const Mat4& b) {
 Mat4 translation(float x,float y,float z) { auto m=identity(); m[12]=x; m[13]=y; m[14]=z; return m; }
 Mat4 scaling(float x,float y,float z) { auto m=identity(); m[0]=x; m[5]=y; m[10]=z; return m; }
 Mat4 rotateY(float a) { auto m=identity(); const float c=std::cos(a),s=std::sin(a); m[0]=c; m[2]=-s; m[8]=s; m[10]=c; return m; }
+Mat4 rotateX(float a) { auto m=identity(); const float c=std::cos(a),s=std::sin(a); m[5]=c; m[6]=s; m[9]=-s; m[10]=c; return m; }
 Mat4 quatMatrix(XrQuaternionf q) {
     const float x=q.x,y=q.y,z=q.z,w=q.w;
     Mat4 m=identity();
@@ -1003,6 +1021,12 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     locUvScale_=glGetUniformLocation(program_,"uUvScale");locMaterial_=glGetUniformLocation(program_,"uMaterial");
     locModel_=glGetUniformLocation(program_,"uModel");locRounded_=glGetUniformLocation(program_,"uRounded");
     locBevel_=glGetUniformLocation(program_,"uBevel");
+    locCeilingLightPosition_=glGetUniformLocation(program_,"uCeilingLightPosition");
+    locCeilingLightColor_=glGetUniformLocation(program_,"uCeilingLightColor");
+    locCeilingLightIntensity_=glGetUniformLocation(program_,"uCeilingLightIntensity");
+    locPracticalLightPosition_=glGetUniformLocation(program_,"uPracticalLightPosition");
+    locPracticalLightColor_=glGetUniformLocation(program_,"uPracticalLightColor");
+    locPracticalLightIntensity_=glGetUniformLocation(program_,"uPracticalLightIntensity");
     GLuint vvs=compileShader(GL_VERTEX_SHADER,kVignetteVertex), vfs=compileShader(GL_FRAGMENT_SHADER,kVignetteFragment);
     if(vvs&&vfs){vignetteProgram_=glCreateProgram();glAttachShader(vignetteProgram_,vvs);glAttachShader(vignetteProgram_,vfs);glLinkProgram(vignetteProgram_);GLint vok=GL_FALSE;glGetProgramiv(vignetteProgram_,GL_LINK_STATUS,&vok);if(vok!=GL_TRUE){glDeleteProgram(vignetteProgram_);vignetteProgram_=0;}}
     if(vvs)glDeleteShader(vvs);if(vfs)glDeleteShader(vfs);
@@ -1018,6 +1042,27 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,4,4,0,GL_RGB,GL_UNSIGNED_BYTE,idlePixels);glBindTexture(GL_TEXTURE_2D,0);
+    // Soft radial contact-shadow texture, generated locally to avoid runtime downloads.
+    constexpr int shadowSize=96;
+    std::vector<uint8_t> shadowPixels(static_cast<size_t>(shadowSize*shadowSize*4),0);
+    for(int py=0;py<shadowSize;++py) for(int px=0;px<shadowSize;++px) {
+        const float nx=(2.0f*(px+0.5f)/shadowSize)-1.0f;
+        const float ny=(2.0f*(py+0.5f)/shadowSize)-1.0f;
+        const float radius=std::sqrt(nx*nx+ny*ny);
+        const float edge=std::clamp((1.0f-radius)/0.22f,0.0f,1.0f);
+        const float alpha=0.34f*std::exp(-radius*radius*4.8f)*edge;
+        const size_t offset=static_cast<size_t>((py*shadowSize+px)*4);
+        shadowPixels[offset+0]=10;shadowPixels[offset+1]=12;shadowPixels[offset+2]=17;
+        shadowPixels[offset+3]=static_cast<uint8_t>(std::clamp(alpha*255.0f,0.0f,255.0f));
+    }
+    glGenTextures(1,&groundShadowTexture_);
+    glBindTexture(GL_TEXTURE_2D,groundShadowTexture_);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,shadowSize,shadowSize,0,GL_RGBA,GL_UNSIGNED_BYTE,shadowPixels.data());
+    glBindTexture(GL_TEXTURE_2D,0);
     initialized_=true; chooseEnvironment(); LOGI("cozy room renderer initialized"); return true;
 }
 
@@ -1412,6 +1457,26 @@ void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+void RoomRenderer::drawGroundShadow(const float* pv,float x,float y,float z,
+                                     float width,float depth,float opacity) {
+    if(!groundShadowTexture_) return;
+    Mat4 projectionView{};std::copy(pv,pv+projectionView.size(),projectionView.begin());
+    const Mat4 model=mul(translation(x,y,z),mul(rotateX(-kPi*0.5f),scaling(width,depth,1.0f)));
+    const Mat4 mvp=mul(projectionView,model);
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
+    glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
+    glUniform4f(locColor_,1.0f,1.0f,1.0f,std::clamp(opacity,0.0f,1.0f));
+    glUniform1i(locTextured_,1);glUniform1i(locMaterial_,-1);glUniform1i(locRounded_,0);
+    glUniform2f(locUvScale_,1.0f,1.0f);
+    glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,groundShadowTexture_);
+    glUniform1i(locTexture_,0);
+    glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+    glBindTexture(GL_TEXTURE_2D,0);
+}
 void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floorY,float backZ,GLuint tex,float windowW,float windowH) {
     (void)halfW;
     const float windowY=floorY+2.4f;
@@ -1561,6 +1626,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     sofa=rgb(.20f,.24f,.30f);
     glUseProgram(program_);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDisable(GL_CULL_FACE);
     glUniform1i(locTexture_,0);
+    glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
+    glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
+    glUniform1f(locCeilingLightIntensity_,1.55f);
+    glUniform3f(locPracticalLightPosition_,-halfW+0.30f,floorY+1.92f,-1.45f);
+    glUniform3f(locPracticalLightColor_,1.0f,0.72f,0.50f);
+    glUniform1f(locPracticalLightIntensity_,0.88f);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
     drawBox(pv.data(),0,floorY-0.08f,0,halfW*2+0.1f,0.16f,halfD*2+0.1f,floor,0.0f,6);
     drawBox(pv.data(),0,ceilingY+0.05f,0,halfW*2+0.1f,0.1f,halfD*2+0.1f,wall,0.0f,2);
@@ -1577,6 +1648,13 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,std::min(halfW*1.35f,settings_.roomSize=="small"?3.4f:6.2f),activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f);
 
     const float deskZ=-halfD+1.35f;
+    // Soft contact shadows ground the desk, seating and chair without expensive shadow maps.
+    const float shadowDeskX=halfW-1.48f;
+    const float shadowDeskZ=-halfD+1.35f;
+    const float shadowDeskWidth=std::min(2.65f,halfW*1.02f);
+    drawGroundShadow(pv.data(),shadowDeskX,floorY+0.004f,shadowDeskZ+0.02f,shadowDeskWidth*.82f,1.10f,.42f);
+    drawGroundShadow(pv.data(),halfW-1.25f,floorY+0.004f,.05f,1.55f,2.35f,.40f);
+    drawGroundShadow(pv.data(),shadowDeskX-.25f,floorY+0.004f,shadowDeskZ+1.20f,.92f,1.02f,.34f);
 
     const auto accentBlue = rgb(.16f,.58f,1.0f);
     const auto accentViolet = rgb(.48f,.25f,1.0f);
@@ -1952,5 +2030,6 @@ void RoomRenderer::release() {
     if(sphereVao_)glDeleteVertexArrays(1,&sphereVao_);if(sphereVbo_)glDeleteBuffers(1,&sphereVbo_);
     if(roundedVao_)glDeleteVertexArrays(1,&roundedVao_);if(roundedVbo_)glDeleteBuffers(1,&roundedVbo_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=0;sphereVertexCount_=roundedVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    if(groundShadowTexture_)glDeleteTextures(1,&groundShadowTexture_);
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=0;sphereVertexCount_=roundedVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
