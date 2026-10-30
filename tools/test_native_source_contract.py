@@ -35,6 +35,12 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("Sat on the virtual", source)
         self.assertIn("settings_.showCouch", source)
         self.assertIn("settings_.showChair", source)
+        self.assertIn('environment = "skyline_penthouse"', header)
+        self.assertIn('environment=skyline_penthouse', source)
+        self.assertIn('value == "skyline_penthouse"', source)
+        self.assertIn("if (sceneIndex == 29)", renderer)
+        self.assertIn("city lights into softened, vertically stretched reflections", renderer)
+        self.assertIn("const bool hitsBed", renderer)
 
     def test_room_controls_keep_locomotion_but_have_no_hidden_click_shortcuts(self):
         source = (ROOT / "quest-client/app/src/main/cpp/main.cpp").read_text(encoding="utf-8")
