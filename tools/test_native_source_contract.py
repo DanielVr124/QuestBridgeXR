@@ -114,6 +114,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("A finished floor lamp", renderer)
         self.assertIn("const Mat4 model=mul(translation(x,y,z),mul(rotateX(pitch)", renderer)
         self.assertIn("Tailored sofa: a rigid upholstered frame carries separate domed seat and back cushions", renderer)
+        self.assertIn("Sofa frame axes follow the room: width across X, full seat length along Z", renderer)
+        self.assertIn("Back shell is on +X", renderer)
         self.assertIn("Padded armrests sit on swept metal supports", renderer)
         self.assertIn("Parametric upholstery mesh", renderer)
         self.assertIn("Pleated cloth panel mesh", renderer)
