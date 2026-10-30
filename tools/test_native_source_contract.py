@@ -46,6 +46,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("if (sceneIndex == 29)", source)
         self.assertIn("city lights into softened, vertically stretched reflections", source)
         self.assertIn("const bool hitsBed", source)
+        self.assertIn("backZ+3.35f", source)
+        self.assertIn("-halfD+3.35f", source)
 
     def test_room_controls_keep_locomotion_but_have_no_hidden_click_shortcuts(self):
         source = (ROOT / "quest-client/app/src/main/cpp/main.cpp").read_text(encoding="utf-8")
@@ -135,16 +137,16 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertNotIn("Tailored sofa: a rigid upholstered frame carries separate domed seat and back cushions", renderer)
         self.assertNotIn("Sofa frame axes follow the room: width across X, full seat length along Z", renderer)
         self.assertNotIn("Back shell is on -X", renderer)
-        self.assertIn("Padded armrests sit on swept metal supports", renderer)
+        self.assertNotIn("Padded armrests sit on swept metal supports", renderer)
         self.assertIn("Parametric upholstery mesh", renderer)
         self.assertIn("Pleated cloth panel mesh", renderer)
         self.assertIn("void RoomRenderer::drawCurtainPanel", renderer)
         self.assertIn("drawCurtainPanel(pv.data(),curtainCenter", renderer)
         self.assertIn("void RoomRenderer::drawPillow", renderer)
         self.assertNotIn("drawPillow(pv.data(),cx+.10f", renderer)
-        self.assertIn("drawPillow(pv.data(),chairX,floorY+.665f", renderer)
-        self.assertIn("drawPillow(pv.data(),chairX,floorY+1.03f", renderer)
-        self.assertIn("individual caster wheels", renderer)
+        self.assertNotIn("drawPillow(pv.data(),chairX,floorY+.665f", renderer)
+        self.assertNotIn("drawPillow(pv.data(),chairX,floorY+1.03f", renderer)
+        self.assertNotIn("individual caster wheels", renderer)
         self.assertIn("individually modeled rear cooling louvers", renderer)
         self.assertIn("Recessed connector bay", renderer)
         self.assertIn("Four metallic fastener heads", renderer)
@@ -161,7 +163,12 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("cabinetZ=tvZ+.27f", renderer)
         self.assertIn("DESK CHAIR", renderer)
         self.assertIn("kEnvironmentNames[activeEnvironmentIndex_]", renderer)
-        self.assertIn("yawPivotX_ = headPose.position.x + moveX_ + worldOffsetX_", renderer)
+        self.assertIn("Mat4 camera=makeView(view.pose,moveX_,moveZ_,virtualYaw_,sittingDrop)", renderer)
+        self.assertNotIn("yawPivot", renderer)
+        glb_loader = (ROOT / "quest-client/app/src/main/cpp/glb_model.cpp").read_text(encoding="utf-8")
+        self.assertIn("cgltf_load_buffers(&options,data,nullptr)", glb_loader)
+        self.assertLess(glb_loader.index("cgltf_load_buffers(&options,data,nullptr)"),
+                        glb_loader.index("cgltf_accessor_unpack_floats(pos"))
 
     def test_fake_vr_bridge_is_connected_and_default_off(self):
         host = (ROOT / "host/src/main.cpp").read_text(encoding="utf-8")

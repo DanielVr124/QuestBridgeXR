@@ -55,8 +55,14 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
     cgltf_options options{}; cgltf_data* data=nullptr;
     cgltf_result result=cgltf_parse(&options,bytes.data(),bytes.size(),&data);
     if(result!=cgltf_result_success || !data) { GLB_LOG("GLB parse failed (%d): %s",int(result),assetPath); return false; }
-    // GLB's BIN chunk is retained by cgltf during parse. External buffers are deliberately rejected:
-    // QuestBridge models are packaged as self-contained .glb assets.
+    // cgltf_parse reads the GLB container but does not attach the embedded BIN data
+    // to buffer accessors. Load that buffer before unpacking positions or UVs.
+    const cgltf_result bufferResult=cgltf_load_buffers(&options,data,nullptr);
+    if(bufferResult!=cgltf_result_success) {
+        GLB_LOG("GLB buffer load failed (%d): %s",int(bufferResult),assetPath);
+        cgltf_free(data);
+        return false;
+    }
     bool ok=true;
     for(cgltf_size mi=0;mi<data->meshes_count;++mi) {
         cgltf_mesh* mesh=&data->meshes[mi];

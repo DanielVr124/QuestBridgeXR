@@ -43,7 +43,6 @@ public:
     bool sitting() const { return sitting_; }
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
                    GLuint videoTexture, bool hasVideo);
-    void rebaseYawPivot(const XrPosef& headPose);
     float locomotionX() const { return moveX_; }
     float locomotionZ() const { return moveZ_; }
 
@@ -155,15 +154,8 @@ private:
     float moveZ_ = 0.0f;
     float virtualYaw_ = 0.0f;
     float snapCooldown_ = 0.0f;
-    float yawPivotX_ = 0.0f;
-    float yawPivotY_ = 0.0f;
-    float yawPivotZ_ = 0.0f;
-    float worldOffsetX_ = 0.0f;
-    float worldOffsetZ_ = 0.0f;
-    bool yawPivotInitialized_ = false;
     bool previousTurnRight_ = false;
     bool previousTurnLeft_ = false;
-    bool previousSmoothTurning_ = false;
     bool sitting_ = false;
     bool menuVisible_ = false;
     int menuSelection_ = 0;
