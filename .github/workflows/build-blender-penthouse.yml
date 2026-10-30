@@ -55,7 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          /opt/blender/blender --background --factory-startup --threads 4 \
+          "$GITHUB_WORKSPACE/.cache/blender-4.5.15/blender" --background --factory-startup --threads 4 \
             --python tools/blender/build_skyline_penthouse.py -- \
             --output-dir "$GITHUB_WORKSPACE/dist/skyline-penthouse"
           test -s dist/skyline-penthouse/skyline_penthouse.blend
