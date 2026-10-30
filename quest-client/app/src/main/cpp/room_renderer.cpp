@@ -450,8 +450,11 @@ void main(){
     vec2 atlasTile=fract(uv*0.42);
     vec2 atlasUv=atlasOrigin+vec2(0.012)+atlasTile*0.476;
     materialAtlasUv=atlasUv;
-    float texel=texture(uMaterialAtlas,atlasUv).r;
+    vec3 albedoTexel=texture(uMaterialAtlas,atlasUv).rgb;
+    float texel=dot(albedoTexel,vec3(0.2126,0.7152,0.0722));
     surface += (texel-0.86)*0.55;
+    // Subtle material-specific color variation is layered over the room's base palette.
+    base.rgb*=mix(vec3(1.0),albedoTexel*1.15,0.38);
     if(uHasRoughnessAtlas!=0) roughness=texture(uRoughnessAtlas,atlasUv).r;
   }
   base.rgb=max(base.rgb*(1.0+surface),vec3(0.0));
