@@ -1209,6 +1209,35 @@ void RoomRenderer::createGeometry() {
     glEnableVertexAttribArray(1);glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(3*sizeof(float)));
     glBindVertexArray(0);
 
+    // One shared tapered cylinder mesh for ceramic planters, cups, gas lifts and table legs.
+    std::vector<Vertex> cylinderVertices;
+    constexpr int cylinderSegments=40;
+    cylinderVertices.reserve(static_cast<size_t>(cylinderSegments)*12u);
+    auto cylinderPoint=[](float angle,float y,float radius,float u) {
+        return Vertex{std::cos(angle)*radius,y,std::sin(angle)*radius,u,y+0.5f};
+    };
+    for(int segment=0;segment<cylinderSegments;++segment) {
+        const float u0=float(segment)/cylinderSegments,u1=float(segment+1)/cylinderSegments;
+        const float a0=u0*2.0f*kPi,a1=u1*2.0f*kPi;
+        const Vertex b0=cylinderPoint(a0,-.5f,.42f,u0),b1=cylinderPoint(a1,-.5f,.42f,u1);
+        const Vertex t0=cylinderPoint(a0,.5f,.50f,u0),t1=cylinderPoint(a1,.5f,.50f,u1);
+        cylinderVertices.insert(cylinderVertices.end(),{b0,b1,t1,b0,t1,t0});
+        const Vertex bottomCenter{0,-.5f,0,.5f,.5f};
+        const Vertex topCenter{0,.5f,0,.5f,.5f};
+        cylinderVertices.insert(cylinderVertices.end(),{bottomCenter,b1,b0,topCenter,t0,t1});
+    }
+    cylinderVertexCount_=static_cast<GLsizei>(cylinderVertices.size());
+    glGenVertexArrays(1,&cylinderVao_);
+    glGenBuffers(1,&cylinderVbo_);
+    glBindVertexArray(cylinderVao_);
+    glBindBuffer(GL_ARRAY_BUFFER,cylinderVbo_);
+    glBufferData(GL_ARRAY_BUFFER,static_cast<GLsizeiptr>(cylinderVertices.size()*sizeof(Vertex)),cylinderVertices.data(),GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(Vertex),nullptr);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(3*sizeof(float)));
+    glBindVertexArray(0);
+
     // Smooth UV sphere mesh used for rounded cushions, chair details and PC cooling fans.
     // It is generated once and shared by every room object to keep draw overhead low.
     std::vector<float> sphere;
@@ -1354,6 +1383,21 @@ void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,floa
     glUniform2f(locUvScale_,scaleX,scaleY);
     glBindVertexArray(vao_);glDrawArrays(GL_TRIANGLES,0,36);glBindVertexArray(0);
 }
+void RoomRenderer::drawCylinder(const float* pv,float x,float y,float z,float diameter,float height,
+                                const std::array<float,4>& color,int material) {
+    Mat4 projectionView{};std::copy(pv,pv+projectionView.size(),projectionView.begin());
+    const Mat4 model=mul(translation(x,y,z),scaling(diameter,height,diameter));
+    const Mat4 mvp=mul(projectionView,model);
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
+    glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
+    glUniform4fv(locColor_,1,color.data());
+    glUniform1i(locTextured_,0);glUniform1i(locMaterial_,material);glUniform1i(locRounded_,0);
+    glUniform2f(locUvScale_,1.0f,1.0f);
+    glBindVertexArray(cylinderVao_);
+    glDrawArrays(GL_TRIANGLES,0,cylinderVertexCount_);
+    glBindVertexArray(0);
+}
+
 void RoomRenderer::drawRoundedBox(const float* pv,float x,float y,float z,float sx,float sy,float sz,
                                       const std::array<float,4>& color,float yaw,int material) {
     Mat4 projectionView{}; std::copy(pv,pv+projectionView.size(),projectionView.begin());
@@ -1757,7 +1801,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float plantX=-halfW+.62f, plantZ=backZ+.44f;
     const auto potColor=rgb(.47f,.43f,.37f);
     const auto leafColor=rgb(.12f,.25f,.17f);
-    drawRoundedBox(pv.data(),plantX,floorY+.25f,plantZ,.38f,.48f,.38f,potColor,0.0f,5);
+    drawCylinder(pv.data(),plantX,floorY+.24f,plantZ,.38f,.48f,potColor,5);
     drawRoundedBox(pv.data(),plantX,floorY+.49f,plantZ,.42f,.055f,.42f,rgb(.57f,.51f,.42f),0.0f,5);
     drawSphere(pv.data(),plantX,floorY+.53f,plantZ,.16f,.035f,.16f,rgb(.16f,.12f,.08f));
     for(int stem=0;stem<5;++stem) {
@@ -2086,8 +2130,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawRoundedBox(pv.data(),coffeeX,coffeeY-.15f,coffeeZ,1.00f,.045f,1.18f,
                    rgb(.23f,.16f,.11f),0.0f,1);
     for(int side : {-1,1}) for(int end : {-1,1}) {
-        drawRoundedBox(pv.data(),coffeeX+side*.48f,coffeeY-.22f,coffeeZ+end*.57f,
-                       .055f,.36f,.055f,silver,0.0f,4);
+        drawCylinder(pv.data(),coffeeX+side*.48f,coffeeY-.22f,coffeeZ+end*.57f,
+                     .055f,.36f,silver,4);
     }
     // A pair of stacked hardback books and a small ceramic cup on a coaster.
     drawRoundedBox(pv.data(),coffeeX-.20f,coffeeY+.052f,coffeeZ-.20f,.39f,.045f,.29f,
@@ -2096,8 +2140,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                    rgb(.49f,.26f,.18f),.06f,5);
     drawBox(pv.data(),coffeeX-.17f,coffeeY+.107f,coffeeZ-.19f,.29f,.003f,.23f,
             rgb(.80f,.76f,.66f),.06f);
-    drawSphere(pv.data(),coffeeX+.30f,coffeeY+.085f,coffeeZ+.27f,.075f,.095f,.075f,
-               rgb(.76f,.72f,.64f),5);
+    drawCylinder(pv.data(),coffeeX+.30f,coffeeY+.085f,coffeeZ+.27f,
+                  .15f,.17f,rgb(.76f,.72f,.64f),5);
     drawSphere(pv.data(),coffeeX+.30f,coffeeY+.172f,coffeeZ+.27f,.060f,.014f,.060f,
                rgb(.14f,.09f,.055f));
     drawSphere(pv.data(),coffeeX+.38f,coffeeY+.08f,coffeeZ+.27f,.040f,.045f,.015f,
@@ -2151,7 +2195,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawSphere(pv.data(),chairX,floorY+.62f,chairZ,.36f,.13f,.34f,sofa,3);
         drawSphere(pv.data(),chairX,floorY+1.00f,chairZ-.22f,.34f,.44f,.13f,sofa,3);
         drawSphere(pv.data(),chairX,floorY+1.34f,chairZ-.24f,.20f,.18f,.12f,sofa,3);
-        drawBox(pv.data(),chairX,floorY+.27f,chairZ,.07f,.38f,.07f,silver);
+        drawCylinder(pv.data(),chairX,floorY+.27f,chairZ,.07f,.38f,silver,4);
         for(int i=0;i<5;++i) {
             const float a=2*kPi*i/5;
             drawBox(pv.data(),chairX+std::cos(a)*.30f,floorY+.07f,chairZ+std::sin(a)*.28f,.32f,.045f,.055f,trimDark,a);
@@ -2230,10 +2274,11 @@ void RoomRenderer::release() {
     if(curvedVao_)glDeleteVertexArrays(1,&curvedVao_);if(curvedVbo_)glDeleteBuffers(1,&curvedVbo_);
     if(sphereVao_)glDeleteVertexArrays(1,&sphereVao_);if(sphereVbo_)glDeleteBuffers(1,&sphereVbo_);
     if(roundedVao_)glDeleteVertexArrays(1,&roundedVao_);if(roundedVbo_)glDeleteBuffers(1,&roundedVbo_);
+    if(cylinderVao_)glDeleteVertexArrays(1,&cylinderVao_);if(cylinderVbo_)glDeleteBuffers(1,&cylinderVbo_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
     if(groundShadowTexture_)glDeleteTextures(1,&groundShadowTexture_);
     if(materialAtlasTexture_)glDeleteTextures(1,&materialAtlasTexture_);
     if(normalAtlasTexture_)glDeleteTextures(1,&normalAtlasTexture_);
     if(roughnessAtlasTexture_)glDeleteTextures(1,&roughnessAtlasTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=0;sphereVertexCount_=roundedVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
