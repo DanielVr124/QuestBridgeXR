@@ -1980,7 +1980,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawRoundedBox(pv.data(),side*.765f,floorY+1.16f,casingZ,
                        .115f,2.42f,.15f,casingWood,0.0f,1);
         drawRoundedBox(pv.data(),side*.695f,floorY+1.14f,frontZ-.020f,
-                       .055f,2.30f,.11f,wallTrim);
+                       .055f,2.30f,.11f,rgb(.12f,.14f,.20f));
     }
     drawRoundedBox(pv.data(),0,floorY+2.365f,casingZ,1.62f,.14f,.15f,casingWood,0.0f,1);
     drawRoundedBox(pv.data(),0,floorY+.035f,frontZ-.045f,1.48f,.07f,.24f,
