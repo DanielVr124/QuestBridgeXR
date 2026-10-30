@@ -2571,7 +2571,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawBox(pv.data(),pcX-.12f+vent*.06f,pcY+.337f,pcZ,.035f,.006f,.24f,pcEdge);
     drawSphere(pv.data(),pcX+.13f,pcY+.337f,pcZ+.18f,.018f,.012f,.018f,accentBlue);
 
-    // TV on the left wall, facing into the room; the couch across from it faces the TV.
+    // TV on the right wall, facing into the room; the couch across from it faces the TV.
     // Layered living-area rug with a woven pile, stitched perimeter and inset geometric border.
     const float rugX=.40f, rugZ=.12f;
     drawRoundedBox(pv.data(),rugX,floorY+.024f,rugZ,4.00f,.045f,3.72f,
@@ -2666,7 +2666,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float cx=couchX;
         // Sofa frame axes follow the room: width across X, full seat length along Z.
         drawRoundedBox(pv.data(),cx,floorY+.38f,couchZ,.88f,.25f,1.92f,trimDark,0.0f,5);
-        // Back shell is on +X, directly behind the two cushions that face the TV at -X.
+        // Back shell is on -X, directly behind the two cushions that face the TV at +X.
         drawRoundedBox(pv.data(),cx-.20f,floorY+.66f,couchZ,.24f,.47f,1.82f,trimDark,0.0f,5);
         // Separate seat cushions sit proud of the upholstered deck with a visible center split.
         for(int seat=-1;seat<=1;seat+=2) {
