@@ -351,6 +351,15 @@ uniform float uCeilingLightIntensity;
 uniform vec3 uPracticalLightPosition;
 uniform vec3 uPracticalLightColor;
 uniform float uPracticalLightIntensity;
+uniform vec3 uNeonBluePosition;
+uniform vec3 uNeonBlueColor;
+uniform float uNeonBlueIntensity;
+uniform vec3 uNeonVioletPosition;
+uniform vec3 uNeonVioletColor;
+uniform float uNeonVioletIntensity;
+uniform vec3 uNeonPinkPosition;
+uniform vec3 uNeonPinkColor;
+uniform float uNeonPinkIntensity;
 out vec4 outColor;
 
 float hash21(vec2 p) {
@@ -395,6 +404,8 @@ vec3 evaluatePbrLight(vec3 n,vec3 v,vec3 l,vec3 albedo,float roughness,float met
 void main(){
   vec4 tex = uTextured != 0 ? texture(uTexture, vUv) : vec4(1.0);
   vec4 base = tex * uColor;
+  // Emissive shader path for recessed neon strips and illuminated hardware.
+  if (uMaterial == 7) { outColor=vec4(min(base.rgb*1.42,vec3(1.0)),base.a); return; }
   if (uTextured != 0 || uMaterial < 0) { outColor=base; return; }
 
   vec2 uv=vUv*uUvScale;
@@ -490,9 +501,21 @@ void main(){
   float practicalAttenuation=1.0/(1.0+0.16*practicalDistance+0.085*practicalDistance*practicalDistance);
   vec3 practical=evaluatePbrLight(normal,viewDir,practicalDirection,base.rgb,roughness,metallic,
                                   uPracticalLightColor*(practicalAttenuation*uPracticalLightIntensity*.58));
+  vec3 blueVector=uNeonBluePosition-vWorldPosition;
+  float blueDistance=max(length(blueVector),0.001);
+  vec3 blueBounce=evaluatePbrLight(normal,viewDir,blueVector/blueDistance,base.rgb,roughness,metallic,
+      uNeonBlueColor*(uNeonBlueIntensity/(1.0+0.18*blueDistance+0.095*blueDistance*blueDistance)));
+  vec3 violetVector=uNeonVioletPosition-vWorldPosition;
+  float violetDistance=max(length(violetVector),0.001);
+  vec3 violetBounce=evaluatePbrLight(normal,viewDir,violetVector/violetDistance,base.rgb,roughness,metallic,
+      uNeonVioletColor*(uNeonVioletIntensity/(1.0+0.18*violetDistance+0.095*violetDistance*violetDistance)));
+  vec3 pinkVector=uNeonPinkPosition-vWorldPosition;
+  float pinkDistance=max(length(pinkVector),0.001);
+  vec3 pinkBounce=evaluatePbrLight(normal,viewDir,pinkVector/pinkDistance,base.rgb,roughness,metallic,
+      uNeonPinkColor*(uNeonPinkIntensity/(1.0+0.18*pinkDistance+0.095*pinkDistance*pinkDistance)));
   float ambientOcclusion=0.90+max(normal.y,0.0)*0.10;
-  vec3 ambient=base.rgb*(0.22+max(normal.y,0.0)*0.055)*ambientOcclusion;
-  vec3 lit=ambient+directional+ceiling+practical;
+  vec3 ambient=base.rgb*(0.15+max(normal.y,0.0)*0.035)*ambientOcclusion;
+  vec3 lit=ambient+directional+ceiling+practical+blueBounce+violetBounce+pinkBounce;
   outColor=vec4(max(lit,vec3(0.0)),base.a);
 }
 )GLSL";
@@ -1088,6 +1111,15 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     locPracticalLightPosition_=glGetUniformLocation(program_,"uPracticalLightPosition");
     locPracticalLightColor_=glGetUniformLocation(program_,"uPracticalLightColor");
     locPracticalLightIntensity_=glGetUniformLocation(program_,"uPracticalLightIntensity");
+    locNeonBluePosition_=glGetUniformLocation(program_,"uNeonBluePosition");
+    locNeonBlueColor_=glGetUniformLocation(program_,"uNeonBlueColor");
+    locNeonBlueIntensity_=glGetUniformLocation(program_,"uNeonBlueIntensity");
+    locNeonVioletPosition_=glGetUniformLocation(program_,"uNeonVioletPosition");
+    locNeonVioletColor_=glGetUniformLocation(program_,"uNeonVioletColor");
+    locNeonVioletIntensity_=glGetUniformLocation(program_,"uNeonVioletIntensity");
+    locNeonPinkPosition_=glGetUniformLocation(program_,"uNeonPinkPosition");
+    locNeonPinkColor_=glGetUniformLocation(program_,"uNeonPinkColor");
+    locNeonPinkIntensity_=glGetUniformLocation(program_,"uNeonPinkIntensity");
     locMaterialAtlas_=glGetUniformLocation(program_,"uMaterialAtlas");
     locHasMaterialAtlas_=glGetUniformLocation(program_,"uHasMaterialAtlas");
     locNormalAtlas_=glGetUniformLocation(program_,"uNormalAtlas");
@@ -1928,10 +1960,11 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     }
     // Neutral, physically plausible finishes keep the room interior grounded;
     // selected scenes remain visible through the window and in practical accent lights.
-    wall=rgb(.70f,.67f,.61f);
-    floor=rgb(.27f,.20f,.15f);
-    wood=rgb(.40f,.27f,.18f);
-    sofa=rgb(.20f,.24f,.30f);
+    // Neon-noir material palette: dark charcoal and midnight-blue surfaces preserve contrast.
+    wall=rgb(.075f,.083f,.135f);
+    floor=rgb(.035f,.045f,.075f);
+    wood=rgb(.075f,.080f,.125f);
+    sofa=rgb(.105f,.115f,.205f);
     glUseProgram(program_);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDisable(GL_CULL_FACE);
     glUniform1i(locTexture_,0);
     glUniform3f(locCameraPosition_,cameraX,cameraY,cameraZ);
@@ -1952,8 +1985,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
     glUniform1f(locCeilingLightIntensity_,1.55f);
     glUniform3f(locPracticalLightPosition_,-halfW+0.30f,floorY+1.92f,-1.45f);
-    glUniform3f(locPracticalLightColor_,1.0f,0.72f,0.50f);
-    glUniform1f(locPracticalLightIntensity_,0.88f);
+    glUniform3f(locPracticalLightColor_,0.40f,0.32f,1.0f);
+    glUniform1f(locPracticalLightIntensity_,0.46f);
+    // Recessed blue, violet and magenta fixtures cast colored bounce on nearby surfaces.
+    glUniform3f(locNeonBluePosition_,-halfW+0.20f,floorY+2.75f,-0.45f);
+    glUniform3f(locNeonBlueColor_,0.12f,0.34f,1.0f);
+    glUniform1f(locNeonBlueIntensity_,2.25f);
+    glUniform3f(locNeonVioletPosition_,halfW-0.20f,floorY+2.55f,0.80f);
+    glUniform3f(locNeonVioletColor_,0.55f,0.14f,1.0f);
+    glUniform1f(locNeonVioletIntensity_,2.05f);
+    glUniform3f(locNeonPinkPosition_,0.0f,floorY+2.25f,backZ+0.58f);
+    glUniform3f(locNeonPinkColor_,1.0f,0.075f,0.38f);
+    glUniform1f(locNeonPinkIntensity_,1.55f);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
     drawBox(pv.data(),0,floorY-0.08f,0,halfW*2+0.1f,0.16f,halfD*2+0.1f,floor,0.0f,6);
     drawBox(pv.data(),0,ceilingY+0.05f,0,halfW*2+0.1f,0.1f,halfD*2+0.1f,wall,0.0f,2);
@@ -2048,8 +2091,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
     // A leafy floor plant and ceramic planter bring a natural material break to the back corner.
     const float plantX=-halfW+.62f, plantZ=backZ+.44f;
-    const auto potColor=rgb(.47f,.43f,.37f);
-    const auto leafColor=rgb(.12f,.25f,.17f);
+    const auto potColor=rgb(.12f,.14f,.22f);
+    const auto leafColor=rgb(.10f,.22f,.20f);
     drawCylinder(pv.data(),plantX,floorY+.24f,plantZ,.38f,.48f,potColor,5);
     drawRoundedBox(pv.data(),plantX,floorY+.49f,plantZ,.42f,.055f,.42f,rgb(.57f,.51f,.42f),0.0f,5);
     drawSphere(pv.data(),plantX,floorY+.53f,plantZ,.16f,.035f,.16f,rgb(.16f,.12f,.08f));
@@ -2077,15 +2120,28 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawGroundShadow(pv.data(),1.12f,floorY+0.004f,.08f,1.55f,1.78f,.30f);
     drawGroundShadow(pv.data(),-halfW+.62f,floorY+0.004f,backZ+.44f,.62f,.64f,.24f);
 
-    const auto accentBlue = rgb(.16f,.58f,1.0f);
-    const auto accentViolet = rgb(.48f,.25f,1.0f);
-    const auto trimDark = rgb(.035f,.045f,.075f);
-    const auto silver = rgb(.55f,.61f,.70f);
+    const auto accentBlue = rgb(.08f,.34f,1.0f);
+    const auto accentViolet = rgb(.50f,.12f,1.0f);
+    const auto neonCyan = rgb(.08f,.78f,1.0f);
+    const auto neonMagenta = rgb(1.0f,.08f,.42f);
+    const auto trimDark = rgb(.012f,.018f,.034f);
+    const auto silver = rgb(.22f,.27f,.39f);
     const float trimY = floorY + 3.72f;
-    drawBox(pv.data(),0,trimY,0,halfW*1.62f,.035f,.045f,trimDark);
-    drawBox(pv.data(),0,trimY-.035f,0,halfW*1.48f,.018f,.028f,accentViolet);
-    drawBox(pv.data(),-halfW+.12f,trimY-.08f,0,.035f,.035f,halfD*1.65f,accentBlue);
-    drawBox(pv.data(), halfW-.12f,trimY-.08f,0,.035f,.035f,halfD*1.65f,accentViolet);
+    // Recessed RGB coves sit inside a dark ceiling reveal; the cores are truly emissive.
+    drawRoundedBox(pv.data(),0,trimY,0,halfW*1.66f,.050f,.075f,trimDark,0.0f,5);
+    drawBox(pv.data(),0,trimY-.030f,0,halfW*1.53f,.012f,.022f,accentViolet,0.0f,7);
+    drawBox(pv.data(),-halfW+.12f,trimY-.08f,0,.020f,.022f,halfD*1.65f,accentBlue,0.0f,7);
+    drawBox(pv.data(), halfW-.12f,trimY-.08f,0,.020f,.022f,halfD*1.65f,accentViolet,0.0f,7);
+    drawBox(pv.data(),0,trimY-.08f,-halfD+.14f,halfW*1.60f,.020f,.022f,neonCyan,0.0f,7);
+    // Vertical bars are recessed into the side-wall reveals, rather than floating props.
+    for(int side : {-1,1}) {
+        for(int bar=0;bar<3;++bar) {
+            const float z=-1.8f+bar*1.65f;
+            const auto tint=(bar+side+4)%2==0?neonCyan:accentViolet;
+            drawBox(pv.data(),side*(halfW-.16f),floorY+2.45f,z,.055f,1.28f,.10f,trimDark,0.0f,5);
+            drawBox(pv.data(),side*(halfW-.125f),floorY+2.45f,z,.010f,.91f,.026f,tint,0.0f,7);
+        }
+    }
 
     // Acoustic wall panels with inset highlights; keep the selected environment as the window view.
     const float panelY=floorY+2.48f, panelZ=backZ+.16f;
@@ -2098,9 +2154,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
     // Architectural finish pass: layered skirting, wall reveals, ceiling coffers,
     // and repeated floor inlays give the room real scale and construction detail.
-    const auto wallTrim=rgb(.12f,.14f,.20f);
-    const auto wallHighlight=rgb(.22f,.25f,.33f);
-    const auto floorInlay=rgb(.10f,.12f,.17f);
+    const auto wallTrim=rgb(.018f,.026f,.052f);
+    const auto wallHighlight=rgb(.055f,.075f,.14f);
+    const auto floorInlay=rgb(.025f,.045f,.085f);
     const float roomHeight=ceilingY-floorY;
     for(int side : {-1,1}) {
         const float wx=side*(halfW-.105f);
@@ -2134,7 +2190,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float lz=(row==0?-1.0f:1.0f)*halfD*.42f;
         drawBox(pv.data(),lx,ceilingY-.012f,lz,.34f,.012f,.12f,wallTrim);
         drawBox(pv.data(),lx,ceilingY-.020f,lz,.25f,.006f,.075f,
-                row==0?rgb(.92f,.78f,.60f):rgb(.68f,.78f,1.0f));
+                row==0?neonCyan:accentViolet,0.0f,7);
     }
     // Individual floorboard seams, with alternating lengths and subtle tonal variation.
     for(int row=0;row<11;++row) {
@@ -2148,15 +2204,16 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
     // Framed abstract wall art on the open right wall, above the living-area sightline.
     const float artX=halfW-.085f, artY=floorY+2.52f, artZ=1.75f;
-    drawRoundedBox(pv.data(),artX,artY,artZ,.065f,.92f,1.18f,
-                   rgb(.25f,.19f,.14f),0.0f,1);
-    drawBox(pv.data(),artX-.037f,artY,artZ,.012f,.80f,1.06f,rgb(.10f,.12f,.15f));
-    drawSphere(pv.data(),artX-.046f,artY+.10f,artZ-.12f,.010f,.23f,.28f,
-               rgb(.30f,.38f,.42f));
-    drawSphere(pv.data(),artX-.048f,artY-.12f,artZ+.20f,.010f,.17f,.18f,
-               rgb(.72f,.47f,.29f));
-    drawBox(pv.data(),artX-.050f,artY-.23f,artZ-.18f,.008f,.30f,.12f,
-            rgb(.25f,.39f,.31f),-.18f);
+    drawRoundedBox(pv.data(),artX,artY,artZ,.065f,1.04f,1.48f,trimDark,0.0f,5);
+    drawBox(pv.data(),artX-.037f,artY,artZ,.012f,.94f,1.38f,rgb(.035f,.055f,.105f));
+    // Glowing signal-line wall art in smoked glass, echoing the room's RGB palette.
+    for(int trace=0;trace<3;++trace) {
+        const float yy=artY+.28f-trace*.28f;
+        const float zz=artZ-.44f+trace*.19f;
+        drawBox(pv.data(),artX-.046f,yy,zz,.010f,.018f,.52f,trace==1?neonMagenta:neonCyan,0.0f,7);
+        drawBox(pv.data(),artX-.046f,yy-.08f,zz+.24f,.010f,.16f,.018f,trace==1?neonMagenta:accentViolet,0.0f,7);
+        drawSphere(pv.data(),artX-.052f,yy,zz-.25f,.012f,.034f,.034f,trace==1?neonMagenta:neonCyan,7);
+    }
 
     // Gaming desk occupies the back-right corner, leaving the center of the room open.
     const float deskX=halfW-1.48f;
@@ -2164,6 +2221,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float deskFrontZ=deskZ+.45f;
     const float deskTopY=floorY+.78f;
     drawRoundedBox(pv.data(),deskX,deskTopY,deskZ,deskWidth,.085f,.88f,wood,0.0f,1);
+    drawRoundedBox(pv.data(),deskX,deskTopY-.051f,deskFrontZ-.015f,deskWidth*.96f,.014f,.026f,trimDark,0.0f,5);
+    drawBox(pv.data(),deskX,deskTopY-.048f,deskFrontZ-.030f,deskWidth*.88f,.008f,.010f,neonCyan,0.0f,7);
     // The desktop rests on two finished drawer pedestals, not bare rectangular slab supports.
     for(int side : {-1,1}) {
         const float cabinetX=deskX+side*deskWidth*.405f;
@@ -2323,19 +2382,39 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
     // Desk mat, sculpted compact keyboard, mouse and near-field monitor speakers.
     drawRoundedBox(pv.data(),monitorX,deskSurface+.010f,deskZ+.30f,1.18f,.016f,.43f,
-                   rgb(.055f,.070f,.095f),0.0f,3);
+                   rgb(.025f,.035f,.065f),0.0f,3);
+    // RGB edge-stitch on the oversized textile desk mat.
+    drawBox(pv.data(),monitorX,deskSurface+.020f,deskZ+.085f,1.12f,.006f,.008f,accentBlue,0.0f,7);
+    drawBox(pv.data(),monitorX,deskSurface+.020f,deskZ+.515f,1.12f,.006f,.008f,accentViolet,0.0f,7);
     drawRoundedBox(pv.data(),monitorX,deskSurface+.045f,deskZ+.30f,.83f,.052f,.205f,
-                   rgb(.14f,.16f,.19f),0.0f,5);
-    for(int row=0;row<4;++row) {
-        drawRoundedBox(pv.data(),monitorX,deskSurface+.074f,deskZ+.225f+row*.047f,
-                       .73f,.010f,.025f,rgb(.48f,.51f,.55f),0.0f,5);
+                   rgb(.055f,.070f,.115f),0.0f,5);
+    // Individual sculpted keycaps with blue/violet switch illumination.
+    for(int row=0;row<4;++row) for(int key=0;key<12;++key) {
+        const float keyX=monitorX-.34f+key*.062f;
+        const float keyZ=deskZ+.225f+row*.047f;
+        const bool cyanKey=((key+row)%4<2);
+        drawRoundedBox(pv.data(),keyX,deskSurface+.077f,keyZ,.043f,.014f,.032f,
+                       cyanKey?rgb(.34f,.43f,.58f):rgb(.28f,.24f,.52f),0.0f,5);
+        drawBox(pv.data(),keyX,deskSurface+.085f,keyZ,.026f,.003f,.012f,
+                cyanKey?neonCyan:accentViolet,0.0f,7);
     }
-    drawRoundedBox(pv.data(),monitorX,deskSurface+.074f,deskZ+.405f,.28f,.010f,.025f,
-                   rgb(.48f,.51f,.55f),0.0f,5);
+    drawRoundedBox(pv.data(),monitorX,deskSurface+.077f,deskZ+.405f,.23f,.014f,.025f,
+                   rgb(.36f,.40f,.54f),0.0f,5);
     drawSphere(pv.data(),monitorX+.69f,deskSurface+.072f,deskZ+.31f,
                .095f,.045f,.145f,rgb(.16f,.19f,.23f),5);
     drawSphere(pv.data(),monitorX+.69f,deskSurface+.112f,deskZ+.285f,
                .012f,.008f,.022f,silver,4);
+    // Desk-mounted broadcast mic and low-profile illuminated headphone stand.
+    drawCylinder(pv.data(),monitorX-.62f,deskSurface+.26f,deskZ-.08f,.025f,.36f,silver,4,.55f);
+    drawCylinder(pv.data(),monitorX-.48f,deskSurface+.42f,deskZ-.14f,.020f,.34f,silver,4,-.80f);
+    drawCylinder(pv.data(),monitorX-.33f,deskSurface+.50f,deskZ-.20f,.060f,.18f,trimDark,5,.10f);
+    drawSphere(pv.data(),monitorX-.33f,deskSurface+.59f,deskZ-.20f,.030f,.018f,.030f,accentBlue,7);
+    drawCylinder(pv.data(),monitorX+1.02f,deskSurface+.12f,deskZ-.18f,.10f,.24f,trimDark,5);
+    drawRoundedBox(pv.data(),monitorX+1.02f,deskSurface+.27f,deskZ-.18f,.065f,.12f,.055f,silver,0.0f,4);
+    for(int ear : {-1,1}) {
+        drawSphere(pv.data(),monitorX+1.02f+ear*.07f,deskSurface+.32f,deskZ-.18f,.055f,.075f,.040f,trimDark,5);
+        drawSphere(pv.data(),monitorX+1.02f+ear*.07f,deskSurface+.32f,deskZ-.15f,.034f,.052f,.012f,accentViolet,7);
+    }
     for(int side : {-1,1}) {
         const float speakerX=monitorX+side*.88f;
         drawRoundedBox(pv.data(),speakerX,deskSurface+.16f,deskZ-.15f,.145f,.29f,.16f,
@@ -2350,16 +2429,22 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float pcX=deskX+deskWidth*.31f;
     const float pcY=deskSurface+.34f;
     const float pcZ=deskZ+.12f;
-    const auto pcWhite=rgb(.88f,.91f,.96f);
-    const auto pcEdge=rgb(.66f,.72f,.80f);
+    const auto pcWhite=rgb(.075f,.095f,.16f);
+    const auto pcEdge=rgb(.20f,.25f,.38f);
     drawRoundedBox(pv.data(),pcX,pcY,pcZ,.43f,.66f,.57f,pcWhite,0.0f,5);
     drawBox(pv.data(),pcX,pcY,pcZ+.292f,.37f,.60f,.012f,rgb(.10f,.13f,.20f));
     drawBox(pv.data(),pcX-.16f,pcY,pcZ+.302f,.045f,.55f,.008f,rgb(.20f,.24f,.33f));
     drawBox(pv.data(),pcX+.16f,pcY,pcZ+.302f,.045f,.55f,.008f,rgb(.20f,.24f,.33f));
     for(int fan=0;fan<3;++fan) {
         const float fy=pcY+.20f-fan*.20f;
-        drawSphere(pv.data(),pcX,fy,pcZ+.315f,.060f,.060f,.012f,fan==1?accentViolet:accentBlue);
-        drawSphere(pv.data(),pcX,fy,pcZ+.329f,.027f,.027f,.009f,rgb(.88f,.92f,1.0f));
+        drawSphere(pv.data(),pcX,fy,pcZ+.315f,.071f,.071f,.013f,trimDark,5);
+        drawSphere(pv.data(),pcX,fy,pcZ+.329f,.060f,.060f,.010f,fan==1?accentViolet:accentBlue,7);
+        drawSphere(pv.data(),pcX,fy,pcZ+.342f,.022f,.022f,.008f,rgb(.82f,.89f,1.0f),4);
+        for(int blade=0;blade<4;++blade) {
+            const float a=blade*kPi*.5f+fan*.18f;
+            drawSphere(pv.data(),pcX+std::cos(a)*.032f,fy+std::sin(a)*.032f,pcZ+.339f,
+                       .012f,.012f,.006f,rgb(.18f,.23f,.37f),5);
+        }
     }
     // Individual front I/O sockets, feet, and side-panel fasteners.
     for(int port=0;port<2;++port) {
