@@ -350,6 +350,7 @@ uniform vec3 uCameraPosition;
 uniform vec3 uCeilingLightPosition;
 uniform vec3 uCeilingLightColor;
 uniform float uCeilingLightIntensity;
+uniform float uRoomLightLevel;
 uniform vec3 uPracticalLightPosition;
 uniform vec3 uPracticalLightColor;
 uniform float uPracticalLightIntensity;
@@ -407,7 +408,7 @@ void main(){
   vec4 tex = uTextured != 0 ? texture(uTexture, vUv) : vec4(1.0);
   vec4 base = tex * uColor;
   // Emissive shader path for recessed neon strips and illuminated hardware.
-  if (uMaterial == 7) { outColor=vec4(min(base.rgb*1.42,vec3(1.0)),base.a); return; }
+  if (uMaterial == 7 || uMaterial == 70 || uMaterial == 71 || uMaterial == 72 || uMaterial == 73) { outColor=vec4(min(base.rgb*1.42,vec3(1.0)),base.a); return; }
   if (uTextured != 0 || uMaterial < 0) { outColor=base; return; }
 
   vec2 uv=vUv*uUvScale;
@@ -504,7 +505,7 @@ void main(){
   vec3 viewDir=normalize(uCameraPosition-vWorldPosition);
   roughness=clamp(roughness,0.045,1.0);
   vec3 directional= evaluatePbrLight(normal,viewDir,normalize(vec3(-0.42,0.78,0.46)),
-                                     base.rgb,roughness,metallic,vec3(.58,.60,.62));
+                                     base.rgb,roughness,metallic,vec3(.58,.60,.62)*uRoomLightLevel);
   vec3 ceilingVector=uCeilingLightPosition-vWorldPosition;
   float ceilingDistance=max(length(ceilingVector),0.001);
   vec3 ceilingDirection=ceilingVector/ceilingDistance;
@@ -716,10 +717,29 @@ void RoomRenderer::drawPenthouseMesh(const float* projectionView, float floorY) 
     glUniform1i(locRounded_, 0);
     glUniform2f(locUvScale_, 1.0f, 1.0f);
     glBindVertexArray(penthouseVao_);
-    // Render all opaque room and skyline surfaces first.
+    // Render all opaque room and skyline surfaces first. Dedicated LED material
+    // IDs are recolored from the handheld remote without tinting city windows.
+    static const std::array<std::array<float, 3>, 5> ledPresets{{
+        {{0.02f, 0.80f, 1.00f}}, // cyan
+        {{0.04f, 0.20f, 1.00f}}, // electric blue
+        {{0.48f, 0.08f, 1.00f}}, // violet
+        {{1.00f, 0.035f, 0.32f}}, // magenta
+        {{1.00f, 0.62f, 0.28f}} // warm amber
+    }};
+    const auto& selectedLed = ledPresets[static_cast<size_t>(std::clamp(ledPreset_, 0, 4))];
     for (const auto& batch : penthouseBatches_) {
         if (batch.material == 9) continue;
-        glUniform4fv(locColor_, 1, batch.color.data());
+        auto color = batch.color;
+        if (batch.material == 70 || batch.material == 71 || batch.material == 72) {
+            if (roomLightsOn_) {
+                color[0] = selectedLed[0]; color[1] = selectedLed[1]; color[2] = selectedLed[2];
+            } else {
+                color[0] = 0.004f; color[1] = 0.006f; color[2] = 0.010f;
+            }
+        } else if (batch.material == 73 && !roomLightsOn_) {
+            color[0] = 0.004f; color[1] = 0.006f; color[2] = 0.010f;
+        }
+        glUniform4fv(locColor_, 1, color.data());
         glUniform1i(locMaterial_, batch.material);
         glDrawArrays(GL_TRIANGLES, batch.first, batch.count);
     }
@@ -1278,6 +1298,7 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     locCeilingLightPosition_=glGetUniformLocation(program_,"uCeilingLightPosition");
     locCeilingLightColor_=glGetUniformLocation(program_,"uCeilingLightColor");
     locCeilingLightIntensity_=glGetUniformLocation(program_,"uCeilingLightIntensity");
+    locRoomLightLevel_=glGetUniformLocation(program_,"uRoomLightLevel");
     locPracticalLightPosition_=glGetUniformLocation(program_,"uPracticalLightPosition");
     locPracticalLightColor_=glGetUniformLocation(program_,"uPracticalLightColor");
     locPracticalLightIntensity_=glGetUniformLocation(program_,"uPracticalLightIntensity");
@@ -1651,6 +1672,72 @@ void RoomRenderer::toggleMenu() {
     previousMenuNavigation_ = false;
     if (menuVisible_) menuSelection_ = 0;
     menuTextureDirty_ = true;
+}
+
+void RoomRenderer::handleRoomControlInput(const XrPosef& controllerPose, uint32_t poseFlags, bool selectPressed) {
+    if (!settings_.roomControlsEnabled || !selectPressed || menuVisible_ ||
+        (poseFlags & 3u) != 3u || activeEnvironmentIndex_ != 29 || !penthouseVao_) return;
+
+    // Transform the controller ray through the same virtual room transform used by
+    // renderEye. This keeps interaction targets aligned after joystick walking/turning.
+    const float sittingDrop = sitting_ ? std::clamp(settings_.sittingHeadDropM, 0.10f, 0.75f) : 0.0f;
+    const float c = std::cos(-virtualYaw_);
+    const float s = std::sin(-virtualYaw_);
+    const float px = controllerPose.position.x - yawPivotX_;
+    const float pz = controllerPose.position.z - yawPivotZ_;
+    float ox = yawPivotX_ + c * px + s * pz - (moveX_ + worldOffsetX_);
+    float oy = controllerPose.position.y + sittingDrop;
+    float oz = yawPivotZ_ - s * px + c * pz - (moveZ_ + worldOffsetZ_);
+
+    // OpenXR controller grip pose points along local -Z.
+    const Mat4 orientation = quatMatrix(controllerPose.orientation);
+    float dx = -orientation[8];
+    float dy = -orientation[9];
+    float dz = -orientation[10];
+    const float roomDx = c * dx + s * dz;
+    const float roomDz = -s * dx + c * dz;
+    dx = roomDx; dz = roomDz;
+    const float directionLength = std::sqrt(dx*dx + dy*dy + dz*dz);
+    if (directionLength < 0.001f) return;
+    dx /= directionLength; dy /= directionLength; dz /= directionLength;
+
+    const float floorY = settings_.floorOffsetY;
+
+    // Wall rocker on the right-hand entrance wall. Trigger is a press edge, so
+    // holding the controller on it cannot toggle repeatedly.
+    if (dx > 0.10f) {
+        const float t = (3.84f - ox) / dx;
+        if (t > 0.05f && t < 3.0f) {
+            const float hitY = oy + dy * t;
+            const float hitZ = oz + dz * t;
+            if (std::fabs(hitY - (floorY + 1.35f)) < 0.19f &&
+                std::fabs(hitZ - 3.51f) < 0.14f) {
+                roomLightsOn_ = !roomLightsOn_;
+                LOGI("Penthouse room lights %s", roomLightsOn_ ? "on" : "off");
+                return;
+            }
+        }
+    }
+
+    // Five-button LED remote on the right bedside table. Aim down and press one
+    // of the tactile buttons to choose cyan, blue, violet, magenta or amber.
+    if (dy < -0.10f) {
+        const float remoteTopY = floorY + 1.146f;
+        const float t = (remoteTopY - oy) / dy;
+        if (t > 0.05f && t < 2.5f) {
+            const float hitX = ox + dx * t;
+            const float hitZ = oz + dz * t;
+            if (std::fabs(hitX - 0.63f) < 0.115f &&
+                std::fabs(hitZ + 3.98f) < 0.205f) {
+                const float firstButtonZ = -3.98f - 0.14f;
+                const int button = static_cast<int>(std::lround((hitZ - firstButtonZ) / 0.07f));
+                if (button >= 0 && button < 5) {
+                    ledPreset_ = button;
+                    LOGI("Penthouse LED preset changed to %d", ledPreset_);
+                }
+            }
+        }
+    }
 }
 
 void RoomRenderer::handleMenuInput(float vertical, bool selectPressed) {
@@ -2350,20 +2437,23 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glActiveTexture(GL_TEXTURE0);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
     glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
-    glUniform1f(locCeilingLightIntensity_,1.55f);
+    const float roomLightLevel = roomLightsOn_ ? 1.0f : 0.015f;
+    glUniform1f(locRoomLightLevel_, roomLightLevel);
+    glUniform1f(locCeilingLightIntensity_,1.55f*roomLightLevel);
     glUniform3f(locPracticalLightPosition_,-halfW+0.30f,floorY+1.92f,-1.45f);
     glUniform3f(locPracticalLightColor_,0.40f,0.32f,1.0f);
-    glUniform1f(locPracticalLightIntensity_,0.46f);
-    // Recessed blue, violet and magenta fixtures cast colored bounce on nearby surfaces.
+    glUniform1f(locPracticalLightIntensity_,0.46f*roomLightLevel);
+    // All RGB emitters share one selected preset; the Blender material batches
+    // are recolored at draw time, leaving the skyline windows unchanged.
     glUniform3f(locNeonBluePosition_,-halfW+0.20f,floorY+2.75f,-0.45f);
     glUniform3f(locNeonBlueColor_,0.12f,0.34f,1.0f);
-    glUniform1f(locNeonBlueIntensity_,2.25f);
+    glUniform1f(locNeonBlueIntensity_,2.25f*roomLightLevel);
     glUniform3f(locNeonVioletPosition_,halfW-0.20f,floorY+2.55f,0.80f);
     glUniform3f(locNeonVioletColor_,0.55f,0.14f,1.0f);
-    glUniform1f(locNeonVioletIntensity_,2.05f);
+    glUniform1f(locNeonVioletIntensity_,2.05f*roomLightLevel);
     glUniform3f(locNeonPinkPosition_,0.0f,floorY+2.25f,backZ+0.58f);
     glUniform3f(locNeonPinkColor_,1.0f,0.075f,0.38f);
-    glUniform1f(locNeonPinkIntensity_,1.55f);
+    glUniform1f(locNeonPinkIntensity_,1.55f*roomLightLevel);
     // Use the Blender-authored mesh for the base penthouse when all model visibility
     // toggles are in their default state. Preserve the procedural fallback for variants.
     skipProceduralDraws_ = activeEnvironmentIndex_ == 29 && penthouseVao_ != 0 &&
@@ -3095,6 +3185,30 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     if (skipProceduralDraws_) {
         skipProceduralDraws_ = false;
         drawPenthouseMesh(pv.data(), floorY);
+
+        // Live status details for the Blender-authored wall switch and tabletop
+        // remote. The physical housings/buttons are part of the mesh; these small
+        // emissive overlays reflect the current room-light and LED-preset state.
+        const std::array<std::array<float, 4>, 5> presetColors{{
+            rgb(0.02f,0.80f,1.00f), rgb(0.04f,0.20f,1.00f),
+            rgb(0.48f,0.08f,1.00f), rgb(1.00f,0.035f,0.32f),
+            rgb(1.00f,0.62f,0.28f)
+        }};
+        const auto& activePresetColor = presetColors[static_cast<size_t>(std::clamp(ledPreset_,0,4))];
+        drawSphere(pv.data(),3.829f,floorY+1.445f,3.455f,
+                   .018f,.018f,.018f,
+                   roomLightsOn_ ? rgb(0.12f,0.92f,0.40f) : rgb(0.95f,0.08f,0.08f),7);
+        for (int button=0;button<5;++button) {
+            const float buttonZ=-3.98f-.14f+button*.07f;
+            const float radius=button==ledPreset_?.027f:.018f;
+            auto buttonColor=presetColors[static_cast<size_t>(button)];
+            if (!roomLightsOn_) {
+                buttonColor[0]*=.30f; buttonColor[1]*=.30f; buttonColor[2]*=.30f;
+            }
+            drawSphere(pv.data(),.63f,floorY+1.151f,buttonZ,
+                       radius,.012f,radius,buttonColor,7);
+        }
+
         const bool monitorStream = settings_.screenDestination == "monitor" ||
                                    settings_.screenDestination == "both";
         if (monitorStream && hasVideo) {
