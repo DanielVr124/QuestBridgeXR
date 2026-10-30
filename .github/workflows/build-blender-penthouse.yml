@@ -4,7 +4,7 @@ on:
   push:
     branches: [feature/blender-penthouse-base]
     paths:
-      - "tools/blender/**"
+      - "tools/blender/build_skyline_penthouse.py"
       - ".github/workflows/build-blender-penthouse.yml"
   workflow_dispatch:
 
