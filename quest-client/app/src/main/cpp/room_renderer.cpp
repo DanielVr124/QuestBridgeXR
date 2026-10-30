@@ -376,41 +376,43 @@ void main(){
   float roughness=0.72;
   float metallic=0.04;
   float surface=0.0;
+  // Keep material response values cheap and deterministic when atlas maps are resident.
   if(uMaterial==1 || uMaterial==6) {
-    // Directional grain, soft pores, and staggered plank joints.
-    float warp=fbm(uv*vec2(2.2,0.42))*0.20;
-    float grain=sin((uv.y+warp)*145.0 + fbm(uv*vec2(4.0,0.8))*5.0);
-    float fine=sin((uv.y+warp)*510.0)*0.18;
-    surface += grain*0.075 + fine*0.018 + (fbm(uv*vec2(18.0,3.0))-0.5)*0.11;
     roughness=0.58;
+    if(uHasMaterialAtlas==0) {
+      float warp=fbm(uv*vec2(2.2,0.42))*0.20;
+      float grain=sin((uv.y+warp)*145.0 + fbm(uv*vec2(4.0,0.8))*5.0);
+      float fine=sin((uv.y+warp)*510.0)*0.18;
+      surface += grain*0.075 + fine*0.018 + (fbm(uv*vec2(18.0,3.0))-0.5)*0.11;
+    }
     if(uMaterial==6) {
       vec2 plank=fract(vec2(uv.x+mod(floor(uv.y),2.0)*0.5,uv.y));
       float seam=min(min(plank.x,1.0-plank.x),min(plank.y,1.0-plank.y));
       surface -= (1.0-smoothstep(0.008,0.035,seam))*0.20;
     }
   } else if(uMaterial==2) {
-    // Fine mineral variation keeps painted plaster from looking like flat plastic.
-    surface += (fbm(uv*vec2(13.0,11.0))-0.5)*0.075;
-    surface += (noise2(uv*vec2(96.0,84.0))-0.5)*0.025;
     roughness=0.92;
+    if(uHasMaterialAtlas==0) {
+      surface += (fbm(uv*vec2(13.0,11.0))-0.5)*0.075;
+      surface += (noise2(uv*vec2(96.0,84.0))-0.5)*0.025;
+    }
   } else if(uMaterial==3) {
-    // Tight woven fibres with low-contrast yarn variation for upholstery.
-    vec2 weave=fract(uv*vec2(190.0,160.0));
-    float thread=max(smoothstep(0.02,0.18,weave.x)*(1.0-smoothstep(0.76,0.98,weave.x)),
-                     smoothstep(0.02,0.18,weave.y)*(1.0-smoothstep(0.76,0.98,weave.y)));
-    surface += (thread-0.42)*0.045+(fbm(uv*vec2(22.0,22.0))-0.5)*0.05;
     roughness=0.94;
+    if(uHasMaterialAtlas==0) {
+      vec2 weave=fract(uv*vec2(190.0,160.0));
+      float thread=max(smoothstep(0.02,0.18,weave.x)*(1.0-smoothstep(0.76,0.98,weave.x)),
+                       smoothstep(0.02,0.18,weave.y)*(1.0-smoothstep(0.76,0.98,weave.y)));
+      surface += (thread-0.42)*0.045+(fbm(uv*vec2(22.0,22.0))-0.5)*0.05;
+    }
   } else if(uMaterial==4) {
-    // Satin/brushed metal grain runs along one axis and catches narrow highlights.
-    surface += (noise2(vec2(uv.x*7.0,uv.y*260.0))-0.5)*0.035;
     roughness=0.27;
     metallic=0.78;
+    if(uHasMaterialAtlas==0) surface += (noise2(vec2(uv.x*7.0,uv.y*260.0))-0.5)*0.035;
   } else if(uMaterial==5) {
-    // Moulded polymer: subdued mottling and a soft, broad clear-coat response.
-    surface += (fbm(uv*vec2(27.0,27.0))-0.5)*0.035;
     roughness=0.39;
     metallic=0.02;
-  } else {
+    if(uHasMaterialAtlas==0) surface += (fbm(uv*vec2(27.0,27.0))-0.5)*0.035;
+  } else if(uHasMaterialAtlas==0) {
     surface += (noise2(uv*140.0)-0.5)*0.025;
   }
   if(uHasMaterialAtlas!=0 && (uMaterial==1 || uMaterial==2 || uMaterial==3 || uMaterial==4 || uMaterial==6)) {
@@ -429,12 +431,13 @@ void main(){
 
   vec3 dpdx=dFdx(vWorldPosition), dpdy=dFdy(vWorldPosition);
   vec3 normal=normalize(cross(dpdx,dpdy));
-  vec2 duvdx=dFdx(uv), duvdy=dFdy(uv);
-  vec3 tangent=normalize(dpdx*duvdy.y-dpdy*duvdx.y);
-  vec3 bitangent=normalize(-dpdx*duvdy.x+dpdy*duvdx.x);
   if (!gl_FrontFacing) normal=-normal;
   if(uHasNormalAtlas!=0 && uHasMaterialAtlas!=0 &&
      (uMaterial==1 || uMaterial==2 || uMaterial==3 || uMaterial==4 || uMaterial==6)) {
+    vec2 duvdx=dFdx(uv), duvdy=dFdy(uv);
+    vec3 tangent=normalize(dpdx*duvdy.y-dpdy*duvdx.y);
+    vec3 bitangent=normalize(-dpdx*duvdy.x+dpdy*duvdx.x);
+    bitangent*=sign(dot(cross(tangent,bitangent),normal));
     vec3 tangentNormal=texture(uNormalAtlas,materialAtlasUv).xyz*2.0-1.0;
     tangentNormal.xy*=0.38;
     tangentNormal=normalize(tangentNormal);
