@@ -335,6 +335,8 @@ in vec2 vUv;
 in vec3 vWorldPosition;
 uniform vec4 uColor;
 uniform sampler2D uTexture;
+uniform sampler2D uMaterialAtlas;
+uniform int uHasMaterialAtlas;
 uniform int uTextured;
 uniform int uMaterial;
 uniform vec2 uUvScale;
@@ -407,6 +409,17 @@ void main(){
     metallic=0.02;
   } else {
     surface += (noise2(uv*140.0)-0.5)*0.025;
+  }
+  if(uHasMaterialAtlas!=0 && (uMaterial==1 || uMaterial==2 || uMaterial==3 || uMaterial==4 || uMaterial==6)) {
+    vec2 atlasOrigin=vec2(0.0,0.0);
+    if(uMaterial==2) atlasOrigin=vec2(0.5,0.0);
+    else if(uMaterial==3) atlasOrigin=vec2(0.0,0.5);
+    else if(uMaterial==4) atlasOrigin=vec2(0.5,0.5);
+    // Atlas tiles are inset from their boundaries to prevent mip bleed.
+    vec2 atlasTile=fract(uv*0.42);
+    vec2 atlasUv=atlasOrigin+vec2(0.012)+atlasTile*0.476;
+    float texel=texture(uMaterialAtlas,atlasUv).r;
+    surface += (texel-0.86)*0.55;
   }
   base.rgb=max(base.rgb*(1.0+surface),vec3(0.0));
 
@@ -1027,6 +1040,8 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     locPracticalLightPosition_=glGetUniformLocation(program_,"uPracticalLightPosition");
     locPracticalLightColor_=glGetUniformLocation(program_,"uPracticalLightColor");
     locPracticalLightIntensity_=glGetUniformLocation(program_,"uPracticalLightIntensity");
+    locMaterialAtlas_=glGetUniformLocation(program_,"uMaterialAtlas");
+    locHasMaterialAtlas_=glGetUniformLocation(program_,"uHasMaterialAtlas");
     GLuint vvs=compileShader(GL_VERTEX_SHADER,kVignetteVertex), vfs=compileShader(GL_FRAGMENT_SHADER,kVignetteFragment);
     if(vvs&&vfs){vignetteProgram_=glCreateProgram();glAttachShader(vignetteProgram_,vvs);glAttachShader(vignetteProgram_,vfs);glLinkProgram(vignetteProgram_);GLint vok=GL_FALSE;glGetProgramiv(vignetteProgram_,GL_LINK_STATUS,&vok);if(vok!=GL_TRUE){glDeleteProgram(vignetteProgram_);vignetteProgram_=0;}}
     if(vvs)glDeleteShader(vvs);if(vfs)glDeleteShader(vfs);
@@ -1034,6 +1049,18 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     environmentTextures_[0]=loadRgbAsset(assets,"environments/blossom.rgb");
     environmentTextures_[1]=loadRgbAsset(assets,"environments/night_city.rgb");
     environmentTextures_[2]=loadRgbAsset(assets,"environments/golden_city.rgb");
+    materialAtlasTexture_=loadRgbAsset(assets,"materials/room_surface_atlas.rgb");
+    if(materialAtlasTexture_) {
+        glBindTexture(GL_TEXTURE_2D,materialAtlasTexture_);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D,0);
+        LOGI("loaded room surface material atlas");
+    } else {
+        LOGW("room surface material atlas missing; procedural material fallback active");
+    }
     // A harmless fallback texture gives an intentional dark idle screen before a PC stream starts.
     const uint8_t idlePixels[4*4*3] = {
       18,24,39, 20,28,45, 20,28,45, 18,24,39, 20,28,45, 35,42,63, 35,42,63, 20,28,45,
@@ -1626,6 +1653,11 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     sofa=rgb(.20f,.24f,.30f);
     glUseProgram(program_);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDisable(GL_CULL_FACE);
     glUniform1i(locTexture_,0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D,materialAtlasTexture_);
+    glUniform1i(locMaterialAtlas_,1);
+    glUniform1i(locHasMaterialAtlas_,materialAtlasTexture_?1:0);
+    glActiveTexture(GL_TEXTURE0);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
     glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
     glUniform1f(locCeilingLightIntensity_,1.55f);
@@ -2031,5 +2063,6 @@ void RoomRenderer::release() {
     if(roundedVao_)glDeleteVertexArrays(1,&roundedVao_);if(roundedVbo_)glDeleteBuffers(1,&roundedVbo_);
     for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
     if(groundShadowTexture_)glDeleteTextures(1,&groundShadowTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=0;sphereVertexCount_=roundedVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    if(materialAtlasTexture_)glDeleteTextures(1,&materialAtlasTexture_);
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=0;sphereVertexCount_=roundedVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
 }
