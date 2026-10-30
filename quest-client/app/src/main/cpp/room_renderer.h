@@ -38,6 +38,7 @@ public:
     void cycleEnvironment();
     void toggleSitting(const XrPosef& headPose);
     void toggleMenu();
+    void handleRoomControlInput(const XrPosef& controllerPose, uint32_t poseFlags, bool selectPressed);
     bool menuVisible() const { return menuVisible_; }
     void handleMenuInput(float vertical, bool selectPressed);
     bool sitting() const { return sitting_; }
@@ -128,6 +129,7 @@ private:
     GLint locCeilingLightPosition_ = -1;
     GLint locCeilingLightColor_ = -1;
     GLint locCeilingLightIntensity_ = -1;
+    GLint locRoomLightLevel_ = -1;
     GLint locPracticalLightPosition_ = -1;
     GLint locPracticalLightColor_ = -1;
     GLint locPracticalLightIntensity_ = -1;
@@ -178,4 +180,6 @@ private:
     bool menuVisible_ = false;
     int menuSelection_ = 0;
     bool previousMenuNavigation_ = false;
+    bool roomLightsOn_ = true;
+    int ledPreset_ = 0;
 };
