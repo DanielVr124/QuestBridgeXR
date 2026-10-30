@@ -1327,7 +1327,7 @@ void RoomRenderer::createGeometry() {
                 const Vertex b{x0,y0,z1,float(row+1)/pillowGrid,t0};
                 const Vertex c{x1,y1,z1,float(row+1)/pillowGrid,t1};
                 const Vertex d{x1,y1,z0,float(row)/pillowGrid,t1};
-                if(side>0){addTri(a,b,c);addTri(a,c,d);}
+                if(side<0){addTri(a,b,c);addTri(a,c,d);}
                 else {addTri(a,c,b);addTri(a,d,c);}
             }
         }
