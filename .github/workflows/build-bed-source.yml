@@ -54,7 +54,7 @@ jobs:
           python - <<'PY'
           import json, pathlib
           manifest = json.loads(pathlib.Path("art/bed/bed_manifest.json").read_text())
-          assert manifest["runtime_draw_meshes"] == 8
+          assert manifest["runtime_draw_meshes"] == 9
           assert manifest["editable_mesh_objects"] >= 40
           print("Bed asset:", manifest["dimensions"], "metres;",
                 manifest["triangles"], "triangles")
