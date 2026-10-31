@@ -99,7 +99,7 @@ for side in (-1,1):
             a=inner+segment; b=inner+nxt
             c=outer+nxt; d=outer+segment
             gusset_faces.extend([(a,b,c),(a,c,d)])
-    add_mesh(f'Sleep_pillow_box_gusset_{side}',gusset_vertices,gusset_faces,gusset_uv,'sheet')
+    add_mesh(f'Sleep_pillow_box_gusset_{side}',gusset_vertices,gusset_faces,gusset_uv,'pillow')
 
     # Slightly crowned underside closes the pillow shell and keeps its thickness
     # believable when viewed from a low VR camera.
