@@ -363,6 +363,12 @@ uniform float uCeilingLightIntensity;
 uniform vec3 uPracticalLightPosition;
 uniform vec3 uPracticalLightColor;
 uniform float uPracticalLightIntensity;
+uniform vec3 uPracticalLight2Position;
+uniform vec3 uPracticalLight2Color;
+uniform float uPracticalLight2Intensity;
+uniform vec3 uHeadboardGlowPosition;
+uniform vec3 uHeadboardGlowColor;
+uniform float uHeadboardGlowIntensity;
 uniform vec3 uNeonBluePosition;
 uniform vec3 uNeonBlueColor;
 uniform float uNeonBlueIntensity;
@@ -523,6 +529,15 @@ void main(){
   float practicalAttenuation=1.0/(1.0+0.16*practicalDistance+0.085*practicalDistance*practicalDistance);
   vec3 practical=evaluatePbrLight(normal,viewDir,practicalDirection,base.rgb,roughness,metallic,
                                   uPracticalLightColor*(practicalAttenuation*uPracticalLightIntensity*.58));
+  vec3 practical2Vector=uPracticalLight2Position-vWorldPosition;
+  float practical2Distance=max(length(practical2Vector),0.001);
+  float practical2Attenuation=1.0/(1.0+0.16*practical2Distance+0.085*practical2Distance*practical2Distance);
+  vec3 practical2=evaluatePbrLight(normal,viewDir,practical2Vector/practical2Distance,base.rgb,roughness,metallic,
+                                   uPracticalLight2Color*(practical2Attenuation*uPracticalLight2Intensity*.58));
+  vec3 headboardVector=uHeadboardGlowPosition-vWorldPosition;
+  float headboardDistance=max(length(headboardVector),0.001);
+  vec3 headboardBounce=evaluatePbrLight(normal,viewDir,headboardVector/headboardDistance,base.rgb,roughness,metallic,
+      uHeadboardGlowColor*(uHeadboardGlowIntensity/(1.0+0.18*headboardDistance+0.095*headboardDistance*headboardDistance)));
   vec3 blueVector=uNeonBluePosition-vWorldPosition;
   float blueDistance=max(length(blueVector),0.001);
   vec3 blueBounce=evaluatePbrLight(normal,viewDir,blueVector/blueDistance,base.rgb,roughness,metallic,
@@ -537,7 +552,7 @@ void main(){
       uNeonPinkColor*(uNeonPinkIntensity/(1.0+0.18*pinkDistance+0.095*pinkDistance*pinkDistance)));
   float ambientOcclusion=0.90+max(normal.y,0.0)*0.10;
   vec3 ambient=base.rgb*(0.15+max(normal.y,0.0)*0.035)*ambientOcclusion;
-  vec3 lit=ambient+directional+ceiling+practical+blueBounce+violetBounce+pinkBounce;
+  vec3 lit=ambient+directional+ceiling+practical+practical2+headboardBounce+blueBounce+violetBounce+pinkBounce;
   outColor=vec4(max(lit,vec3(0.0)),base.a);
 }
 )GLSL";
@@ -591,6 +606,42 @@ float headYaw(const XrPosef& pose) {
     return std::atan2(2.0f*(q.w*q.y + q.x*q.z), 1.0f - 2.0f*(q.y*q.y + q.x*q.x));
 }
 std::array<float,4> rgb(float r,float g,float b,float a=1.0f) { return {r,g,b,a}; }
+
+std::array<float,3> hsvToRgb(float h,float saturation,float value) {
+    h=h-std::floor(h);
+    saturation=std::clamp(saturation,0.0f,1.0f);
+    value=std::clamp(value,0.0f,1.0f);
+    const float sector=h*6.0f;
+    const int index=static_cast<int>(std::floor(sector));
+    const float fraction=sector-index;
+    const float p=value*(1.0f-saturation);
+    const float q=value*(1.0f-saturation*fraction);
+    const float t=value*(1.0f-saturation*(1.0f-fraction));
+    switch(index%6) {
+    case 0:return {value,t,p};
+    case 1:return {q,value,p};
+    case 2:return {p,value,t};
+    case 3:return {p,q,value};
+    case 4:return {t,p,value};
+    default:return {value,p,q};
+    }
+}
+std::array<float,3> rgbToHsv(const std::array<float,3>& color) {
+    const float maximum=std::max({color[0],color[1],color[2]});
+    const float minimum=std::min({color[0],color[1],color[2]});
+    const float delta=maximum-minimum;
+    float hue=0.0f;
+    if(delta>0.00001f) {
+        if(maximum==color[0]) hue=std::fmod((color[1]-color[2])/delta,6.0f);
+        else if(maximum==color[1]) hue=(color[2]-color[0])/delta+2.0f;
+        else hue=(color[0]-color[1])/delta+4.0f;
+        hue/=6.0f;
+        if(hue<0.0f) hue+=1.0f;
+    }
+    const float saturation=maximum<=0.00001f?0.0f:delta/maximum;
+    return {hue,saturation,maximum};
+}
+
 
 bool loadRoomFontAtlas() {
     if (gFontAtlasReady && gFontAtlasTexture) return true;
@@ -1200,6 +1251,16 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
 bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings) {
     if(initialized_) return true;
     settings_=settings;
+    if(!ledDefaultsSeeded_) {
+        ledZones_[0].primary={.04f,.48f,1.0f}; ledZones_[0].secondary={.58f,.12f,1.0f};
+        ledZones_[1].primary={.36f,.10f,1.0f}; ledZones_[1].secondary={.04f,.56f,1.0f};
+        ledZones_[2].primary={.04f,.30f,1.0f}; ledZones_[2].secondary={.02f,.72f,1.0f};
+        ledZones_[3].primary={.48f,.08f,1.0f}; ledZones_[3].secondary={.10f,.34f,1.0f};
+        ledZones_[4].primary={.02f,.72f,.82f}; ledZones_[4].secondary={.18f,.22f,1.0f};
+        ledZones_[5].primary={.04f,.34f,1.0f}; ledZones_[5].secondary={.02f,.72f,1.0f};
+        ledZones_[6].primary={.52f,.10f,1.0f}; ledZones_[6].secondary={.12f,.22f,1.0f};
+        ledDefaultsSeeded_=true;
+    }
     GLuint vs=compileShader(GL_VERTEX_SHADER,kVertexShader), fs=compileShader(GL_FRAGMENT_SHADER,kFragmentShader);
     if(!vs||!fs){if(vs)glDeleteShader(vs);if(fs)glDeleteShader(fs);return false;}
     program_=glCreateProgram(); glAttachShader(program_,vs); glAttachShader(program_,fs); glLinkProgram(program_); glDeleteShader(vs); glDeleteShader(fs);
@@ -1218,6 +1279,12 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     locPracticalLightPosition_=glGetUniformLocation(program_,"uPracticalLightPosition");
     locPracticalLightColor_=glGetUniformLocation(program_,"uPracticalLightColor");
     locPracticalLightIntensity_=glGetUniformLocation(program_,"uPracticalLightIntensity");
+    locPracticalLight2Position_=glGetUniformLocation(program_,"uPracticalLight2Position");
+    locPracticalLight2Color_=glGetUniformLocation(program_,"uPracticalLight2Color");
+    locPracticalLight2Intensity_=glGetUniformLocation(program_,"uPracticalLight2Intensity");
+    locHeadboardGlowPosition_=glGetUniformLocation(program_,"uHeadboardGlowPosition");
+    locHeadboardGlowColor_=glGetUniformLocation(program_,"uHeadboardGlowColor");
+    locHeadboardGlowIntensity_=glGetUniformLocation(program_,"uHeadboardGlowIntensity");
     locNeonBluePosition_=glGetUniformLocation(program_,"uNeonBluePosition");
     locNeonBlueColor_=glGetUniformLocation(program_,"uNeonBlueColor");
     locNeonBlueIntensity_=glGetUniformLocation(program_,"uNeonBlueIntensity");
