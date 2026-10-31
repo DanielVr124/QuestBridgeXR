@@ -3,7 +3,7 @@
 import argparse, json, math, sys
 from pathlib import Path
 import bpy
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 PI=math.pi
 HW,HD,RH=4.2,5.4,4.4
@@ -110,7 +110,10 @@ def import_asset(path,loc,name):
     known=set(objs)
     for o in objs:
         if o.parent not in known:
-            w=o.matrix_world.copy();o.parent=root;o.matrix_world=w
+            # Parent without an inverse-world compensation: the Empty's placement
+            # is the exact renderer anchor, so every imported part moves as one GLB.
+            o.parent=root
+            o.matrix_parent_inverse=Matrix.Identity(4)
     bpy.context.view_layer.update()
     return root,objs
 
