@@ -19,6 +19,7 @@ _REQUIRED_VIEWS = {
 
 # The imported glTF rotates Y-up into Blender Z-up. The bed's length becomes
 # Blender Y: the headboard is on +Y and the footboard is on -Y.
+# Keep camera names stable: the source-packaging job expects these exact render filenames.
 NEW_VIEWS = """review_views = [
     # Wide three-quarter framing of the full platform, mattress and headboard.
     ('bed_three_quarter', (5.5,-4.3,4.0), (0,0,1.0), 42),
