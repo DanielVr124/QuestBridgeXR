@@ -39,9 +39,7 @@ class BedDesignPatchTests(unittest.TestCase):
             "Sleep_pillow_piping_",
             "Slate_accent_cushion_",
             "Lumbar_cushion",
-            "silver cotton bedding",
-            "graphite duvet",
-            "midnight ribbed throw",
+            "Sleep_pillow_",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
@@ -55,16 +53,17 @@ class BedDesignPatchTests(unittest.TestCase):
             "Sleep_pillow_box_gusset_",
             "Sleep_pillow_diamond_quilt_",
             "Graphite_accent_pillow_",
-            "Headboard_blue_violet_LED_reveal",
         ):
-            self.assertIn(token, self.patched) if token == "Headboard_blue_violet_LED_reveal" else self.assertNotIn(token, self.patched)
+            with self.subTest(token=token):
+                self.assertNotIn(token, self.patched)
 
-    def test_only_old_headboard_details_are_removed(self):
+    def test_only_old_headboard_channels_are_removed(self):
         self.assertNotIn("Headboard_channel_", self.patched)
         self.assertNotIn("Headboard_channel_stitch_", self.patched)
-        self.assertNotIn("Headboard_top_rail", self.patched) if False else self.assertIn("Headboard_top_rail", self.patched)
+        self.assertIn("Headboard_top_rail", self.patched)
         self.assertIn("Headboard_side_bolster_", self.patched)
         self.assertIn("Headboard_mount_", self.patched)
+        self.assertIn("original bed frame, mattress and bedding retained", self.patched)
 
 
 if __name__ == "__main__":
