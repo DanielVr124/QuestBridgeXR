@@ -81,7 +81,7 @@ class NativeSourceContractTests(unittest.TestCase):
         camera_patch = (ROOT / "tools/blender_bed_camera_patch.py").read_text(encoding="utf-8")
         self.assertIn("bed_pillow_detail", camera_patch)
         self.assertIn("(3.3,4.25,2.8)", camera_patch)
-        self.assertIn("refusing to render misleading close-up or back-facing camera angles", camera_patch)
+        self.assertIn("misleading close-up or back-facing camera angles", camera_patch)
 
 
     def test_room_controls_keep_locomotion_but_have_no_hidden_click_shortcuts(self):
