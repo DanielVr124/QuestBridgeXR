@@ -73,7 +73,7 @@ class NativeSourceContractTests(unittest.TestCase):
         ):
             with self.subTest(bed_detail=design_marker):
                 self.assertIn(design_marker, bed_design)
-        self.assertIn("The Big One Quilted Side Sleeper Pillow", (ROOT / "art/bed/README.md").read_text(encoding="utf-8"))
+        self.assertIn("4 EVER WINNER LED diamond-tufted bed at Walmart", (ROOT / "art/bed/README.md").read_text(encoding="utf-8"))
         blender_importer = (ROOT / "tools/blender_import_bed.py").read_text(encoding="utf-8")
         self.assertIn("TOOLS_DIR = str(Path(__file__).resolve().parent)", blender_importer)
         self.assertIn("sys.path.insert(0, TOOLS_DIR)", blender_importer)
