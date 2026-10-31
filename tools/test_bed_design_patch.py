@@ -28,7 +28,7 @@ class BedDesignPatchTests(unittest.TestCase):
             "Headboard_outer_lip_edge_",
             "Headboard_inner_lip_edge_",
             "Headboard_panel_perimeter_seam",
-            "single smooth charcoal upholstered headboard panel",
+            "Single smooth charcoal upholstered headboard panel",
             "original bed frame, mattress and bedding retained",
         ):
             with self.subTest(token=token):
