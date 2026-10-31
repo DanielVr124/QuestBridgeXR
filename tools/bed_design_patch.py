@@ -20,7 +20,7 @@ def patch_bed_geometry(source: str) -> str:
     # The native GLB importer identifies controllable parts by node name. Keep
     # the LED diffuser separate from the eight fabric material batches, and
     # give it an emissive glTF material so it is visible in Blender renders too.
-    material_marker = "    materials[key]=mat\\n\\nscene=trimesh.Scene(base_frame='BedRoot')"
+    material_marker = "    materials[key]=mat\n\nscene=trimesh.Scene(base_frame='BedRoot')"
     material_replacement = """    materials[key]=mat
 
 # Dedicated emissive diffuser; isolated so the RGB remote can target its node.
@@ -40,7 +40,7 @@ scene=trimesh.Scene(base_frame='BedRoot')"""
 
     runtime_marker = "runtime_scene.add_geometry(merged,geom_name=f'Bed_{key}',node_name=f'Bed_{key}')"
     runtime_replacement = """runtime_name='Bed_Headboard_LED_reveal' if key=='led' else f'Bed_{key}'
-        runtime_scene.add_geometry(merged,geom_name=runtime_name,node_name=runtime_name)"""
+    runtime_scene.add_geometry(merged,geom_name=runtime_name,node_name=runtime_name)
     if source.count(runtime_marker) != 1:
         raise RuntimeError("Bed generator runtime merge block changed; cannot name LED node.")
     source = source.replace(runtime_marker, runtime_replacement, 1)
