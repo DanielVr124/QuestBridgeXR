@@ -16,8 +16,11 @@ def patch_bed_geometry(source: str) -> str:
             "refusing to generate an unexpected model."
         )
     source = source.replace(OLD_GEOMETRY, NEW_GEOMETRY, 1)
-    old_design = "'design':'Diamond-tufted upholstered LED headboard with satin-silver trim and controllable perimeter lighting; original bed frame, mattress and bedding retained',"
-    new_design = "'design':'Black diamond-tufted LED headboard and matching footboard, silver-grey perimeter trim, quilted gusset pillows, graphite duvet and midnight-blue throw',"
+    old_design = "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',"
+    new_design = "'design':'Diamond-tufted upholstered LED headboard with satin-silver trim and controllable perimeter lighting; original bed frame, mattress and bedding retained',"
     if source.count(old_design) != 1:
         raise RuntimeError("Bed metadata design marker changed; update the design patch.")
-    return source.replace(old_design, new_design, 1)
+    if source.count(old_design) != 1:
+        raise RuntimeError("Bed metadata design marker changed; update the design patch.")
+    source = source.replace(old_design, new_design, 1)
+    return source
