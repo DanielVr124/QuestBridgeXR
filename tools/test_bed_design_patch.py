@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression checks that the reference-matched design changes only the headboard."""
+"""Regression checks that only the headboard changes to the single-panel recessed-glow design."""
 from __future__ import annotations
 import gzip
 import pathlib
@@ -18,40 +18,36 @@ class BedDesignPatchTests(unittest.TestCase):
         cls.source = gzip.decompress(compressed.read_bytes()).decode("utf-8")
         cls.patched = patch_bed_geometry(cls.source)
 
-    def test_headboard_matches_black_diamond_tufted_led_reference(self):
+    def test_headboard_is_one_smooth_panel_with_recessed_hidden_angle_glow(self):
         for token in (
+            "Headboard_single_upholstered_panel",
             "Headboard_outer_shell",
-            "Headboard_quilt_backing",
-            "Headboard_diamond_tuft_",
-            "Headboard_diamond_stitch_",
-            "Headboard_tuft_button_base_",
-            "Headboard_crystal_tuft_button_",
-            "Headboard_side_frame_",
-            "Headboard_top_rail",
-            "Headboard_bottom_rail",
-            "Black upholstered diamond-tufted headboard",
-            "materials['headboard_crystal']",
+            "Headboard_rear_backing",
+            "Headboard_outer_lip_side_",
+            "Headboard_inner_lip_side_",
+            "Headboard_outer_lip_edge_",
+            "Headboard_inner_lip_edge_",
+            "Headboard_panel_perimeter_seam",
+            "single smooth charcoal upholstered headboard panel",
+            "original bed frame, mattress and bedding retained",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
-        self.assertIn("diamond_rx=.225;diamond_ry=.155", self.patched)
-        self.assertIn("radial_steps=20", self.patched)
-        self.assertIn("angular_steps=64", self.patched)
-        self.assertIn("math.cos(.5*math.pi*radius)**2", self.patched)
-        self.assertIn("metallicFactor=0.60", self.patched)
-        self.assertIn("roughnessFactor=0.12", self.patched)
+        self.assertIn("taper=.08", self.patched)
+        self.assertIn("No exposed LED tape, bulbs, diamond tufting or decorative buttons", self.patched)
         self.assertIn("m.vertex_normals  # cache smooth per-vertex normals for GLB export", self.patched)
         self.assertIn("merged.vertex_normals  # include normals in optimized runtime batches", self.patched)
 
-    def test_smooth_single_panel_and_old_vertical_channels_are_removed(self):
+    def test_diamonds_buttons_channels_and_visible_strip_geometry_are_absent(self):
         for token in (
-            "Headboard_single_upholstered_panel",
-            "Headboard_inner_lip_side_",
-            "Headboard_inner_lip_edge_",
-            "Headboard_silver_grey_perimeter",
+            "Headboard_diamond_tuft_",
+            "Headboard_diamond_stitch_",
+            "Headboard_tuft_button_",
+            "Headboard_crystal_tuft_button_",
+            "headboard_crystal",
             "Headboard_channel_",
             "Headboard_channel_stitch_",
-            "Single smooth charcoal upholstered headboard panel",
+            "Headboard_LED_strip",
         ):
             with self.subTest(token=token):
                 self.assertNotIn(token, self.patched)
@@ -59,23 +55,15 @@ class BedDesignPatchTests(unittest.TestCase):
     def test_original_sleep_pillows_and_bedding_geometry_are_preserved(self):
         original_pillows = OLD_GEOMETRY.split("# Structural headboard shell")[0]
         self.assertIn(original_pillows, self.patched)
-        for token in (
-            "Sleep_pillow_piping_",
-            "Slate_accent_cushion_",
-            "Lumbar_cushion",
-            "Sleep_pillow_",
-        ):
+        for token in ("Sleep_pillow_piping_", "Slate_accent_cushion_", "Lumbar_cushion", "Sleep_pillow_"):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
 
     def test_no_new_footboard_or_replacement_pillow_system_is_added(self):
         for token in (
-            "Footboard_outer_shell",
-            "Footboard_tufted_backing",
-            "Footboard_diamond_tuft_",
-            "Footboard_tuft_button_",
-            "Sleep_pillow_box_gusset_",
-            "Sleep_pillow_diamond_quilt_",
+            "Footboard_outer_shell", "Footboard_tufted_backing",
+            "Footboard_diamond_tuft_", "Footboard_tuft_button_",
+            "Sleep_pillow_box_gusset_", "Sleep_pillow_diamond_quilt_",
             "Graphite_accent_pillow_",
         ):
             with self.subTest(token=token):
