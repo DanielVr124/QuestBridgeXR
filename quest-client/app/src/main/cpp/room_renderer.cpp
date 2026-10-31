@@ -1704,7 +1704,7 @@ void RoomRenderer::handleMenuInput(float horizontal, float vertical, float adjus
     previousMenuAdjust_ = adjusting;
 }
 
-void RoomRenderer::drawBox(void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,float yaw,int material) {
+void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,float yaw,int material) {
     Mat4 projectionView{}; std::copy(pv, pv + projectionView.size(), projectionView.begin());
     Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,sz))); Mat4 mvp=mul(projectionView,model);
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
@@ -1834,7 +1834,7 @@ void RoomRenderer::drawText(const float* pv, const char* text, float x, float y,
     glBindVertexArray(0); glBindBuffer(GL_ARRAY_BUFFER,0); glBindTexture(GL_TEXTURE_2D,0);
 }
 
-void RoomRenderer::drawSphere(void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,int material) {
+void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,int material) {
     Mat4 projectionView{}; std::copy(pv,pv+projectionView.size(),projectionView.begin());
     const Mat4 model=mul(translation(x,y,z),scaling(sx,sy,sz));
     const Mat4 mvp=mul(projectionView,model);
@@ -1978,7 +1978,7 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float cente
     }
 }
 
-void RoomRenderer::updateLocomotion(void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
+void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
     if(dt<0.0f||dt>0.1f)dt=0.0f;
     const float yaw=headYaw(headPose)+virtualYaw_;
     const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
