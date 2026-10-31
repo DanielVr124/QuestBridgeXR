@@ -1,0 +1,163 @@
+name: Build Blender Bed Model
+
+on:
+  workflow_run:
+    workflows: ["QuestBridge XR Build"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-bed-source:
+    name: Blender 4.5.15 bed project + Cycles renders
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out the successful main build source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Detect bed-model source changes
+        id: changes
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+          if git diff --name-only "${HEAD_SHA}^" "${HEAD_SHA}" | grep -Eq '^(tools/generate_bed_asset.py|tools/generate_bed_asset.py.gz|tools/blender_import_bed.py|tools/blender_import_bed.py.gz|art/bed/README.md|\.github/workflows/build-bed-source.yml)$'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Bed sources did not change; skipping the Blender project rebuild."
+          fi
+
+      - name: Set up Python
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install bed generator dependencies
+        if: steps.changes.outputs.changed == 'true'
+        run: python -m pip install --disable-pip-version-check numpy pillow trimesh
+
+      - name: Generate runtime and editable bed meshes
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          QBX_BED_OUTPUT_DIR: ${{ github.workspace }}/art/bed
+          QBX_BED_RUNTIME_GLB: ${{ github.workspace }}/quest-client/app/src/main/assets/models/arc_upholstered_bed.glb
+        run: |
+          python tools/generate_bed_asset.py
+          test -s art/bed/arc_upholstered_bed_editable.glb
+          test -s quest-client/app/src/main/assets/models/arc_upholstered_bed.glb
+          python - <<'PY'
+          import json, pathlib
+          manifest = json.loads(pathlib.Path("art/bed/bed_manifest.json").read_text())
+          assert manifest["runtime_draw_meshes"] == 8
+          assert manifest["editable_mesh_objects"] >= 50
+          print("Bed asset:", manifest["dimensions"], "metres;",
+                manifest["triangles"], "triangles")
+          PY
+
+      - name: Restore Blender 4.5.15 cache
+        if: steps.changes.outputs.changed == 'true'
+        id: blender-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/blender-4.5.15
+          key: blender-4.5.15-linux-x64
+
+      - name: Install Blender 4.5.15
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          BLENDER_DIR="$HOME/.cache/blender-4.5.15"
+          if [[ ! -x "$BLENDER_DIR/blender" ]]; then
+            mkdir -p "$BLENDER_DIR"
+            curl --fail --location --retry 3 --retry-delay 3 \
+              https://download.blender.org/release/Blender4.5/blender-4.5.15-linux-x64.tar.xz \
+              --output /tmp/blender-4.5.15-linux-x64.tar.xz
+            tar -xJf /tmp/blender-4.5.15-linux-x64.tar.xz \
+              --strip-components=1 -C "$BLENDER_DIR"
+          fi
+          "$BLENDER_DIR/blender" --version | head -3
+
+      - name: Build editable Blender project and render four views
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          "$HOME/.cache/blender-4.5.15/blender" --background \
+            --python tools/blender_import_bed.py -- \
+            --source art/bed/arc_upholstered_bed_editable.glb \
+            --output art/bed/arc_upholstered_bed.blend \
+            --render-dir art/bed/renders
+          test -s art/bed/arc_upholstered_bed.blend
+          test -s art/bed/renders/bed_three_quarter.png
+          test -s art/bed/renders/bed_headboard.png
+          test -s art/bed/renders/bed_side_profile.png
+          test -s art/bed/renders/bed_foot_three_quarter.png
+
+      - name: Package Blender project, source and renders
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          import hashlib
+          root = Path.cwd()
+          files = [
+              Path('art/bed/arc_upholstered_bed.blend'),
+              Path('art/bed/arc_upholstered_bed_editable.glb'),
+              Path('quest-client/app/src/main/assets/models/arc_upholstered_bed.glb'),
+              Path('art/bed/bed_manifest.json'),
+              Path('art/bed/README.md'),
+              Path('art/bed/renders/bed_three_quarter.png'),
+              Path('art/bed/renders/bed_headboard.png'),
+              Path('art/bed/renders/bed_side_profile.png'),
+              Path('art/bed/renders/bed_foot_three_quarter.png'),
+              Path('tools/generate_bed_asset.py'),
+              Path('tools/generate_bed_asset.py.gz'),
+              Path('tools/blender_import_bed.py'),
+              Path('tools/blender_import_bed.py.gz'),
+          ] + sorted(Path('art/bed/textures').glob('*.png'))
+          out = Path('dist/QuestBridgeXR-Bed-Model-Blender-Source.zip')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          with ZipFile(out, 'w', ZIP_DEFLATED, compresslevel=7) as z:
+              for path in files:
+                  if not path.is_file():
+                      raise FileNotFoundError(path)
+                  z.write(path, path.relative_to(root))
+          digest = hashlib.sha256(out.read_bytes()).hexdigest()
+          out.with_suffix(out.suffix + '.sha256').write_text(f'{digest}  {out.name}\n')
+          print('Created', out, 'bytes=', out.stat().st_size)
+          PY
+
+      - name: Upload Blender bed project artifact
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuestBridgeXR-Blender-Bed-Source
+          path: |
+            dist/QuestBridgeXR-Bed-Model-Blender-Source.zip
+            dist/QuestBridgeXR-Bed-Model-Blender-Source.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Add Blender bed project to the Nightly Release
+        if: steps.changes.outputs.changed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: QuestBridge XR Nightly
+          tag_name: nightly
+          target_commitish: main
+          prerelease: true
+          make_latest: false
+          files: |
+            dist/QuestBridgeXR-Bed-Model-Blender-Source.zip
+            dist/QuestBridgeXR-Bed-Model-Blender-Source.zip.sha256
