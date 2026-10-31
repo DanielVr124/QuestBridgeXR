@@ -30,7 +30,7 @@ jobs:
             exit 0
           fi
           HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
-          if git diff --name-only "${HEAD_SHA}^" "${HEAD_SHA}" | grep -Eq '^(tools/generate_bed_asset.py|tools/generate_bed_asset.py.gz|tools/blender_import_bed.py|tools/blender_import_bed.py.gz|tools/bed_design_patch.py|art/bed/README.md|\.github/workflows/build-bed-source.yml)$'; then
+          if git diff --name-only "${HEAD_SHA}^" "${HEAD_SHA}" | grep -Eq '^(tools/generate_bed_asset.py|tools/generate_bed_asset.py.gz|tools/blender_import_bed.py|tools/blender_import_bed.py.gz|tools/blender_bed_camera_patch.py|tools/bed_design_patch.py|art/bed/README.md|\.github/workflows/build-bed-source.yml)$'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -88,7 +88,7 @@ jobs:
           fi
           "$BLENDER_DIR/blender" --version | head -3
 
-      - name: Build editable Blender project and render four views
+      - name: Build editable Blender project and render five views
         if: steps.changes.outputs.changed == 'true'
         shell: bash
         run: |
@@ -100,6 +100,7 @@ jobs:
           test -s art/bed/arc_upholstered_bed.blend
           test -s art/bed/renders/bed_three_quarter.png
           test -s art/bed/renders/bed_headboard.png
+          test -s art/bed/renders/bed_pillow_detail.png
           test -s art/bed/renders/bed_side_profile.png
           test -s art/bed/renders/bed_foot_three_quarter.png
 
@@ -119,11 +120,13 @@ jobs:
               Path('art/bed/README.md'),
               Path('art/bed/renders/bed_three_quarter.png'),
               Path('art/bed/renders/bed_headboard.png'),
+              Path('art/bed/renders/bed_pillow_detail.png'),
               Path('art/bed/renders/bed_side_profile.png'),
               Path('art/bed/renders/bed_foot_three_quarter.png'),
               Path('tools/generate_bed_asset.py'),
               Path('tools/generate_bed_asset.py.gz'),
               Path('tools/bed_design_patch.py'),
+              Path('tools/blender_bed_camera_patch.py'),
               Path('tools/blender_import_bed.py'),
               Path('tools/blender_import_bed.py.gz'),
           ] + sorted(Path('art/bed/textures').glob('*.png'))
