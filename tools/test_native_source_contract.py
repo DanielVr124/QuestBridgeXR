@@ -215,6 +215,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("const float remoteTopY=floorY+.746f", renderer)
         self.assertIn("const float remoteX=bedX+1.73f", renderer)
         self.assertIn("const float remoteX=nx+.20f,remoteZ=nz+.17f", renderer)
+        self.assertIn("nx,floorY+.405f,nz,.52f,.60f,.56f", renderer)
         self.assertIn("selectedPreset=row*2+column", renderer)
         self.assertIn("room_.handleRoomInteraction(roomPointerPose,roomTriggerPressed)", main)
         self.assertLess(main.index("room_.handleRoomInteraction(roomPointerPose,roomTriggerPressed)"),
