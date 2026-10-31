@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Regression checks for the diamond-tufted LED bed and quilted side-sleeper pillows."""
+"""Regression checks that the custom design changes only the bed headboard."""
 from __future__ import annotations
+
 import gzip
 import pathlib
 import sys
@@ -8,7 +9,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from bed_design_patch import patch_bed_geometry
+from bed_design_patch import OLD_GEOMETRY, patch_bed_geometry
 
 
 class BedDesignPatchTests(unittest.TestCase):
@@ -18,56 +19,53 @@ class BedDesignPatchTests(unittest.TestCase):
         cls.source = gzip.decompress(compressed.read_bytes()).decode("utf-8")
         cls.patched = patch_bed_geometry(cls.source)
 
-    def test_diamond_tufted_headboard_has_silver_edge_and_led(self):
+    def test_headboard_is_diamond_tufted_with_silver_trim_and_led_reveal(self):
         for token in (
+            "Headboard_outer_shell",
             "Headboard_tufted_backing",
             "Headboard_diamond_tuft_",
             "Headboard_tuft_button_",
             "Headboard_silver_grey_perimeter",
             "Headboard_blue_violet_LED_reveal",
-            "Black diamond-tufted LED headboard",
+            "Diamond-tufted upholstered LED headboard",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
 
-    def test_footboard_matches_headboard_diamond_design(self):
+    def test_original_sleep_pillows_and_bedding_geometry_are_preserved(self):
+        original_pillows = OLD_GEOMETRY.split("# Structural headboard shell")[0]
+        self.assertIn(original_pillows, self.patched)
+        for token in (
+            "Sleep_pillow_piping_",
+            "Slate_accent_cushion_",
+            "Lumbar_cushion",
+            "silver cotton bedding",
+            "graphite duvet",
+            "midnight ribbed throw",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, self.patched)
+
+    def test_no_new_footboard_or_replacement_pillow_system_is_added(self):
         for token in (
             "Footboard_outer_shell",
             "Footboard_tufted_backing",
             "Footboard_diamond_tuft_",
             "Footboard_tuft_button_",
-            "Footboard_silver_grey_perimeter",
-            "Footboard_blue_violet_LED_reveal",
-        ):
-            with self.subTest(token=token):
-                self.assertIn(token, self.patched)
-
-    def test_sleep_pillows_have_gussets_quilting_and_soft_corners(self):
-        for token in (
             "Sleep_pillow_box_gusset_",
-            "gusset_uv,'pillow')",
-            "Sleep_pillow_top_welt_",
             "Sleep_pillow_diamond_quilt_",
-            "Sleep_pillow_corner_dart_",
-            "PILLOW_TILT = math.radians(10.0)",
-            "def pillow_outline(u, scale=1.0):",
-            "PILLOW_HALF_WIDTH * scale",
-            "PILLOW_HALF_DEPTH * scale",
+            "Graphite_accent_pillow_",
+            "Headboard_blue_violet_LED_reveal",
         ):
-            with self.subTest(token=token):
-                self.assertIn(token, self.patched)
+            self.assertIn(token, self.patched) if token == "Headboard_blue_violet_LED_reveal" else self.assertNotIn(token, self.patched)
 
-    def test_old_ribbed_headboard_and_old_decor_cushions_are_removed(self):
-        for token in (
-            "Headboard_channel_",
-            "Headboard_channel_stitch_",
-            "Slate_accent_cushion_",
-            "Lumbar_cushion",
-            "Wide sculpted charcoal wingback headboard",
-        ):
-            with self.subTest(token=token):
-                self.assertNotIn(token, self.patched)
+    def test_only_old_headboard_details_are_removed(self):
+        self.assertNotIn("Headboard_channel_", self.patched)
+        self.assertNotIn("Headboard_channel_stitch_", self.patched)
+        self.assertNotIn("Headboard_top_rail", self.patched) if False else self.assertIn("Headboard_top_rail", self.patched)
+        self.assertIn("Headboard_side_bolster_", self.patched)
+        self.assertIn("Headboard_mount_", self.patched)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)
