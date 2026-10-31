@@ -1693,6 +1693,7 @@ void RoomRenderer::toggleMenu() {
     previousMenuHorizontal_ = false;
     previousMenuAdjust_ = false;
     environmentDropdownOpen_ = false;
+    lightingColorPickerOpen_ = false;
     if (menuVisible_) menuSelection_ = 0;
 }
 
@@ -2290,7 +2291,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
         roomLightsOn_=!roomLightsOn_;
         LOGI("Room lighting %s",roomLightsOn_?"on":"off");
     } else if(target==Target::LedRemote) {
-        ledPreset_=selectedPreset;
+        applyLedPreset(selectedPreset);
         LOGI("Room LED preset changed to %d",ledPreset_);
     }
 }
@@ -2319,23 +2320,27 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float cameraY=-(camera[4]*camera[12]+camera[5]*camera[13]+camera[6]*camera[14]);
     const float cameraZ=-(camera[8]*camera[12]+camera[9]*camera[13]+camera[10]*camera[14]);
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
-    std::array<std::array<float,3>,4> ledColors{{
-        {{.08f,.34f,1.0f}}, {{.50f,.12f,1.0f}},
-        {{.08f,.78f,1.0f}}, {{1.0f,.08f,.42f}}
-    }};
-    switch(ledPreset_) {
-    case 0: ledColors={{{{1.0f,.10f,.045f}},{{1.0f,.25f,.035f}},{{1.0f,.42f,.08f}},{{1.0f,.07f,.18f}}}}; break;
-    case 1: ledColors={{{{.04f,.86f,.16f}},{{.06f,.52f,.12f}},{{.18f,1.0f,.28f}},{{.34f,1.0f,.12f}}}}; break;
-    case 2: ledColors={{{{.08f,.34f,1.0f}},{{.50f,.12f,1.0f}},{{.08f,.78f,1.0f}},{{1.0f,.08f,.42f}}}}; break;
-    case 3: ledColors={{{{.62f,.78f,1.0f}},{{.82f,.88f,1.0f}},{{.92f,.96f,1.0f}},{{.55f,.68f,.92f}}}}; break;
-    case 4: ledColors={{{{.43f,.08f,1.0f}},{{.78f,.08f,.92f}},{{.26f,.12f,.86f}},{{1.0f,.12f,.72f}}}}; break;
-    case 5: ledColors={{{{.02f,.68f,.74f}},{{.02f,.42f,.55f}},{{.10f,1.0f,.90f}},{{.08f,.88f,.70f}}}}; break;
-    default: break;
-    }
-    const auto accentBlue=rgb(ledColors[0][0],ledColors[0][1],ledColors[0][2]);
-    const auto accentViolet=rgb(ledColors[1][0],ledColors[1][1],ledColors[1][2]);
-    const auto neonCyan=rgb(ledColors[2][0],ledColors[2][1],ledColors[2][2]);
-    const auto neonMagenta=rgb(ledColors[3][0],ledColors[3][1],ledColors[3][2]);
+    const auto ledHeadboard=ledZoneAverageColor(0);
+    const auto ledCeiling=ledZoneAverageColor(1);
+    const auto ledLeftWall=ledZoneAverageColor(2);
+    const auto ledRightWall=ledZoneAverageColor(3);
+    const auto ledRear=ledZoneAverageColor(4);
+    const auto ledLeftLamp=ledZoneAverageColor(5);
+    const auto ledRightLamp=ledZoneAverageColor(6);
+    const auto accentBlue=rgb(ledLeftWall[0],ledLeftWall[1],ledLeftWall[2]);
+    const auto accentViolet=rgb(ledRightWall[0],ledRightWall[1],ledRightWall[2]);
+    const auto neonCyan=rgb(ledRear[0],ledRear[1],ledRear[2]);
+    const auto neonMagenta=rgb(ledRear[0],ledRear[1],ledRear[2]);
+    auto drawGradientBar=[&](int zone,float x,float y,float z,float sx,float sy,float sz,int segments=24) {
+        if(zone<0||zone>=static_cast<int>(ledZones_.size())||!ledZones_[static_cast<size_t>(zone)].enabled) return;
+        const float segmentWidth=sx/static_cast<float>(segments);
+        for(int segment=0;segment<segments;++segment) {
+            const float t=(static_cast<float>(segment)+0.5f)/static_cast<float>(segments);
+            const auto color=ledZoneColor(zone,t);
+            drawBox(pv.data(),x-sx*.5f+segmentWidth*(segment+.5f),y,z,
+                    segmentWidth*1.08f,sy,sz,rgb(color[0],color[1],color[2]),0.0f,7);
+        }
+    };
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
     std::array<float,4> floor = rgb(.09f,.12f,.18f);
     std::array<float,4> wood = rgb(.22f,.18f,.22f);
@@ -2405,22 +2410,29 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glActiveTexture(GL_TEXTURE0);
     const float roomLightScale=roomLightsOn_?1.0f:0.0f;
     glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?1.0f:0.075f);
+    const float roomLightScale=roomLightsOn_?1.0f:0.0f;
+    glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?1.0f:0.075f);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
     glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
     glUniform1f(locCeilingLightIntensity_,1.55f*roomLightScale);
     glUniform3f(locPracticalLightPosition_,-halfW+0.30f,floorY+1.92f,-1.45f);
-    glUniform3f(locPracticalLightColor_,accentViolet[0],accentViolet[1],accentViolet[2]);
-    glUniform1f(locPracticalLightIntensity_,0.46f*roomLightScale);
-    // Recessed blue, violet and magenta fixtures cast colored bounce on nearby surfaces.
+    glUniform3f(locPracticalLightColor_,ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]);
+    glUniform1f(locPracticalLightIntensity_,ledZones_[5].enabled?0.82f*roomLightScale:0.0f);
+    glUniform3f(locPracticalLight2Position_,halfW-0.30f,floorY+1.92f,-1.45f);
+    glUniform3f(locPracticalLight2Color_,ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]);
+    glUniform1f(locPracticalLight2Intensity_,ledZones_[6].enabled?0.82f*roomLightScale:0.0f);
+    glUniform3f(locHeadboardGlowPosition_,halfW-2.0f,floorY+1.43f,-halfD+2.10f-1.22f);
+    glUniform3f(locHeadboardGlowColor_,ledHeadboard[0],ledHeadboard[1],ledHeadboard[2]);
+    glUniform1f(locHeadboardGlowIntensity_,ledZones_[0].enabled?2.60f*roomLightScale:0.0f);
     glUniform3f(locNeonBluePosition_,-halfW+0.20f,floorY+2.75f,-0.45f);
-    glUniform3f(locNeonBlueColor_,accentBlue[0],accentBlue[1],accentBlue[2]);
-    glUniform1f(locNeonBlueIntensity_,2.25f);
+    glUniform3f(locNeonBlueColor_,ledLeftWall[0],ledLeftWall[1],ledLeftWall[2]);
+    glUniform1f(locNeonBlueIntensity_,ledZones_[2].enabled?2.25f*roomLightScale:0.0f);
     glUniform3f(locNeonVioletPosition_,halfW-0.20f,floorY+2.55f,0.80f);
-    glUniform3f(locNeonVioletColor_,accentViolet[0],accentViolet[1],accentViolet[2]);
-    glUniform1f(locNeonVioletIntensity_,2.05f);
+    glUniform3f(locNeonVioletColor_,ledRightWall[0],ledRightWall[1],ledRightWall[2]);
+    glUniform1f(locNeonVioletIntensity_,ledZones_[3].enabled?2.05f*roomLightScale:0.0f);
     glUniform3f(locNeonPinkPosition_,0.0f,floorY+2.25f,backZ+0.58f);
-    glUniform3f(locNeonPinkColor_,neonMagenta[0],neonMagenta[1],neonMagenta[2]);
-    glUniform1f(locNeonPinkIntensity_,1.55f);
+    glUniform3f(locNeonPinkColor_,ledRear[0],ledRear[1],ledRear[2]);
+    glUniform1f(locNeonPinkIntensity_,ledZones_[4].enabled?1.55f*roomLightScale:0.0f);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
     // Deep polished stone replaces the old matte plank floor and picks up colored light.
     drawBox(pv.data(),0,floorY-0.08f,0,halfW*2+0.1f,0.16f,halfD*2+0.1f,floor,0.0f,8);
@@ -2578,10 +2590,20 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float bedPlacement[16] = {
         1,0,0,0, 0,1,0,0, 0,0,1,0, bedX,floorY,bedZ,1
     };
-    const auto bedLedTint=rgb(ledColors[2][0],ledColors[2][1],ledColors[2][2]);
-    // The headboard and footboard LED reveals follow the same six presets as the bedside remote.
     bedModel_.draw(pv.data(),bedPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                   locTexture_,locMaterial_,locRounded_,locUvScale_,&bedLedTint,"LED_reveal");
+                   locTexture_,locMaterial_,locRounded_,locUvScale_);
+    // Concealed headboard light: the upholstered bezel lips project in front
+    // of this narrow source. A normal lying view sees the soft wall/bed bounce;
+    // looking straight at the headboard reveals only the recessed light channel.
+    if(ledZones_[0].enabled) {
+        const float emitterZ=bedZ-1.135f;
+        drawGradientBar(0,bedX,floorY+0.475f,emitterZ,2.14f,.012f,.010f,32);
+        drawGradientBar(0,bedX,floorY+1.875f,emitterZ,2.14f,.012f,.010f,32);
+        for(int edge=0;edge<2;++edge) {
+            const float x=bedX+(edge==0?-1.075f:1.075f);
+            drawGradientBar(0,x,floorY+1.175f,emitterZ,.012f,1.40f,.010f,24);
+        }
+    }
     // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.
     for(int side : {-1,1}) {
         const float nx=bedX+side*1.53f, nz=bedZ-.94f;
@@ -2596,11 +2618,11 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         }
         drawCylinder(pv.data(),nx,floorY+.79f,nz,.055f,.20f,bedMetal,4);
         drawCylinder(pv.data(),nx,floorY+.925f,nz,.25f,.20f,
-                     side<0?accentBlue:accentViolet,3);
+                     side<0?rgb(ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]):rgb(ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]),3);
         drawCylinder(pv.data(),nx,floorY+1.035f,nz,.17f,.025f,
-                     side<0?neonCyan:neonMagenta,0,0.0f);
+                     side<0?rgb(ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]):rgb(ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]),0,0.0f);
         drawSphere(pv.data(),nx,floorY+.91f,nz,.07f,.075f,.07f,
-                   side<0?accentBlue:accentViolet,7);
+                   side<0?rgb(ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]):rgb(ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]),7);
         if(side>0) {
             const float remoteX=nx+.20f,remoteZ=nz+.17f,remoteY=floorY+.720f;
             drawGroundShadow(pv.data(),remoteX,floorY+.709f,remoteZ,.17f,.27f,.18f);
@@ -2643,17 +2665,31 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float trimY = floorY + 3.72f;
     // Recessed RGB coves sit inside a dark ceiling reveal; the cores are truly emissive.
     drawRoundedBox(pv.data(),0,trimY,0,halfW*1.66f,.050f,.075f,trimDark,0.0f,5);
-    drawBox(pv.data(),0,trimY-.030f,0,halfW*1.53f,.012f,.022f,accentViolet,0.0f,7);
-    drawBox(pv.data(),-halfW+.12f,trimY-.08f,0,.020f,.022f,halfD*1.65f,accentBlue,0.0f,7);
-    drawBox(pv.data(), halfW-.12f,trimY-.08f,0,.020f,.022f,halfD*1.65f,accentViolet,0.0f,7);
-    drawBox(pv.data(),0,trimY-.08f,-halfD+.14f,halfW*1.60f,.020f,.022f,neonCyan,0.0f,7);
+    drawGradientBar(1,0,trimY-.030f,0,halfW*1.53f,.012f,.022f,32);
+    // Individually controlled left/right and rear room accents.
+    for(int segment=0;segment<24;++segment) {
+        const float z=-halfD*.82f+(segment+.5f)*(halfD*1.64f/24.0f);
+        const auto left=ledZoneColor(2,(segment+.5f)/24.0f);
+        const auto right=ledZoneColor(3,(segment+.5f)/24.0f);
+        drawBox(pv.data(),-halfW+.12f,trimY-.08f,z,.020f,.022f,halfD*1.65f/24.0f,
+                rgb(left[0],left[1],left[2]),0.0f,7);
+        drawBox(pv.data(),halfW-.12f,trimY-.08f,z,.020f,.022f,halfD*1.65f/24.0f,
+                rgb(right[0],right[1],right[2]),0.0f,7);
+    }
+    drawGradientBar(4,0,trimY-.08f,-halfD+.14f,halfW*1.60f,.020f,.022f,32);
     // Vertical bars are recessed into the side-wall reveals, rather than floating props.
     for(int side : {-1,1}) {
         for(int bar=0;bar<3;++bar) {
             const float z=-1.8f+bar*1.65f;
-            const auto tint=(bar+side+4)%2==0?neonCyan:accentViolet;
+            const int zone=side<0?2:3;
             drawBox(pv.data(),side*(halfW-.16f),floorY+2.45f,z,.055f,1.28f,.10f,trimDark,0.0f,5);
-            drawBox(pv.data(),side*(halfW-.125f),floorY+2.45f,z,.010f,.91f,.026f,tint,0.0f,7);
+            for(int segment=0;segment<12;++segment) {
+                const float t=(segment+.5f)/12.0f;
+                const auto tint=ledZoneColor(zone,t);
+                drawBox(pv.data(),side*(halfW-.125f),floorY+2.45f-.91f*.5f+.91f*t,z,
+                        .010f,.91f/12.0f*1.08f,.026f,
+                        rgb(tint[0],tint[1],tint[2]),0.0f,7);
+            }
         }
     }
 
