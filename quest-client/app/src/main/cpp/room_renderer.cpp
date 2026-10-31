@@ -356,6 +356,7 @@ uniform int uTextured;
 uniform int uMaterial;
 uniform vec2 uUvScale;
 uniform vec3 uCameraPosition;
+uniform float uRoomAmbientIntensity;
 uniform vec3 uCeilingLightPosition;
 uniform vec3 uCeilingLightColor;
 uniform float uCeilingLightIntensity;
@@ -509,7 +510,7 @@ void main(){
   vec3 viewDir=normalize(uCameraPosition-vWorldPosition);
   roughness=clamp(roughness,0.045,1.0);
   vec3 directional= evaluatePbrLight(normal,viewDir,normalize(vec3(-0.42,0.78,0.46)),
-                                     base.rgb,roughness,metallic,vec3(.58,.60,.62));
+                                     base.rgb,roughness,metallic,vec3(.58,.60,.62)*uRoomAmbientIntensity);
   vec3 ceilingVector=uCeilingLightPosition-vWorldPosition;
   float ceilingDistance=max(length(ceilingVector),0.001);
   vec3 ceilingDirection=ceilingVector/ceilingDistance;
@@ -1210,6 +1211,7 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     locModel_=glGetUniformLocation(program_,"uModel");locRounded_=glGetUniformLocation(program_,"uRounded");
     locBevel_=glGetUniformLocation(program_,"uBevel");
     locCameraPosition_=glGetUniformLocation(program_,"uCameraPosition");
+    locRoomAmbientIntensity_=glGetUniformLocation(program_,"uRoomAmbientIntensity");
     locCeilingLightPosition_=glGetUniformLocation(program_,"uCeilingLightPosition");
     locCeilingLightColor_=glGetUniformLocation(program_,"uCeilingLightColor");
     locCeilingLightIntensity_=glGetUniformLocation(program_,"uCeilingLightIntensity");
@@ -2051,6 +2053,91 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     }
 }
 
+void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool triggerPressed) {
+    const bool triggerEdge = triggerPressed && !previousRoomTrigger_;
+    previousRoomTrigger_ = triggerPressed;
+    if (!triggerEdge || menuVisible_ || !settings_.roomControlsEnabled) return;
+
+    float halfW=3.0f,halfD=3.8f;
+    if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}
+    else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
+    (void)halfW;
+
+    const float floorY=settings_.floorOffsetY;
+    const float frontZ=halfD;
+    const float bedX=halfW-2.0f;
+    const float bedZ=-halfD+2.10f;
+    const float remoteX=bedX+1.73f;
+    const float remoteZ=bedZ-.77f;
+
+    const XrQuaternionf roomYaw{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
+    const XrQuaternionf roomOrientation=quatMul(roomYaw,controllerPose.orientation);
+    auto rotateVector=[](const XrQuaternionf& q,const std::array<float,3>& v) {
+        const float tx=2.0f*(q.y*v[2]-q.z*v[1]);
+        const float ty=2.0f*(q.z*v[0]-q.x*v[2]);
+        const float tz=2.0f*(q.x*v[1]-q.y*v[0]);
+        return std::array<float,3>{
+            v[0]+q.w*tx+(q.y*tz-q.z*ty),
+            v[1]+q.w*ty+(q.z*tx-q.x*tz),
+            v[2]+q.w*tz+(q.x*ty-q.y*tx)
+        };
+    };
+    const auto origin=rotateVector(roomYaw,{controllerPose.position.x+moveX_,
+                                             controllerPose.position.y,
+                                             controllerPose.position.z+moveZ_});
+    auto direction=rotateVector(roomOrientation,{0.0f,0.0f,-1.0f});
+    const float directionLength=std::sqrt(direction[0]*direction[0]+direction[1]*direction[1]+direction[2]*direction[2]);
+    if(directionLength<0.0001f)return;
+    for(float& component:direction)component/=directionLength;
+
+    enum class Target { None, LightSwitch, LedRemote };
+    Target target=Target::None;
+    float nearest=4.5f;
+    int selectedPreset=ledPreset_;
+
+    // Wall switch: a forward-facing hit on the rocker beside the entry opening.
+    constexpr float lightSwitchX=1.12f;
+    const float lightSwitchY=floorY+1.42f;
+    const float lightSwitchFaceZ=frontZ-.132f;
+    if(direction[2]>0.10f) {
+        const float t=(lightSwitchFaceZ-origin[2])/direction[2];
+        if(t>0.0f&&t<nearest) {
+            const float hitX=origin[0]+direction[0]*t;
+            const float hitY=origin[1]+direction[1]*t;
+            if(std::fabs(hitX-lightSwitchX)<=.145f&&std::fabs(hitY-lightSwitchY)<=.17f) {
+                nearest=t;
+                target=Target::LightSwitch;
+            }
+        }
+    }
+
+    // The small six-button remote sits on the right bedside table. Its button
+    // surface is deliberately a little larger than the visible caps for VR use.
+    if(direction[1]<-0.12f) {
+        const float remoteTopY=floorY+.746f;
+        const float t=(remoteTopY-origin[1])/direction[1];
+        if(t>0.0f&&t<nearest) {
+            const float hitX=origin[0]+direction[0]*t;
+            const float hitZ=origin[2]+direction[2]*t;
+            if(std::fabs(hitX-remoteX)<=.083f&&std::fabs(hitZ-remoteZ)<=.136f) {
+                const int column=hitX<remoteX?0:1;
+                const int row=std::clamp(static_cast<int>(std::lround((hitZ-remoteZ)/.060f))+1,0,2);
+                nearest=t;
+                selectedPreset=row*2+column;
+                target=Target::LedRemote;
+            }
+        }
+    }
+
+    if(target==Target::LightSwitch) {
+        roomLightsOn_=!roomLightsOn_;
+        LOGI("Room lighting %s",roomLightsOn_?"on":"off");
+    } else if(target==Target::LedRemote) {
+        ledPreset_=selectedPreset;
+        LOGI("Room LED preset changed to %d",ledPreset_);
+    }
+}
+
 XrPosef RoomRenderer::projectionPose(const XrPosef& viewPose) const {
     XrPosef adjusted=viewPose;
     const XrQuaternionf virtualTurn{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
@@ -2075,6 +2162,23 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float cameraY=-(camera[4]*camera[12]+camera[5]*camera[13]+camera[6]*camera[14]);
     const float cameraZ=-(camera[8]*camera[12]+camera[9]*camera[13]+camera[10]*camera[14]);
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
+    std::array<std::array<float,3>,4> ledColors{{
+        {{.08f,.34f,1.0f}}, {{.50f,.12f,1.0f}},
+        {{.08f,.78f,1.0f}}, {{1.0f,.08f,.42f}}
+    }};
+    switch(ledPreset_) {
+    case 0: ledColors={{{{1.0f,.10f,.045f}},{{1.0f,.25f,.035f}},{{1.0f,.42f,.08f}},{{1.0f,.07f,.18f}}}}; break;
+    case 1: ledColors={{{{.04f,.86f,.16f}},{{.06f,.52f,.12f}},{{.18f,1.0f,.28f}},{{.34f,1.0f,.12f}}}}; break;
+    case 2: ledColors={{{{.08f,.34f,1.0f}},{{.50f,.12f,1.0f}},{{.08f,.78f,1.0f}},{{1.0f,.08f,.42f}}}}; break;
+    case 3: ledColors={{{{.62f,.78f,1.0f}},{{.82f,.88f,1.0f}},{{.92f,.96f,1.0f}},{{.55f,.68f,.92f}}}}; break;
+    case 4: ledColors={{{{.43f,.08f,1.0f}},{{.78f,.08f,.92f}},{{.26f,.12f,.86f}},{{1.0f,.12f,.72f}}}}; break;
+    case 5: ledColors={{{{.02f,.68f,.74f}},{{.02f,.42f,.55f}},{{.10f,1.0f,.90f}},{{.08f,.88f,.70f}}}}; break;
+    default: break;
+    }
+    const auto accentBlue=rgb(ledColors[0][0],ledColors[0][1],ledColors[0][2]);
+    const auto accentViolet=rgb(ledColors[1][0],ledColors[1][1],ledColors[1][2]);
+    const auto neonCyan=rgb(ledColors[2][0],ledColors[2][1],ledColors[2][2]);
+    const auto neonMagenta=rgb(ledColors[3][0],ledColors[3][1],ledColors[3][2]);
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
     std::array<float,4> floor = rgb(.09f,.12f,.18f);
     std::array<float,4> wood = rgb(.22f,.18f,.22f);
@@ -2142,21 +2246,23 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform1i(locRoughnessAtlas_,3);
     glUniform1i(locHasRoughnessAtlas_,roughnessAtlasTexture_?1:0);
     glActiveTexture(GL_TEXTURE0);
+    const float roomLightScale=roomLightsOn_?1.0f:0.0f;
+    glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?1.0f:0.075f);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
     glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
-    glUniform1f(locCeilingLightIntensity_,1.55f);
+    glUniform1f(locCeilingLightIntensity_,1.55f*roomLightScale);
     glUniform3f(locPracticalLightPosition_,-halfW+0.30f,floorY+1.92f,-1.45f);
-    glUniform3f(locPracticalLightColor_,0.40f,0.32f,1.0f);
-    glUniform1f(locPracticalLightIntensity_,0.46f);
+    glUniform3f(locPracticalLightColor_,accentViolet[0],accentViolet[1],accentViolet[2]);
+    glUniform1f(locPracticalLightIntensity_,0.46f*roomLightScale);
     // Recessed blue, violet and magenta fixtures cast colored bounce on nearby surfaces.
     glUniform3f(locNeonBluePosition_,-halfW+0.20f,floorY+2.75f,-0.45f);
-    glUniform3f(locNeonBlueColor_,0.12f,0.34f,1.0f);
+    glUniform3f(locNeonBlueColor_,accentBlue[0],accentBlue[1],accentBlue[2]);
     glUniform1f(locNeonBlueIntensity_,2.25f);
     glUniform3f(locNeonVioletPosition_,halfW-0.20f,floorY+2.55f,0.80f);
-    glUniform3f(locNeonVioletColor_,0.55f,0.14f,1.0f);
+    glUniform3f(locNeonVioletColor_,accentViolet[0],accentViolet[1],accentViolet[2]);
     glUniform1f(locNeonVioletIntensity_,2.05f);
     glUniform3f(locNeonPinkPosition_,0.0f,floorY+2.25f,backZ+0.58f);
-    glUniform3f(locNeonPinkColor_,1.0f,0.075f,0.38f);
+    glUniform3f(locNeonPinkColor_,neonMagenta[0],neonMagenta[1],neonMagenta[2]);
     glUniform1f(locNeonPinkIntensity_,1.55f);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
     // Deep polished stone replaces the old matte plank floor and picks up colored light.
@@ -2227,6 +2333,19 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const auto knob=doorFacePoint(-.48f,floorY+1.12f,-.105f);
     drawSphere(pv.data(),knob[0],knob[1],knob[2],.045f,.045f,.045f,brass,4);
 
+    // A slim, flush-mounted smart rocker switch sits just to the right of the doorway.
+    const float lightSwitchX=1.12f,lightSwitchY=floorY+1.42f;
+    drawRoundedBox(pv.data(),lightSwitchX,lightSwitchY,frontZ-.082f,.19f,.31f,.038f,
+                   rgb(.13f,.16f,.23f),0.0f,4);
+    drawRoundedBox(pv.data(),lightSwitchX,lightSwitchY,frontZ-.105f,.158f,.276f,.012f,
+                   rgb(.025f,.034f,.055f),0.0f,5);
+    drawRoundedBox(pv.data(),lightSwitchX,lightSwitchY+(roomLightsOn_?.030f:-.030f),
+                   frontZ-.125f,.064f,.132f,.014f,
+                   roomLightsOn_?rgb(.29f,.34f,.43f):rgb(.105f,.125f,.17f),0.0f,4);
+    drawSphere(pv.data(),lightSwitchX+.052f,lightSwitchY+.105f,frontZ-.133f,
+               .010f,.010f,.010f,
+               roomLightsOn_?rgb(1.0f,.58f,.16f):rgb(.045f,.055f,.075f),7);
+
     // A wide glazing bay occupies the right wall immediately beside the bed.
     const float roomWindowWidth=std::min(3.50f,halfD*.78f);
     const float roomWindowHeight=activeEnvironmentIndex_==1?2.55f:2.15f;
@@ -2283,10 +2402,6 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawSphere(pv.data(),plantX+.12f,floorY+1.26f,plantZ-.08f,.18f,.14f,.08f,leafColor);
     drawSphere(pv.data(),plantX-.12f,floorY+1.28f,plantZ+.06f,.17f,.16f,.08f,leafColor);
 
-    const auto accentBlue = rgb(.08f,.34f,1.0f);
-    const auto accentViolet = rgb(.50f,.12f,1.0f);
-    const auto neonCyan = rgb(.08f,.78f,1.0f);
-    const auto neonMagenta = rgb(1.0f,.08f,.42f);
     const auto trimDark = rgb(.012f,.018f,.034f);
     const auto silver = rgb(.22f,.27f,.39f);
 
@@ -2354,7 +2469,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.
     for(int side : {-1,1}) {
         const float nx=bedX+side*1.53f, nz=bedZ-.94f;
-        drawRoundedBox(pv.data(),nx,floorY+.405f,nz,.52f,.70f,.56f,bedBase,0.0f,5);
+        drawRoundedBox(pv.data(),nx,floorY+.405f,nz,.52f,.60f,.56f,bedBase,0.0f,5);
         drawRoundedBox(pv.data(),nx,floorY+.68f,nz,.56f,.055f,.60f,bedMetal,0.0f,4);
         for(int drawer=0;drawer<2;++drawer) {
             const float dy=floorY+.34f+drawer*.22f;
@@ -2365,11 +2480,35 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         }
         drawCylinder(pv.data(),nx,floorY+.79f,nz,.055f,.20f,bedMetal,4);
         drawCylinder(pv.data(),nx,floorY+.925f,nz,.25f,.20f,
-                     side<0?rgb(.20f,.40f,.95f):rgb(.43f,.18f,.95f),3);
+                     side<0?accentBlue:accentViolet,3);
         drawCylinder(pv.data(),nx,floorY+1.035f,nz,.17f,.025f,
                      side<0?neonCyan:neonMagenta,0,0.0f);
         drawSphere(pv.data(),nx,floorY+.91f,nz,.07f,.075f,.07f,
                    side<0?accentBlue:accentViolet,7);
+        if(side>0) {
+            const float remoteX=nx+.20f,remoteZ=nz+.17f,remoteY=floorY+.720f;
+            drawGroundShadow(pv.data(),remoteX,floorY+.709f,remoteZ,.17f,.27f,.18f);
+            drawRoundedBox(pv.data(),remoteX,remoteY,remoteZ,.15f,.026f,.26f,
+                           rgb(.035f,.043f,.064f),0.0f,5);
+            drawRoundedBox(pv.data(),remoteX,remoteY+.015f,remoteZ,.134f,.006f,.238f,
+                           rgb(.075f,.092f,.135f),0.0f,4);
+            const std::array<std::array<float,3>,6> swatches{{
+                {{1.0f,.08f,.055f}},{{.04f,.95f,.16f}},
+                {{.08f,.34f,1.0f}},{{.88f,.94f,1.0f}},
+                {{.62f,.08f,1.0f}},{{.02f,.86f,.90f}}
+            }};
+            for(int row=0;row<3;++row) for(int column=0;column<2;++column) {
+                const float bx=remoteX+(column==0?-.033f:.033f);
+                const float bz=remoteZ+(row-1)*.060f;
+                drawCylinder(pv.data(),bx,remoteY+.023f,bz,.040f,.008f,
+                             rgb(.018f,.024f,.040f),4);
+                const auto& swatch=swatches[row*2+column];
+                drawCylinder(pv.data(),bx,remoteY+.029f,bz,.032f,.008f,
+                             rgb(swatch[0],swatch[1],swatch[2]),7);
+            }
+            drawSphere(pv.data(),remoteX,remoteY+.031f,remoteZ-.102f,.010f,.006f,.010f,
+                       ledPreset_==2?rgb(.08f,.78f,1.0f):rgb(.72f,.78f,.92f),7);
+        }
     }
 
     // Place the supplied desk almost flush to both walls in the back-left corner.

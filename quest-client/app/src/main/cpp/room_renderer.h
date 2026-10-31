@@ -35,6 +35,7 @@ public:
     void setSettings(const RoomSettings& settings);
     void updateLocomotion(float leftX, float leftY, float rightX, float dt,
                           const XrPosef& headPose);
+    void handleRoomInteraction(const XrPosef& controllerPose, bool triggerPressed);
     void cycleScreenDestination();
     void cycleEnvironment();
     void toggleMenu();
@@ -118,6 +119,7 @@ private:
     GLint locMaterial_ = -1;
     GLint locModel_ = -1;
     GLint locCameraPosition_ = -1;
+    GLint locRoomAmbientIntensity_ = -1;
     GLint locRounded_ = -1;
     GLint locBevel_ = -1;
     GLint locMaterialAtlas_ = -1;
@@ -170,6 +172,9 @@ private:
     bool previousMenuHorizontal_ = false;
     bool previousMenuAdjust_ = false;
     bool reconnectRequested_ = false;
+    bool roomLightsOn_ = true;
+    bool previousRoomTrigger_ = false;
+    int ledPreset_ = 2;
     bool pcConnected_ = false;
     bool pcStreaming_ = false;
     std::string pcHostIp_ = "Not configured";
