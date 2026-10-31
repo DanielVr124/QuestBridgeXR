@@ -1708,107 +1708,161 @@ bool RoomRenderer::consumeReconnectRequest() {
     return requested;
 }
 
-void RoomRenderer::handleMenuInput(float horizontal, float vertical, float adjust, bool selectPressed) {
-    if (!menuVisible_) return;
-    const bool navigatingVertical = std::fabs(vertical) > 0.58f;
-    const bool navigatingHorizontal = std::fabs(horizontal) > 0.68f;
-    const bool adjusting = std::fabs(adjust) > 0.70f;
+void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,bool selectPressed) {
+    if(!menuVisible_) return;
+    const bool navigatingVertical=std::fabs(vertical)>0.58f;
+    const bool navigatingHorizontal=std::fabs(horizontal)>0.68f;
+    const bool adjusting=std::fabs(adjust)>0.70f;
 
-    if (navigatingHorizontal && !previousMenuHorizontal_ && !environmentDropdownOpen_) {
-        menuPage_ = (menuPage_ + (horizontal > 0.0f ? 1 : 3)) % 4;
-        menuSelection_ = 0;
-    } else if (navigatingVertical && !previousMenuNavigation_) {
-        if (environmentDropdownOpen_) {
-            environmentDropdownIndex_ = (environmentDropdownIndex_ +
-                (vertical > 0.0f ? static_cast<int>(kEnvironmentNames.size()) - 1 : 1)) %
+    // In the HSV picker, the left stick controls hue and saturation; the
+    // right stick controls value. A returns to the Lighting page.
+    if(lightingColorPickerOpen_&&menuPage_==3) {
+        if(selectPressed) {
+            lightingColorPickerOpen_=false;
+        } else {
+            lightingPickerHue_=std::fmod(lightingPickerHue_+horizontal*0.0014f+1.0f,1.0f);
+            lightingPickerSaturation_=std::clamp(lightingPickerSaturation_+vertical*0.0015f,0.0f,1.0f);
+            lightingPickerValue_=std::clamp(lightingPickerValue_+adjust*0.0015f,0.04f,1.0f);
+            const auto picked=hsvToRgb(lightingPickerHue_,lightingPickerSaturation_,lightingPickerValue_);
+            auto& zone=ledZones_[static_cast<size_t>(lightingZoneIndex_)];
+            if(lightingColorTarget_==0) zone.primary=picked;
+            else zone.secondary=picked;
+            ledPreset_=-1;
+        }
+        previousMenuNavigation_=false;
+        previousMenuHorizontal_=std::fabs(horizontal)>0.08f;
+        previousMenuAdjust_=std::fabs(adjust)>0.08f;
+        return;
+    }
+
+    if(navigatingHorizontal&&!previousMenuHorizontal_&&!environmentDropdownOpen_) {
+        menuPage_=(menuPage_+(horizontal>0.0f?1:4))%5;
+        menuSelection_=0;
+    } else if(navigatingVertical&&!previousMenuNavigation_) {
+        if(environmentDropdownOpen_) {
+            environmentDropdownIndex_=(environmentDropdownIndex_+
+                (vertical>0.0f?static_cast<int>(kEnvironmentNames.size())-1:1))%
                 static_cast<int>(kEnvironmentNames.size());
         } else {
-            const int rowCounts[4] = {1, 5, 3, 4};
-            const int count = rowCounts[menuPage_];
-            menuSelection_ = (menuSelection_ + (vertical > 0.0f ? count - 1 : 1)) % count;
+            const int rowCounts[5]={1,5,3,6,4};
+            const int count=rowCounts[menuPage_];
+            menuSelection_=(menuSelection_+(vertical>0.0f?count-1:1))%count;
         }
     }
 
-    auto adjustSelected = [&](int direction) {
-        if (menuPage_ == 1) {
-            if (menuSelection_ == 0) {
-                environmentDropdownIndex_ = (environmentDropdownIndex_ +
-                    (direction > 0 ? 1 : static_cast<int>(kEnvironmentNames.size()) - 1)) %
+    auto adjustSelected=[&](int direction) {
+        if(menuPage_==1) {
+            if(menuSelection_==0) {
+                environmentDropdownIndex_=(environmentDropdownIndex_+
+                    (direction>0?1:static_cast<int>(kEnvironmentNames.size())-1))%
                     static_cast<int>(kEnvironmentNames.size());
-                settings_.environment = kEnvironmentNames[environmentDropdownIndex_];
+                settings_.environment=kEnvironmentNames[environmentDropdownIndex_];
                 chooseEnvironment();
-            } else if (menuSelection_ == 1) {
-                const char* sizes[] = {"small", "medium", "large"};
-                const int index = settings_.roomSize == "small" ? 0 : (settings_.roomSize == "large" ? 2 : 1);
-                settings_.roomSize = sizes[(index + (direction > 0 ? 1 : 2)) % 3];
-            } else if (menuSelection_ == 3) {
-                settings_.movementSpeed = std::clamp(settings_.movementSpeed + direction * 0.10f, 0.30f, 3.00f);
+            } else if(menuSelection_==1) {
+                const char* sizes[]={"small","medium","large"};
+                const int index=settings_.roomSize=="small"?0:(settings_.roomSize=="large"?2:1);
+                settings_.roomSize=sizes[(index+(direction>0?1:2))%3];
+            } else if(menuSelection_==3) {
+                settings_.movementSpeed=std::clamp(settings_.movementSpeed+direction*0.10f,0.30f,3.00f);
             }
-        } else if (menuPage_ == 2) {
-            if (menuSelection_ == 0) {
-                const char* modes[] = {"monitor", "tv", "both"};
-                const int index = settings_.screenDestination == "tv" ? 1 :
-                    (settings_.screenDestination == "both" ? 2 : 0);
-                settings_.screenDestination = modes[(index + (direction > 0 ? 1 : 2)) % 3];
-            } else if (menuSelection_ == 2) {
-                settings_.monitorCount = std::clamp(settings_.monitorCount + direction, 1, 3);
+        } else if(menuPage_==2) {
+            if(menuSelection_==0) {
+                const char* modes[]={"monitor","tv","both"};
+                const int index=settings_.screenDestination=="tv"?1:
+                    (settings_.screenDestination=="both"?2:0);
+                settings_.screenDestination=modes[(index+(direction>0?1:2))%3];
+            } else if(menuSelection_==2) {
+                settings_.monitorCount=std::clamp(settings_.monitorCount+direction,1,3);
             }
-        } else if (menuPage_ == 3) {
-            if (menuSelection_ == 1) {
-                settings_.turnSpeed = std::clamp(settings_.turnSpeed + direction * 0.10f, 0.2f, 3.5f);
-            } else if (menuSelection_ == 2) {
-                settings_.snapTurnDegrees = std::clamp(settings_.snapTurnDegrees + direction * 15.0f, 15.0f, 60.0f);
+        } else if(menuPage_==3) {
+            if(menuSelection_==0) {
+                lightingZoneIndex_=(lightingZoneIndex_+(direction>0?1:6))%7;
+            } else if(menuSelection_==1) {
+                auto& zone=ledZones_[static_cast<size_t>(lightingZoneIndex_)];
+                zone.gradient=!zone.gradient;
+            } else if(menuSelection_==4) {
+                auto& zone=ledZones_[static_cast<size_t>(lightingZoneIndex_)];
+                zone.brightness=std::clamp(zone.brightness+direction*0.05f,0.0f,1.0f);
+            }
+            ledPreset_=-1;
+        } else if(menuPage_==4) {
+            if(menuSelection_==1) {
+                settings_.turnSpeed=std::clamp(settings_.turnSpeed+direction*0.10f,0.2f,3.5f);
+            } else if(menuSelection_==2) {
+                settings_.snapTurnDegrees=std::clamp(settings_.snapTurnDegrees+direction*15.0f,15.0f,60.0f);
             }
         }
     };
 
-    if (adjusting && !previousMenuAdjust_) {
-        if (environmentDropdownOpen_) {
-            environmentDropdownIndex_ = (environmentDropdownIndex_ +
-                (adjust > 0.0f ? 1 : static_cast<int>(kEnvironmentNames.size()) - 1)) %
+    if(adjusting&&!previousMenuAdjust_) {
+        if(environmentDropdownOpen_) {
+            environmentDropdownIndex_=(environmentDropdownIndex_+
+                (adjust>0.0f?1:static_cast<int>(kEnvironmentNames.size())-1))%
                 static_cast<int>(kEnvironmentNames.size());
         } else {
-            adjustSelected(adjust > 0.0f ? 1 : -1);
+            adjustSelected(adjust>0.0f?1:-1);
         }
     }
 
-    if (selectPressed) {
-        if (environmentDropdownOpen_) {
-            settings_.environment = kEnvironmentNames[environmentDropdownIndex_];
+    if(selectPressed) {
+        if(environmentDropdownOpen_) {
+            settings_.environment=kEnvironmentNames[environmentDropdownIndex_];
             chooseEnvironment();
-            environmentDropdownOpen_ = false;
-        } else if (menuPage_ == 0) {
-            reconnectRequested_ = true;
-        } else if (menuPage_ == 1) {
-            switch (menuSelection_) {
+            environmentDropdownOpen_=false;
+        } else if(menuPage_==0) {
+            reconnectRequested_=true;
+        } else if(menuPage_==1) {
+            switch(menuSelection_) {
             case 0:
-                environmentDropdownOpen_ = true;
-                environmentDropdownIndex_ = activeEnvironmentIndex_;
+                environmentDropdownOpen_=true;
+                environmentDropdownIndex_=activeEnvironmentIndex_;
                 break;
             case 1: adjustSelected(1); break;
-            case 2: settings_.roomMovementEnabled = !settings_.roomMovementEnabled; break;
+            case 2: settings_.roomMovementEnabled=!settings_.roomMovementEnabled; break;
             case 4:
-                moveX_ = 0.0f;
-                moveZ_ = 0.0f;
-                virtualYaw_ = 0.0f;
-                snapCooldown_ = 0.0f;
-                previousTurnRight_ = previousTurnLeft_ = false;
+                moveX_=0.0f;
+                moveZ_=0.0f;
+                virtualYaw_=0.0f;
+                snapCooldown_=0.0f;
+                previousTurnRight_=previousTurnLeft_=false;
                 break;
             default: break;
             }
-        } else if (menuPage_ == 2) {
-            if (menuSelection_ == 0) adjustSelected(1);
-            else if (menuSelection_ == 1) settings_.showTv = !settings_.showTv;
-            else if (menuSelection_ == 2) adjustSelected(1);
-        } else if (menuPage_ == 3) {
-            if (menuSelection_ == 0) settings_.smoothTurn = !settings_.smoothTurn;
-            else if (menuSelection_ == 3) settings_.comfortVignette = !settings_.comfortVignette;
-            else if (menuSelection_ == 1 || menuSelection_ == 2) adjustSelected(1);
+        } else if(menuPage_==2) {
+            if(menuSelection_==0) adjustSelected(1);
+            else if(menuSelection_==1) settings_.showTv=!settings_.showTv;
+            else if(menuSelection_==2) adjustSelected(1);
+        } else if(menuPage_==3) {
+            auto& zone=ledZones_[static_cast<size_t>(lightingZoneIndex_)];
+            if(menuSelection_==0) {
+                lightingZoneIndex_=(lightingZoneIndex_+1)%7;
+            } else if(menuSelection_==1) {
+                zone.gradient=!zone.gradient;
+                ledPreset_=-1;
+            } else if(menuSelection_==2||menuSelection_==3) {
+                lightingColorTarget_=menuSelection_==2?0:1;
+                const auto& color=lightingColorTarget_==0?zone.primary:zone.secondary;
+                const auto hsv=rgbToHsv(color);
+                lightingPickerHue_=hsv[0];
+                lightingPickerSaturation_=hsv[1];
+                lightingPickerValue_=std::max(0.04f,hsv[2]);
+                lightingColorPickerOpen_=true;
+            } else if(menuSelection_==4) {
+                zone.brightness=std::clamp(zone.brightness+0.05f,0.0f,1.0f);
+                ledPreset_=-1;
+            } else if(menuSelection_==5) {
+                zone.enabled=!zone.enabled;
+                ledPreset_=-1;
+            }
+        } else if(menuPage_==4) {
+            if(menuSelection_==0) settings_.smoothTurn=!settings_.smoothTurn;
+            else if(menuSelection_==3) settings_.comfortVignette=!settings_.comfortVignette;
+            else if(menuSelection_==1||menuSelection_==2) adjustSelected(1);
         }
     }
-    previousMenuNavigation_ = navigatingVertical;
-    previousMenuHorizontal_ = navigatingHorizontal;
-    previousMenuAdjust_ = adjusting;
+    previousMenuNavigation_=navigatingVertical;
+    previousMenuHorizontal_=navigatingHorizontal;
+    previousMenuAdjust_=adjusting;
 }
 
 void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,float yaw,int material) {
