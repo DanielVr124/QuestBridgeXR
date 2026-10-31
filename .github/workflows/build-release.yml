@@ -12,6 +12,50 @@ permissions:
   contents: read
 
 jobs:
+  bed-asset:
+    name: Generate upholstered bed meshes and fabric maps
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install bed asset generator dependencies
+        run: python -m pip install --upgrade pip numpy Pillow trimesh
+
+      - name: Generate optimized and editable bed GLBs
+        run: python art/bed/generate_bed_asset.py
+
+      - name: Validate generated bed models
+        run: |
+          python - <<'PY'
+          import json
+          import trimesh
+          from pathlib import Path
+          out = Path('art/bed/generated')
+          manifest = json.loads((out / 'bed_manifest.json').read_text())
+          runtime = trimesh.load(out / 'arc_upholstered_bed.glb', force='scene')
+          editable = trimesh.load(out / 'arc_upholstered_bed_editable.glb', force='scene')
+          assert len(runtime.geometry) == 8, len(runtime.geometry)
+          assert len(editable.geometry) >= 55, len(editable.geometry)
+          dims = manifest['dimensions']
+          assert 2.5 < dims[0] < 2.8 and 2.0 < dims[1] < 2.3 and 3.3 < dims[2] < 3.7, dims
+          assert manifest['triangles'] < 300000, manifest['triangles']
+          print(f"runtime meshes={len(runtime.geometry)} editable parts={len(editable.geometry)} dimensions={dims}")
+          PY
+
+      - name: Upload generated bed source models
+        uses: actions/upload-artifact@v4
+        with:
+          name: bed-model-source
+          path: art/bed/generated/
+          if-no-files-found: error
+          retention-days: 30
+
   windows-portable:
     name: Windows portable Studio + experimental OpenXR runtime
     runs-on: windows-2022
@@ -63,10 +107,23 @@ jobs:
 
   quest-apk:
     name: Quest Android debug APK
+    needs: [bed-asset]
     runs-on: ubuntu-22.04
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Download generated bed model
+        uses: actions/download-artifact@v4
+        with:
+          name: bed-model-source
+          path: art/bed/generated
+
+      - name: Package bed GLB into Quest Android assets
+        run: |
+          mkdir -p quest-client/app/src/main/assets/models
+          cp art/bed/generated/arc_upholstered_bed.glb quest-client/app/src/main/assets/models/arc_upholstered_bed.glb
+          test -s quest-client/app/src/main/assets/models/arc_upholstered_bed.glb
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -111,6 +168,59 @@ jobs:
           path: quest-client/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+  blender-bed:
+    name: Build editable Blender bed project and studio render
+    needs: [bed-asset]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download generated bed source models
+        uses: actions/download-artifact@v4
+        with:
+          name: bed-model-source
+          path: art/bed/generated
+
+      - name: Install Blender runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxi6 libxrender1 libxfixes3 libxkbcommon0 libsm6 libice6 libxrandr2 libxinerama1 libgl1 libegl1
+
+      - name: Download Blender 4.5.15 LTS
+        run: |
+          wget -q https://download.blender.org/release/Blender4.5/blender-4.5.15-linux-x64.tar.xz -O /tmp/blender.tar.xz
+          tar -xJf /tmp/blender.tar.xz -C "$PWD"
+          echo "$PWD/blender-4.5.15-linux-x64" >> "$GITHUB_PATH"
+          "$PWD/blender-4.5.15-linux-x64/blender" --version
+
+      - name: Build editable Blender project and render
+        run: |
+          ./blender-4.5.15-linux-x64/blender --background --python-exit-code 1 --python tools/blender_import_bed.py -- \
+            --source art/bed/generated/arc_upholstered_bed_editable.glb \
+            --output art/bed/arc_upholstered_bed.blend \
+            --render art/bed/arc_upholstered_bed_blender_render.png
+          test -s art/bed/arc_upholstered_bed.blend
+          test -s art/bed/arc_upholstered_bed_blender_render.png
+
+      - name: Assemble Blender release files
+        run: |
+          mkdir -p bed-release/textures
+          cp art/bed/arc_upholstered_bed.blend bed-release/
+          cp art/bed/arc_upholstered_bed_blender_render.png bed-release/
+          cp art/bed/generated/arc_upholstered_bed.glb bed-release/
+          cp art/bed/generated/arc_upholstered_bed_editable.glb bed-release/
+          cp art/bed/generated/bed_manifest.json bed-release/
+          cp art/bed/generated/textures/*.png bed-release/textures/
+
+      - name: Upload Blender project and model files
+        uses: actions/upload-artifact@v4
+        with:
+          name: bed-blender-deliverables
+          path: bed-release/
+          if-no-files-found: error
+          retention-days: 30
 
   combined-package:
     name: Combined portable ZIP + Windows installer
@@ -185,7 +295,7 @@ jobs:
   publish-release:
     name: Publish downloadable GitHub Release
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
-    needs: [combined-package]
+    needs: [combined-package, blender-bed]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -195,6 +305,12 @@ jobs:
         with:
           name: QuestBridgeXR-Portable
           path: release-assets
+
+      - name: Download editable Blender bed project
+        uses: actions/download-artifact@v4
+        with:
+          name: bed-blender-deliverables
+          path: release-assets/bed
 
       - name: Publish assets to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -209,3 +325,8 @@ jobs:
             release-assets/*.zip
             release-assets/*.sha256
             release-assets/*.exe
+            release-assets/bed/*.blend
+            release-assets/bed/*.png
+            release-assets/bed/*.glb
+            release-assets/bed/*.json
+            release-assets/bed/textures/*.png
