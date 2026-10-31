@@ -17,6 +17,7 @@ struct RoomSettings {
     bool showCouch = false; // Legacy config field; the bedroom renderer no longer draws a couch.
     bool showChair = false; // Legacy config setting; no chair is rendered or collided with.
     bool roomControlsEnabled = true;
+    bool roomMovementEnabled = true;
     bool sittingToggleEnabled = false; // Legacy setting retained for config compatibility.
     float sittingHeadDropM = 0.42f; // Legacy setting; seated mode is no longer active.
     bool smoothTurn = false;
@@ -38,7 +39,10 @@ public:
     void cycleEnvironment();
     void toggleMenu();
     bool menuVisible() const { return menuVisible_; }
-    void handleMenuInput(float vertical, bool selectPressed);
+    void handleMenuInput(float horizontal, float vertical, float adjust, bool selectPressed);
+    void setConnectionState(bool connected, const std::string& hostIp, bool streaming);
+    bool consumeReconnectRequest();
+    XrPosef projectionPose(const XrPosef& viewPose) const;
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
                    GLuint videoTexture, bool hasVideo);
     float locomotionX() const { return moveX_; }
@@ -61,12 +65,14 @@ private:
                     float sx, float sy, float sz, const std::array<float, 4>& color,
                     float yaw = 0.0f, float pitch = 0.0f, int material = 3);
     void drawCurtainPanel(const float* projectionView, float x, float y, float z,
-                          float width, float height, const std::array<float, 4>& color);
+                          float width, float height, const std::array<float, 4>& color,
+                          float yaw = 0.0f);
     void drawCylinder(const float* projectionView, float x, float y, float z,
                       float diameter, float height, const std::array<float, 4>& color,
                       int material = 0, float pitch = 0.0f);
     void drawText(const float* projectionView, const char* text, float x, float y, float z,
-                  float pixelSize, const std::array<float, 4>& color);
+                  float pixelSize, const std::array<float, 4>& color,
+                  float curveCenterX = 0.0f, float curveWidth = 0.0f, float curveDepth = 0.0f);
     void drawSphere(const float* projectionView, float x, float y, float z,
                     float sx, float sy, float sz, const std::array<float, 4>& color,
                     int material = 0);
@@ -78,8 +84,8 @@ private:
                          const std::array<float, 4>& color, int segments = 24);
     void drawGroundShadow(const float* projectionView, float x, float y, float z,
                           float width, float depth, float opacity);
-    void drawEnvironmentWindow(const float* projectionView, float halfW, float floorY, float backZ,
-                               GLuint environmentTexture, float windowW, float windowH);
+    void drawEnvironmentWindow(const float* projectionView, float wallX, float centerZ, float floorY,
+                               GLuint environmentTexture, float windowW, float windowH, float yaw);
 
     RoomSettings settings_{};
     GlbModel deskModel_;
@@ -155,6 +161,15 @@ private:
     bool previousTurnRight_ = false;
     bool previousTurnLeft_ = false;
     bool menuVisible_ = false;
+    int menuPage_ = 0;
     int menuSelection_ = 0;
+    int environmentDropdownIndex_ = 0;
+    bool environmentDropdownOpen_ = false;
     bool previousMenuNavigation_ = false;
+    bool previousMenuHorizontal_ = false;
+    bool previousMenuAdjust_ = false;
+    bool reconnectRequested_ = false;
+    bool pcConnected_ = false;
+    bool pcStreaming_ = false;
+    std::string pcHostIp_ = "Not configured";
 };
