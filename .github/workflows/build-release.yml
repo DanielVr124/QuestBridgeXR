@@ -104,7 +104,7 @@ jobs:
           assert runtime.is_file() and runtime.stat().st_size > 1_000_000
           assert editable.is_file() and editable.stat().st_size > 1_000_000
           assert manifest["runtime_draw_meshes"] == 8
-          assert manifest["editable_mesh_objects"] >= 50
+          assert manifest["editable_mesh_objects"] >= 40
           print("Bed GLB generated:", manifest["dimensions"], "metres;",
                 manifest["triangles"], "triangles")
           PY

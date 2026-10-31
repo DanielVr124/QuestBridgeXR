@@ -5,13 +5,14 @@ This is a custom-made bed asset for the neon gaming bedroom. The shape and texti
 ## Model design
 
 - Low floating charcoal platform with rounded upholstered side rails, a soft footboard, six recessed support feet and a tailored welt seam.
-- Tall seven-channel upholstered headboard with individual cushioned ribs, rolled side bolsters and subtle dark stitching.
-- Separate mattress and fitted cotton sheet, graphite duvet with low-amplitude fabric folds, two sleeping pillows, two slate accent cushions, a lumbar cushion and a draped midnight-blue throw.
-- Eight mobile-friendly runtime material groups with embedded 512 px woven fabric textures; the editable source preserves the individual named components.
+- Wide, softly crowned upholstered wingback headboard with a continuous padded face, rounded wraparound side wings and subtle perimeter welt; the old seven narrow vertical channels have been removed.
+- Two full-size cotton hotel pillows, each tilted back approximately 22 degrees so the upper edge rests against the headboard and the lower edge sits naturally on the mattress. Smaller decorative cushion layers have been removed.
+- Separate mattress and fitted cotton sheet, graphite duvet with low-amplitude fabric folds, and a draped midnight-blue throw.
+- Eight mobile-friendly runtime material groups with embedded 512 px woven fabric textures; the editable source preserves 40+ separately named mesh components.
 
 ## Dimensions and coordinates
 
-All dimensions are metres. X is width, Y is up and Z is bed length. The headboard is at negative Z. The model is centred on the floor plane and measures approximately 2.62 m wide × 3.47 m long × 2.12 m high including the headboard. The Quest room places it at the existing back-right bed anchor; the bedside tables, RGB remote, window, TV and collision footprint remain in their current positions.
+All dimensions are metres. X is width, Y is up and Z is bed length. The headboard is at negative Z. The model is centred on the floor plane and measures approximately 2.62 m wide × 3.47 m long × 2.10 m high including the headboard. The Quest room places it at the existing back-right bed anchor; the bedside tables, RGB remote, window, TV and collision footprint remain in their current positions.
 
 ## Blender project
 
@@ -39,7 +40,7 @@ blender --background --python tools/blender_import_bed.py -- \
 The design borrows broad silhouette/material cues from these reference images, not their geometry:
 
 - [Rove Concepts Harper Bed](https://www.roveconcepts.com/harper-bed) — low floating platform and restrained dark linen styling.
-- [Poliform Dream upholstered bed](https://www.ciatdesign.com/en/dream-upholstered-bed.html) — deep charcoal frame and tall panelled headboard.
+- [Poliform Dream upholstered bed](https://www.ciatdesign.com/en/dream-upholstered-bed.html) — deep charcoal frame and sculpted upholstered headboard.
 - [Contemporary floating upholstered-bed interiors](https://design-homes.ru/komnaty/spalnya/krovati-s-myagkim-izgolovem-foto) — soft upholstered form and subtle under-platform lighting.
 
 The model is original; no third-party 3D bed asset is included or used.
