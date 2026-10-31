@@ -2603,8 +2603,16 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Concealed headboard light: the upholstered bezel lips project in front
     // of this narrow source. A normal lying view sees the soft wall/bed bounce;
     // looking straight at the headboard reveals only the recessed light channel.
-    if(ledZones_[0].enabled) {
-        const float emitterZ=bedZ-1.45f;
+    const float emitterZ=bedZ-1.45f;
+    const float toLedX=bedX-cameraX;
+    const float toLedY=floorY+1.840f-cameraY;
+    const float toLedZ=emitterZ-cameraZ;
+    const float toLedLength=std::max(std::sqrt(toLedX*toLedX+toLedY*toLedY+toLedZ*toLedZ),0.001f);
+    const float viewForwardX=-camera[8],viewForwardY=-camera[9],viewForwardZ=-camera[10];
+    const float straightOn=(viewForwardX*toLedX+viewForwardY*toLedY+viewForwardZ*toLedZ)/toLedLength;
+    // The colored light bounce remains active while reclining, but the actual
+    // emitter is only revealed when the headset is aimed almost straight at it.
+    if(ledZones_[0].enabled&&straightOn>0.985f) {
         drawGradientBar(0,bedX,floorY+.510f,emitterZ,2.10f,.010f,.010f,32);
         drawGradientBar(0,bedX,floorY+1.840f,emitterZ,2.10f,.010f,.010f,32);
         for(int edge=0;edge<2;++edge) {
