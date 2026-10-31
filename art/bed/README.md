@@ -5,7 +5,7 @@ This original bed model is made for the existing neon gaming bedroom. Its design
 ## Model design
 
 - Black upholstered headboard with a broad, softly padded back, individual diamond-shaped tuft pads, recessed lattice points, and small silver-grey pull buttons.
-- Raised silver-grey perimeter trim around the headboard, with a thin blue-violet LED reveal just inside the frame. The footboard has a matching diamond-tufted upholstered face, grey piping and a subtle LED edge.
+- Raised silver-grey perimeter trim around the headboard, with an inset LED reveal. The footboard has a matching diamond-tufted face, grey piping and a matching LED edge. Both LED reveals follow the existing bedside RGB remote's red, green, blue, white, purple and cyan presets.
 - Two full-size side-sleeper pillows with a rounded-rectangle footprint, genuinely deep separate box-gusset sidewalls, a domed/fluffy cotton crown, softly eased corners, raised perimeter welt and diamond-quilt stitching that follows the puffed surface. The top, gusset and underside are separate named meshes; the pillows sit slightly propped against the headboard.
 - Smaller graphite accent pillows remain behind the white pillows; the mattress, fitted cotton sheet, folded graphite duvet, and draped midnight-blue throw retain their existing material palette.
 - The floating black platform, side rails, bedside cabinets, RGB remote, bed anchor, TV, window and collision footprint remain unchanged.
