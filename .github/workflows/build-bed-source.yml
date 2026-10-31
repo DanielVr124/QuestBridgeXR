@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: questbridge-blender-bed-source
+  cancel-in-progress: true
+
 jobs:
   build-bed-source:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
@@ -22,24 +26,12 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 2
 
-      - name: Detect bed-model source changes
+      - name: Build Blender source for this successful main build
         id: changes
         shell: bash
         run: |
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
-          CHANGED_FILES="$(git show --pretty=format: --name-only "$HEAD_SHA")"
-          printf 'Files in triggering commit:\n%s\n' "$CHANGED_FILES"
-          if printf '%s\n' "$CHANGED_FILES" | grep -Fqx -e 'tools/generate_bed_asset.py' -e 'tools/generate_bed_asset.py.gz' -e 'tools/blender_import_bed.py' -e 'tools/blender_import_bed.py.gz' -e 'tools/blender_bed_camera_patch.py' -e 'tools/bed_design_patch.py' -e 'art/bed/README.md' -e '.github/workflows/build-bed-source.yml'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Bed sources did not change; skipping the Blender project rebuild."
-          fi
-
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "Building the current Blender bed source and five review renders."
       - name: Set up Python
         if: steps.changes.outputs.changed == 'true'
         uses: actions/setup-python@v5
