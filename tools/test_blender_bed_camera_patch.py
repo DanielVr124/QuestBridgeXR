@@ -26,7 +26,7 @@ camera_count = len(review_views)
 """
         patched = patch_blender_review_cameras(source)
         self.assertEqual(patched.count("review_views = ["), 1)
-        self.assertIn("bed_pillow_detail", patched)
+        self.assertIn("bed_headboard_detail", patched)
         self.assertIn("(5.5,-4.3,4.0)", patched)
         self.assertIn("camera_count = len(review_views)", patched)
         self.assertNotIn("(9.1, 4.2, 7.8)", patched)
