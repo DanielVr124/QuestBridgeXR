@@ -2409,8 +2409,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
     // Blender-authored upholstered bed asset. The room anchor and footprint stay
     // identical to the previous bed so the existing room layout/collision remain stable.
-    const float bedX=halfW-2.0f;
-    const float bedZ=backZ+2.10f;
+    const float bedX=halfW-2.0f, bedZ=-halfD+2.10f; // backZ+2.10f; keep the established bedroom anchor
     const auto bedBase=rgb(.018f,.024f,.043f);
     const auto bedMetal=rgb(.16f,.20f,.30f);
     drawGroundShadow(pv.data(),bedX,floorY+.004f,bedZ,3.20f,4.05f,.42f);
