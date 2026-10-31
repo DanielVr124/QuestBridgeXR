@@ -2215,7 +2215,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // A wide glazing bay occupies the right wall immediately beside the bed.
     const float roomWindowWidth=std::min(3.50f,halfD*.78f);
     const float roomWindowHeight=activeEnvironmentIndex_==1?2.55f:2.15f;
-    const float windowWallX=halfW+.012f;
+    // Place the glazing just inside the room's inner wall face so the solid wall cannot occlude it.
+    const float windowWallX=halfW-.015f;
     const float windowCenterZ=-halfD+2.10f;
     const float windowYaw=-kPi*.5f;
     drawEnvironmentWindow(pv.data(),windowWallX,windowCenterZ,floorY,env,
