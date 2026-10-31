@@ -1,29 +1,52 @@
-"""Correct camera framing and subject direction in the packed Blender import scene."""
+"""Robust review-camera framing for the packed Blender bed scene.
+
+The original importer is gzip-packed, so its view coordinates can change without
+requiring a brittle whole-block string match. We replace only the review_views
+literal after verifying that it contains the four expected bed views.
+"""
 from __future__ import annotations
 
-OLD_VIEWS = """review_views = [
-    ('bed_three_quarter', (4.4,3.1,4.0), (0,.95,0), 52),
-    ('bed_headboard', (3.5,2.45,-3.25), (0,1.32,-1.28), 58),
-    ('bed_side_profile', (4.9,2.35,.15), (0,.82,0), 54),
-    ('bed_foot_three_quarter', (-4.0,2.8,2.8), (0,.9,.1), 52),
-]"""
+import re
 
+_REVIEW_VIEWS = re.compile(r"(?ms)^review_views\\s*=\\s*\\[.*?^\\]")
+_REQUIRED_VIEWS = {
+    "bed_three_quarter",
+    "bed_headboard",
+    "bed_side_profile",
+    "bed_foot_three_quarter",
+}
+
+# The imported glTF rotates Y-up into Blender Z-up. The bed's length becomes
+# Blender Y: the headboard is on +Y and the footboard is on -Y.
 NEW_VIEWS = """review_views = [
-    # Wide framing keeps the whole 3.75 m bed inside the first review image.
-    ('bed_three_quarter', (5.5,4.3,6.2), (0,.95,0), 42),
-    # The upholstered face points into +Z; these cameras stay on that front side.
-    ('bed_headboard', (2.8,2.7,4.8), (0,1.28,-1.28), 52),
-    # Dedicated fabric/pillow close-up, framed around both puffed cushions.
-    ('bed_pillow_detail', (1.9,2.4,3.1), (0,1.12,-1.02), 68),
-    ('bed_side_profile', (6.5,2.7,.2), (0,.95,0), 48),
-    ('bed_foot_three_quarter', (-5.5,4.0,6.2), (0,.9,.1), 42),
+    # Wide three-quarter framing of the full platform, mattress and headboard.
+    ('bed_three_quarter', (5.5,-4.3,4.0), (0,0,1.0), 42),
+    # Headboard-facing view from its +Y side, with the tufting kept near eye level.
+    ('bed_headboard', (3.3,4.25,2.8), (0,1.2,1.25), 52),
+    # Close fabric view of the domed pillows, grey welt and deep box gusset.
+    ('bed_pillow_detail', (2.0,2.8,1.95), (0,.82,1.12), 68),
+    # Side silhouette view shows pillow depth, mattress height and frame trim.
+    ('bed_side_profile', (6.5,0.0,2.65), (0,0,1.0), 48),
+    # Footboard detail from the -Y side.
+    ('bed_foot_three_quarter', (-5.5,-4.2,4.0), (0,-1.1,.9), 42),
 ]"""
 
 
 def patch_blender_review_cameras(source: str) -> str:
-    if source.count(OLD_VIEWS) != 1:
+    matches = list(_REVIEW_VIEWS.finditer(source))
+    if not matches:
+        raise RuntimeError("Blender camera patch expected a review_views list.")
+    if len(matches) != 1:
+        raise RuntimeError("Blender camera patch expected exactly one review_views list.")
+
+    match = matches[0]
+    original = match.group(0)
+    present = set(re.findall(r"\\(\\s*['\\\"]([^'\\\"]+)['\\\"]\\s*,", original))
+    missing = _REQUIRED_VIEWS - present
+    if missing:
+        names = ", ".join(sorted(missing))
         raise RuntimeError(
-            "Blender camera patch did not find the expected review_views block; "
-            "refusing to render misleading close-up or back-facing camera angles."
+            f"Blender camera patch review_views list is missing required bed camera entries: {names}"
         )
-    return source.replace(OLD_VIEWS, NEW_VIEWS, 1)
+
+    return source[:match.start()] + NEW_VIEWS + source[match.end():]
