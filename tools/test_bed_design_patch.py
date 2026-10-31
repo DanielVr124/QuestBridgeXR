@@ -40,6 +40,8 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertIn("math.cos(.5*math.pi*radius)**2", self.patched)
         self.assertIn("metallicFactor=0.60", self.patched)
         self.assertIn("roughnessFactor=0.12", self.patched)
+        self.assertIn("m.vertex_normals  # cache smooth per-vertex normals for GLB export", self.patched)
+        self.assertIn("merged.vertex_normals  # include normals in optimized runtime batches", self.patched)
 
     def test_smooth_single_panel_and_old_vertical_channels_are_removed(self):
         for token in (
