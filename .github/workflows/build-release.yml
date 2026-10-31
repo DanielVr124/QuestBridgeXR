@@ -87,8 +87,29 @@ jobs:
             "ndk;27.2.12479018" \
             "cmake;3.22.1"
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Install bed model generator dependencies
+        run: python -m pip install --disable-pip-version-check numpy pillow trimesh
+
+      - name: Generate the custom upholstered bed model
+        env:
+          QBX_BED_OUTPUT_DIR: ${{ github.workspace }}/art/bed
+          QBX_BED_RUNTIME_GLB: ${{ github.workspace }}/quest-client/app/src/main/assets/models/arc_upholstered_bed.glb
+        run: |
+          python tools/generate_bed_asset.py
+          python - <<'PY'
+          import json, pathlib
+          manifest = json.loads(pathlib.Path("art/bed/bed_manifest.json").read_text())
+          runtime = pathlib.Path("quest-client/app/src/main/assets/models/arc_upholstered_bed.glb")
+          editable = pathlib.Path("art/bed/arc_upholstered_bed_editable.glb")
+          assert runtime.is_file() and runtime.stat().st_size > 1_000_000
+          assert editable.is_file() and editable.stat().st_size > 1_000_000
+          assert manifest["runtime_draw_meshes"] == 8
+          assert manifest["editable_mesh_objects"] >= 50
+          print("Bed GLB generated:", manifest["dimensions"], "metres;",
+                manifest["triangles"], "triangles")
+          PY
+
+      - name: Set up Gradle        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
@@ -104,8 +125,18 @@ jobs:
           unzip -t quest-client/app/build/outputs/apk/debug/app-debug.apk
           unzip -l quest-client/app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libqbxquest.so|AndroidManifest.xml'
 
-      - name: Upload Quest APK
+      - name: Upload editable Blender bed source
         uses: actions/upload-artifact@v4
+        with:
+          name: bed-model-source
+          path: |
+            art/bed/arc_upholstered_bed_editable.glb
+            art/bed/bed_manifest.json
+            art/bed/textures/*.png
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Quest APK        uses: actions/upload-artifact@v4
         with:
           name: quest-apk
           path: quest-client/app/build/outputs/apk/debug/app-debug.apk
