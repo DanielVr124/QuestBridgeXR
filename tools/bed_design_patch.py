@@ -20,20 +20,20 @@ def patch_bed_geometry(source: str) -> str:
     # Trimesh's glTF exporter only writes NORMAL accessors when vertex_normals
     # have already been evaluated and cached. Without this, the diamond pads
     # become faceted flat-shaded triangles in the runtime and editable GLBs.
-    smooth_mesh_marker = "        m.fix_normals()\\n"
+    smooth_mesh_marker = "        m.fix_normals()\n"
     if source.count(smooth_mesh_marker) != 1:
         raise RuntimeError("Bed mesh smooth-normal marker changed; refusing a flat-shaded GLB.")
     source = source.replace(
         smooth_mesh_marker,
-        smooth_mesh_marker + "        m.vertex_normals  # cache smooth per-vertex normals for GLB export\\n",
+        smooth_mesh_marker + "        m.vertex_normals  # cache smooth per-vertex normals for GLB export\n",
         1
     )
-    runtime_mesh_marker = "    merged.fix_normals()\\n"
+    runtime_mesh_marker = "    merged.fix_normals()\n"
     if source.count(runtime_mesh_marker) != 1:
         raise RuntimeError("Runtime mesh normal marker changed; refusing a flat-shaded runtime GLB.")
     source = source.replace(
         runtime_mesh_marker,
-        runtime_mesh_marker + "    merged.vertex_normals  # include normals in optimized runtime batches\\n",
+        runtime_mesh_marker + "    merged.vertex_normals  # include normals in optimized runtime batches\n",
         1
     )
 
