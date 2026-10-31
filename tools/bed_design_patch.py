@@ -40,7 +40,7 @@ scene=trimesh.Scene(base_frame='BedRoot')"""
 
     runtime_marker = "runtime_scene.add_geometry(merged,geom_name=f'Bed_{key}',node_name=f'Bed_{key}')"
     runtime_replacement = """runtime_name='Bed_Headboard_LED_reveal' if key=='led' else f'Bed_{key}'
-    runtime_scene.add_geometry(merged,geom_name=runtime_name,node_name=runtime_name)
+    runtime_scene.add_geometry(merged,geom_name=runtime_name,node_name=runtime_name)"""
     if source.count(runtime_marker) != 1:
         raise RuntimeError("Bed generator runtime merge block changed; cannot name LED node.")
     source = source.replace(runtime_marker, runtime_replacement, 1)
