@@ -90,6 +90,7 @@ private:
                                GLuint environmentTexture, float windowW, float windowH, float yaw);
 
     RoomSettings settings_{};
+    GlbModel bedModel_;
     GlbModel deskModel_;
     GlbModel monitorModel_;
     GLuint program_ = 0;
