@@ -993,6 +993,17 @@ private:
         if (room_.consumeReconnectRequest()) network_.requestReconnect();
         room_.updateLocomotion(moveX, moveY, turnX, dt, headPose);
 
+        // Use the existing right-hand pose/trigger for physical room hardware.
+        // The ray interaction is independent of PC controller telemetry forwarding.
+        XrPosef roomPointerPose{};
+        uint32_t roomPointerFlags=0;
+        const bool roomPointerValid=locatePose(hands_[1].poseSpace,predictedTime,
+                                               roomPointerPose,roomPointerFlags) &&
+                                   (roomPointerFlags&3u)==3u;
+        const bool roomTriggerPressed=roomPointerValid &&
+            floatAction(hands_[1].trigger,hands_[1].handPath)>.72f;
+        room_.handleRoomInteraction(roomPointerPose,roomTriggerPressed);
+
         if (!config_.controllersEnabled) return;
         for (int handIndex = 0; handIndex < 2; ++handIndex) {
             const HandActions& hand = hands_[handIndex];
