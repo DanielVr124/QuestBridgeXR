@@ -41,7 +41,11 @@ max_frame_mib=16
 incomplete_frame_timeout_ms=120
 ```
 
-`controller_pose` is `grip` or `aim`. `reference_space` is `local` or `stage`; STAGE is selected only if the active Quest OpenXR runtime reports it as supported. `brightness` is bounded to -0.5..0.5 and `contrast` to 0.25..2.5. Positions are scaled in the outgoing tracking telemetry, not in the local compositor's pose used to render the Quest app.
+`controller_pose` is `grip` or `aim`. `reference_space` is `local` or `stage`; STAGE is selected only if the active Quest OpenXR runtime reports it as supported.
+
+## Room hardware controls
+
+With the room menu closed, point the right controller at the wall rocker beside the entry and squeeze the trigger to toggle the main room lights. The recessed RGB strips remain on so the room can stay in its neon gaming look. Point down at the six-button remote on the right bedside table and squeeze a color button to change the ceiling coves, wall strips, bedside accents, and colored light bounce together. These interactions use the existing right-hand pose and trigger and do not replace joystick movement, turning, or menu bindings. `brightness` is bounded to -0.5..0.5 and `contrast` to 0.25..2.5. Positions are scaled in the outgoing tracking telemetry, not in the local compositor's pose used to render the Quest app.
 
 ## Diagnostics
 
