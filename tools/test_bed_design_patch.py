@@ -19,18 +19,30 @@ class BedDesignPatchTests(unittest.TestCase):
         cls.source = gzip.decompress(compressed.read_bytes()).decode("utf-8")
         cls.patched = patch_bed_geometry(cls.source)
 
-    def test_headboard_is_diamond_tufted_with_silver_trim_and_led_reveal(self):
+    def test_headboard_is_one_smooth_upholstered_panel_with_attached_led(self):
         for token in (
             "Headboard_outer_shell",
-            "Headboard_tufted_backing",
-            "Headboard_diamond_tuft_",
-            "Headboard_tuft_button_",
+            "Headboard_single_upholstered_panel",
             "Headboard_silver_grey_perimeter",
             "Headboard_blue_violet_LED_reveal",
-            "Diamond-tufted upholstered LED headboard",
+            "Single smooth charcoal upholstered headboard panel",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
+        self.assertIn("(0,1.175,-1.255),(2.15,1.38,.22)", self.patched)
+        self.assertIn("headboard_led_outline", self.patched)
+        self.assertIn("headboard_led_outline,.012,'sheet'", self.patched)
+
+    def test_no_diamond_tufts_or_buttons_remain_on_the_headboard(self):
+        for token in (
+            "Headboard_diamond_tuft_",
+            "Headboard_tuft_button_",
+            "Headboard_tufted_backing",
+            "Headboard_channel_",
+            "Headboard_channel_stitch_",
+        ):
+            with self.subTest(token=token):
+                self.assertNotIn(token, self.patched)
 
     def test_original_sleep_pillows_and_bedding_geometry_are_preserved(self):
         original_pillows = OLD_GEOMETRY.split("# Structural headboard shell")[0]
@@ -57,9 +69,7 @@ class BedDesignPatchTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertNotIn(token, self.patched)
 
-    def test_only_old_headboard_channels_are_removed(self):
-        self.assertNotIn("Headboard_channel_", self.patched)
-        self.assertNotIn("Headboard_channel_stitch_", self.patched)
+    def test_original_headboard_wings_and_mounting_are_retained(self):
         self.assertIn("Headboard_top_rail", self.patched)
         self.assertIn("Headboard_side_bolster_", self.patched)
         self.assertIn("Headboard_mount_", self.patched)
