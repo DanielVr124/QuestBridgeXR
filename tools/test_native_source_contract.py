@@ -75,6 +75,9 @@ class NativeSourceContractTests(unittest.TestCase):
             with self.subTest(bed_detail=design_marker):
                 self.assertIn(design_marker, bed_design)
         self.assertIn("The Big One Quilted Side Sleeper Pillow", (ROOT / "art/bed/README.md").read_text(encoding="utf-8"))
+        blender_importer = (ROOT / "tools/blender_import_bed.py").read_text(encoding="utf-8")
+        self.assertIn("TOOLS_DIR = str(Path(__file__).resolve().parent)", blender_importer)
+        self.assertIn("sys.path.insert(0, TOOLS_DIR)", blender_importer)
         camera_patch = (ROOT / "tools/blender_bed_camera_patch.py").read_text(encoding="utf-8")
         self.assertIn("bed_pillow_detail", camera_patch)
         self.assertIn("(2.8,2.7,4.8)", camera_patch)
