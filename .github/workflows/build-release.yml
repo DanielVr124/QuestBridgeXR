@@ -109,7 +109,8 @@ jobs:
                 manifest["triangles"], "triangles")
           PY
 
-      - name: Set up Gradle        uses: gradle/actions/setup-gradle@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
@@ -136,7 +137,8 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload Quest APK        uses: actions/upload-artifact@v4
+      - name: Upload Quest APK
+        uses: actions/upload-artifact@v4
         with:
           name: quest-apk
           path: quest-client/app/build/outputs/apk/debug/app-debug.apk
