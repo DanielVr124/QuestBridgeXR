@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   build-bed-source:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     name: Blender 4.5.15 bed project + Cycles renders
     runs-on: ubuntu-22.04
     steps:
@@ -30,7 +31,9 @@ jobs:
             exit 0
           fi
           HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
-          if git diff --name-only "${HEAD_SHA}^" "${HEAD_SHA}" | grep -Eq '^(tools/generate_bed_asset.py|tools/generate_bed_asset.py.gz|tools/blender_import_bed.py|tools/blender_import_bed.py.gz|tools/blender_bed_camera_patch.py|tools/bed_design_patch.py|art/bed/README.md|\.github/workflows/build-bed-source.yml)$'; then
+          CHANGED_FILES="$(git show --pretty=format: --name-only "$HEAD_SHA")"
+          printf 'Files in triggering commit:\n%s\n' "$CHANGED_FILES"
+          if printf '%s\n' "$CHANGED_FILES" | grep -Fqx -e 'tools/generate_bed_asset.py' -e 'tools/generate_bed_asset.py.gz' -e 'tools/blender_import_bed.py' -e 'tools/blender_import_bed.py.gz' -e 'tools/blender_bed_camera_patch.py' -e 'tools/bed_design_patch.py' -e 'art/bed/README.md' -e '.github/workflows/build-bed-source.yml'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
