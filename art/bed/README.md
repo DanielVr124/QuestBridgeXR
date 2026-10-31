@@ -8,7 +8,7 @@ This is a custom-made bed asset for the neon gaming bedroom. The shape and texti
 - Wide, softly crowned upholstered wingback headboard with a continuous padded face, rounded wraparound side wings and subtle perimeter welt; the old seven narrow vertical channels have been removed.
 - Two full-size cotton hotel pillows, each tilted back approximately 22 degrees so the upper edge rests against the headboard and the lower edge sits naturally on the mattress. Smaller decorative cushion layers have been removed.
 - Separate mattress and fitted cotton sheet, graphite duvet with low-amplitude fabric folds, and a draped midnight-blue throw.
-- Eight mobile-friendly runtime material groups with embedded 512 px woven fabric textures; the editable source preserves the individual named components.
+- Eight mobile-friendly runtime material groups with embedded 512 px woven fabric textures; the editable source preserves 40+ separately named mesh components.
 
 ## Dimensions and coordinates
 
