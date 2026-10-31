@@ -29,7 +29,7 @@ class BedDesignPatchTests(unittest.TestCase):
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
-        self.assertIn("(0,1.175,-1.255),(2.15,1.38,.22)", self.patched)
+        self.assertIn("(0,1.175,-1.255),(2.08,1.31,.22)", self.patched)
         self.assertIn("'charcoal',.38", self.patched)
 
     def test_no_diamond_tufts_or_buttons_remain_on_the_headboard(self):
