@@ -1957,6 +1957,7 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float cente
     box(-windowW*.5f-t*.5f,windowY,0.015f,t,windowH,0.12f,frame);
     box(windowW*.5f+t*.5f,windowY,0.015f,t,windowH,0.12f,frame);
     box(0,windowY,0.005f,0.035f,windowH,0.10f,frame);
+    // Divided-light sash, recessed glazing and a deep interior sill.
     const auto sash=rgb(.052f,.068f,.11f);
     const float sashZ=.092f;
     for(int pane=-1;pane<=1;++pane) {
