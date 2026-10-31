@@ -45,6 +45,7 @@ class BedDesignPatchTests(unittest.TestCase):
     def test_sleep_pillows_have_gussets_quilting_and_soft_corners(self):
         for token in (
             "Sleep_pillow_box_gusset_",
+            "gusset_uv,'pillow')",
             "Sleep_pillow_top_welt_",
             "Sleep_pillow_diamond_quilt_",
             "Sleep_pillow_corner_dart_",
