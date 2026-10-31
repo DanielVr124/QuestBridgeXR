@@ -208,7 +208,7 @@ jobs:
         run: |
           mkdir -p bed-release/textures
           cp art/bed/arc_upholstered_bed.blend bed-release/
-          cp art/bed/arc_upholstered_bed_blender_render.png bed-release/
+          cp art/bed/arc_upholstered_bed_blender_render*.png bed-release/
           cp art/bed/generated/arc_upholstered_bed.glb bed-release/
           cp art/bed/generated/arc_upholstered_bed_editable.glb bed-release/
           cp art/bed/generated/bed_manifest.json bed-release/
