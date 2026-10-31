@@ -2604,12 +2604,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // of this narrow source. A normal lying view sees the soft wall/bed bounce;
     // looking straight at the headboard reveals only the recessed light channel.
     if(ledZones_[0].enabled) {
-        const float emitterZ=bedZ-1.135f;
-        drawGradientBar(0,bedX,floorY+0.475f,emitterZ,2.14f,.012f,.010f,32);
-        drawGradientBar(0,bedX,floorY+1.875f,emitterZ,2.14f,.012f,.010f,32);
+        const float emitterZ=bedZ-1.095f;
+        drawGradientBar(0,bedX,floorY+.510f,emitterZ,2.10f,.010f,.010f,32);
+        drawGradientBar(0,bedX,floorY+1.840f,emitterZ,2.10f,.010f,.010f,32);
         for(int edge=0;edge<2;++edge) {
-            const float x=bedX+(edge==0?-1.075f:1.075f);
-            drawGradientBarY(0,x,floorY+1.175f,emitterZ,.010f,1.40f,.012f,24);
+            const float x=bedX+(edge==0?-1.065f:1.065f);
+            drawGradientBarY(0,x,floorY+1.175f,emitterZ,.010f,1.33f,.010f,24);
         }
     }
     // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.
