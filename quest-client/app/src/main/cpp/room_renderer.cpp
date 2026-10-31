@@ -2423,8 +2423,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float bedPlacement[16] = {
         1,0,0,0, 0,1,0,0, 0,0,1,0, bedX,floorY,bedZ,1
     };
+    const auto bedLedTint=rgb(ledColors[2][0],ledColors[2][1],ledColors[2][2]);
+    // The headboard and footboard LED reveals follow the same six presets as the bedside remote.
     bedModel_.draw(pv.data(),bedPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                   locTexture_,locMaterial_,locRounded_,locUvScale_);
+                   locTexture_,locMaterial_,locRounded_,locUvScale_,&bedLedTint,"LED_reveal");
     // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.
     for(int side : {-1,1}) {
         const float nx=bedX+side*1.53f, nz=bedZ-.94f;

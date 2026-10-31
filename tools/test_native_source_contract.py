@@ -57,6 +57,11 @@ class NativeSourceContractTests(unittest.TestCase):
         bed_end = source.index("// Place the supplied desk almost flush", bed_start)
         bed_section = source[bed_start:bed_end]
         self.assertIn("bedModel_.draw(pv.data(),bedPlacement", bed_section)
+        self.assertIn('locUvScale_,&bedLedTint,"LED_reveal"', bed_section)
+        glb_model = (ROOT / "quest-client/app/src/main/cpp/glb_model.cpp").read_text(encoding="utf-8")
+        self.assertIn("copy.nodeName=node->name?node->name:\"\"", glb_model)
+        self.assertIn("p.nodeName.find(emissiveNodeMarker)", glb_model)
+        self.assertIn("emissiveOverride?7:-1", glb_model)
         self.assertNotIn("drawPillow(pv.data(),bedX", bed_section)
         self.assertNotIn("const float headboardZ=bedZ-1.48f", bed_section)
         bed_design = (ROOT / "tools/bed_design_patch.py").read_text(encoding="utf-8")
@@ -64,12 +69,17 @@ class NativeSourceContractTests(unittest.TestCase):
             "Headboard_diamond_tuft_", "Headboard_tuft_button_",
             "Headboard_silver_grey_perimeter", "Headboard_blue_violet_LED_reveal",
             "Footboard_diamond_tuft_", "Footboard_silver_grey_perimeter",
-            "Sleep_pillow_gusset_seam_", "Sleep_pillow_quilt_",
+            "Sleep_pillow_box_gusset_", "Sleep_pillow_diamond_quilt_",
             "Headboard_tufted_backing"
         ):
             with self.subTest(bed_detail=design_marker):
                 self.assertIn(design_marker, bed_design)
         self.assertIn("The Big One Quilted Side Sleeper Pillow", (ROOT / "art/bed/README.md").read_text(encoding="utf-8"))
+        camera_patch = (ROOT / "tools/blender_bed_camera_patch.py").read_text(encoding="utf-8")
+        self.assertIn("bed_pillow_detail", camera_patch)
+        self.assertIn("(2.8,2.7,4.8)", camera_patch)
+        self.assertIn("refusing to render misleading close-up or back-facing camera angles", camera_patch)
+
 
     def test_room_controls_keep_locomotion_but_have_no_hidden_click_shortcuts(self):
         source = (ROOT / "quest-client/app/src/main/cpp/main.cpp").read_text(encoding="utf-8")
