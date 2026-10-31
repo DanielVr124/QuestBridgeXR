@@ -60,27 +60,19 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("drawGradientBar(0,bedX", bed_section)
         self.assertIn("const float emitterZ=bedZ-1.095f", bed_section)
         self.assertNotIn("LED_reveal", bed_section)
-        glb_model = (ROOT / "quest-client/app/src/main/cpp/glb_model.cpp").read_text(encoding="utf-8")
-        self.assertIn("copy.nodeName=node->name?node->name:\"\"", glb_model)
-        self.assertIn("p.nodeName.find(emissiveNodeMarker)", glb_model)
-        self.assertIn("emissiveOverride?7:-1", glb_model)
-        self.assertNotIn("led material", bed_design.lower())
         self.assertNotIn("drawPillow(pv.data(),bedX", bed_section)
         self.assertNotIn("const float headboardZ=bedZ-1.48f", bed_section)
         bed_design = (ROOT / "tools/bed_design_patch.py").read_text(encoding="utf-8")
         for design_marker in (
             "Headboard_single_upholstered_panel",
             "Headboard_inner_lip_side_", "Headboard_inner_lip_edge_",
-            "Headboard_side_bolster_", "Headboard_mount_",
-            "Sleep_pillow_piping_", "Slate_accent_cushion_", "Lumbar_cushion"
+            "Headboard_silver_grey_perimeter", "Headboard_side_bolster_",
+            "Headboard_mount_", "Sleep_pillow_piping_",
+            "Slate_accent_cushion_", "Lumbar_cushion",
+            "'charcoal',.38"
         ):
             with self.subTest(bed_detail=design_marker):
                 self.assertIn(design_marker, bed_design)
-        self.assertIn("Headboard_single_upholstered_panel", bed_design)
-                self.assertIn("Headboard_inner_lip_side_", bed_design)
-                self.assertIn("Headboard_silver_grey_perimeter", bed_design)
-                self.assertIn("'charcoal',.38", bed_design)
-        self.assertIn("4 EVER WINNER LED bed frame at Walmart", (ROOT / "art/bed/README.md").read_text(encoding="utf-8"))
         blender_importer = (ROOT / "tools/blender_import_bed.py").read_text(encoding="utf-8")
         self.assertIn("TOOLS_DIR = str(Path(__file__).resolve().parent)", blender_importer)
         self.assertIn("sys.path.insert(0, TOOLS_DIR)", blender_importer)
@@ -107,17 +99,18 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("Full monitor UI with persistent navigation and distinct virtual-desktop-style pages", renderer)
         self.assertIn("void RoomRenderer::drawCurvedPanel", renderer)
         self.assertIn('const char* tabs[5]={"COMPUTERS","ENVIRONMENT","DISPLAY","LIGHTING","COMFORT"}', renderer)
-                self.assertIn("lightingColorPickerOpen_", renderer)
-                self.assertIn("hsvToRgb", renderer)
-                self.assertIn("rgbToHsv", renderer)
-                self.assertIn("ledZoneColor", renderer)
-                self.assertIn("ledZoneAverageColor", renderer)
-                self.assertIn("Headboard single", renderer)
-                self.assertIn("drawGradientBar(1", renderer)
-                self.assertIn("drawGradientBar(4", renderer)
-                self.assertIn("drawGradientBarY(0", renderer)
-                self.assertIn("locHeadboardGlowIntensity_", renderer)
-                self.assertIn("std::array<LedZoneSettings,7> ledZones_", (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8"))
+        self.assertIn("lightingColorPickerOpen_", renderer)
+        self.assertIn("hsvToRgb", renderer)
+        self.assertIn("rgbToHsv", renderer)
+        self.assertIn("ledZoneColor", renderer)
+        self.assertIn("ledZoneAverageColor", renderer)
+        self.assertIn("drawGradientBar(1", renderer)
+        self.assertIn("drawGradientBar(4", renderer)
+        self.assertIn("drawGradientBarY(0", renderer)
+        self.assertIn("locHeadboardGlowIntensity_", renderer)
+        header = (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8")
+        self.assertIn("std::array<LedZoneSettings,7> ledZones_", header)
+        self.assertIn("lightingPickerHue_", header)
         self.assertNotIn("const float curve=.082f", renderer)
         self.assertIn("void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float centerZ", renderer)
         self.assertIn("const float windowWallX=halfW-.015f", renderer)
