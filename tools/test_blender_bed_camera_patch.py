@@ -35,7 +35,7 @@ camera_count = len(review_views)
         packed_scene = ROOT / "tools" / "blender_import_bed.py.gz"
         source = gzip.decompress(packed_scene.read_bytes()).decode("utf-8")
         patched = patch_blender_review_cameras(source)
-        self.assertIn("bed_pillow_detail", patched)
+        self.assertIn("bed_headboard_detail", patched)
         self.assertIn("(3.3,4.25,2.8)", patched)
         self.assertIn("(3.0,3.7,2.4)", patched)
         self.assertIn("scene.cycles.samples=24", patched)
