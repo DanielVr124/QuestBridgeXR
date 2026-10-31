@@ -56,6 +56,9 @@ private:
     GLuint createProceduralEnvironment(int sceneIndex);
     void createGeometry();
     void chooseEnvironment();
+    std::array<float,3> ledZoneColor(int zone, float position) const;
+    std::array<float,3> ledZoneAverageColor(int zone) const;
+    void applyLedPreset(int preset);
     void drawBox(const float* projectionView, float x, float y, float z,
                  float sx, float sy, float sz, const std::array<float, 4>& color,
                  float yaw = 0.0f, int material = 0);
@@ -89,7 +92,16 @@ private:
     void drawEnvironmentWindow(const float* projectionView, float wallX, float centerZ, float floorY,
                                GLuint environmentTexture, float windowW, float windowH, float yaw);
 
+    struct LedZoneSettings {
+        std::array<float,3> primary{{0.08f,0.34f,1.0f}};
+        std::array<float,3> secondary{{0.50f,0.12f,1.0f}};
+        bool gradient = false;
+        bool enabled = true;
+        float brightness = 0.78f;
+    };
     RoomSettings settings_{};
+    std::array<LedZoneSettings,7> ledZones_{};
+    bool ledDefaultsSeeded_ = false;
     GlbModel bedModel_;
     GlbModel deskModel_;
     GlbModel monitorModel_;
@@ -135,6 +147,12 @@ private:
     GLint locPracticalLightPosition_ = -1;
     GLint locPracticalLightColor_ = -1;
     GLint locPracticalLightIntensity_ = -1;
+    GLint locPracticalLight2Position_ = -1;
+    GLint locPracticalLight2Color_ = -1;
+    GLint locPracticalLight2Intensity_ = -1;
+    GLint locHeadboardGlowPosition_ = -1;
+    GLint locHeadboardGlowColor_ = -1;
+    GLint locHeadboardGlowIntensity_ = -1;
     GLint locNeonBluePosition_ = -1;
     GLint locNeonBlueColor_ = -1;
     GLint locNeonBlueIntensity_ = -1;
@@ -169,6 +187,12 @@ private:
     int menuSelection_ = 0;
     int environmentDropdownIndex_ = 0;
     bool environmentDropdownOpen_ = false;
+    bool lightingColorPickerOpen_ = false;
+    int lightingZoneIndex_ = 0;
+    int lightingColorTarget_ = 0;
+    float lightingPickerHue_ = 0.58f;
+    float lightingPickerSaturation_ = 0.82f;
+    float lightingPickerValue_ = 1.0f;
     bool previousMenuNavigation_ = false;
     bool previousMenuHorizontal_ = false;
     bool previousMenuAdjust_ = false;
