@@ -44,6 +44,8 @@ class BedDesignPatchTests(unittest.TestCase):
 
     def test_sleep_pillows_have_gussets_quilting_and_soft_corners(self):
         for token in (
+            "Sleep_pillow_grey_gusset_",
+            "gusset_half_width,gusset_half_depth=.285,.375",
             "Sleep_pillow_gusset_seam_",
             "Sleep_pillow_crown_welt_",
             "Sleep_pillow_quilt_",
@@ -59,6 +61,7 @@ class BedDesignPatchTests(unittest.TestCase):
             "Headboard_channel_stitch_",
             "Slate_accent_cushion_",
             "Lumbar_cushion",
+            "Graphite_accent_pillow_",
             "Wide sculpted charcoal wingback headboard",
         ):
             with self.subTest(token=token):
