@@ -20,7 +20,5 @@ def patch_bed_geometry(source: str) -> str:
     new_design = "'design':'Diamond-tufted upholstered LED headboard with satin-silver trim and controllable perimeter lighting; original bed frame, mattress and bedding retained',"
     if source.count(old_design) != 1:
         raise RuntimeError("Bed metadata design marker changed; update the design patch.")
-    if source.count(old_design) != 1:
-        raise RuntimeError("Bed metadata design marker changed; update the design patch.")
     source = source.replace(old_design, new_design, 1)
     return source
