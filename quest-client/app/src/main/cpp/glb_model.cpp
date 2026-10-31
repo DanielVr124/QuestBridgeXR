@@ -127,7 +127,12 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
                     index+=data->meshes[m].primitives_count;
                 }
                 index+=pi;
-                if(index<primitives_.size()) { Primitive copy=primitives_[index]; std::copy(world,world+16,copy.nodeMatrix.begin()); transformed.push_back(copy); }
+                if(index<primitives_.size()) {
+                    Primitive copy=primitives_[index];
+                    std::copy(world,world+16,copy.nodeMatrix.begin());
+                    copy.nodeName=node->name?node->name:"";
+                    transformed.push_back(copy);
+                }
             }
         }
         if(!transformed.empty()) primitives_.swap(transformed);
@@ -139,16 +144,22 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
 }
 
 void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint locModel,GLint locColor,
-                    GLint locTextured,GLint locTexture,GLint locMaterial,GLint locRounded,GLint locUvScale) const {
+                    GLint locTextured,GLint locTexture,GLint locMaterial,GLint locRounded,GLint locUvScale,
+                    const std::array<float,4>* emissiveOverrideColor,const char* emissiveNodeMarker) const {
     for(const Primitive& p:primitives_) {
+        const bool emissiveOverride=emissiveOverrideColor&&emissiveNodeMarker&&
+            p.nodeName.find(emissiveNodeMarker)!=std::string::npos;
+        const auto& color=emissiveOverride?*emissiveOverrideColor:p.color;
         float model[16],mvp[16]; multiply(placement,p.nodeMatrix.data(),model); multiply(pv,model,mvp);
         glUniformMatrix4fv(locMvp,1,GL_FALSE,mvp); glUniformMatrix4fv(locModel,1,GL_FALSE,model);
-        glUniform4fv(locColor,1,p.color.data()); glUniform1i(locMaterial,-1); glUniform1i(locRounded,0);
+        glUniform4fv(locColor,1,color.data());
+        glUniform1i(locMaterial,emissiveOverride?7:-1); glUniform1i(locRounded,0);
         glUniform2f(locUvScale,1.0f,1.0f);
-        glUniform1i(locTextured,p.texture?1:0);
-        if(p.texture) { glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,p.texture); glUniform1i(locTexture,0); }
+        const bool textured=p.texture&&!emissiveOverride;
+        glUniform1i(locTextured,textured?1:0);
+        if(textured) { glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,p.texture); glUniform1i(locTexture,0); }
         glBindVertexArray(p.vao); glDrawElements(GL_TRIANGLES,p.indexCount,GL_UNSIGNED_INT,nullptr); glBindVertexArray(0);
-        if(p.texture) glBindTexture(GL_TEXTURE_2D,0);
+        if(textured) glBindTexture(GL_TEXTURE_2D,0);
     }
 }
 void GlbModel::release() {
