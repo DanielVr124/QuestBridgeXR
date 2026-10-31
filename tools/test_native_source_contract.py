@@ -68,9 +68,8 @@ class NativeSourceContractTests(unittest.TestCase):
         for design_marker in (
             "Headboard_diamond_tuft_", "Headboard_tuft_button_",
             "Headboard_silver_grey_perimeter", "Headboard_blue_violet_LED_reveal",
-            "Footboard_diamond_tuft_", "Footboard_silver_grey_perimeter",
-            "Sleep_pillow_box_gusset_", "Sleep_pillow_diamond_quilt_",
-            "Headboard_tufted_backing"
+            "Headboard_tufted_backing",
+            "Sleep_pillow_piping_", "Slate_accent_cushion_", "Lumbar_cushion"
         ):
             with self.subTest(bed_detail=design_marker):
                 self.assertIn(design_marker, bed_design)
