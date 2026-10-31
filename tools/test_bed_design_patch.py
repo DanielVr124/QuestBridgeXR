@@ -19,7 +19,7 @@ class BedDesignPatchTests(unittest.TestCase):
         cls.source = gzip.decompress(compressed.read_bytes()).decode("utf-8")
         cls.patched = patch_bed_geometry(cls.source)
 
-    def test_headboard_is_one_smooth_upholstered_panel_with_attached_led(self):
+    def test_headboard_is_one_smooth_upholstered_panel_with_recessed_led_channel(self):
         for token in (
             "Headboard_outer_shell",
             "Headboard_single_upholstered_panel",
