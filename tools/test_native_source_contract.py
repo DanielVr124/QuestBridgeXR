@@ -59,6 +59,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("bedModel_.draw(pv.data(),bedPlacement", bed_section)
         self.assertIn("drawGradientBar(0,bedX", bed_section)
         self.assertIn("const float emitterZ=bedZ-1.45f", bed_section)
+        self.assertIn("straightOn>0.985f", bed_section)
+        self.assertIn("viewForwardX=-camera[8]", bed_section)
         self.assertNotIn("LED_reveal", bed_section)
         self.assertNotIn("drawPillow(pv.data(),bedX", bed_section)
         self.assertNotIn("const float headboardZ=bedZ-1.48f", bed_section)
