@@ -21,7 +21,7 @@ PILLOW_CORNER_EXPONENT = 4.2
 PILLOW_RING_SEGMENTS = 112
 PILLOW_RING_ROWS = 20
 
-def pillow_outline(u, v, scale=1.0):
+def pillow_outline(u, scale=1.0):
     # Superellipse perimeter gives visible pillow corners without a hard box.
     power = 2.0 / PILLOW_CORNER_EXPONENT
     return (
