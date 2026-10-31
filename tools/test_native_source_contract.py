@@ -213,8 +213,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("glUniform1f(locCeilingLightIntensity_,1.55f*roomLightScale)", renderer)
         self.assertIn("const float lightSwitchFaceZ=frontZ-.132f", renderer)
         self.assertIn("const float remoteTopY=floorY+.746f", renderer)
-        self.assertIn("const float remoteX=bedX+1.68f", renderer)
-        self.assertIn("const float remoteX=nx+.15f,remoteZ=nz+.15f", renderer)
+        self.assertIn("const float remoteX=bedX+1.73f", renderer)
+        self.assertIn("const float remoteX=nx+.20f,remoteZ=nz+.17f", renderer)
         self.assertIn("selectedPreset=row*2+column", renderer)
         self.assertIn("room_.handleRoomInteraction(roomPointerPose,roomTriggerPressed)", main)
         self.assertLess(main.index("room_.handleRoomInteraction(roomPointerPose,roomTriggerPressed)"),
