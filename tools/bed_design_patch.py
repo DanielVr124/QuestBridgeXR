@@ -12,8 +12,17 @@ NEW_GEOMETRY = """# ----------------------- PILLOWS AND HEADBOARD --------------
 # corners, a tailored perimeter welt and a fine diamond-quilted cotton top.
 PILLOW_TILT = math.radians(15.0)
 for side in (-1,1):
-    center=np.array([side*.515,1.105,-1.075],dtype=float)
-    half_width,half_height,half_depth=.535,.205,.325
+    center=np.array([side*.285,1.105,-1.075],dtype=float)
+    # Standard/queen pillow proportions: 20 inches wide by 28 inches long.
+    half_width,half_height,half_depth=.265,.185,.355
+    gusset_half_width,gusset_half_depth=.285,.375
+    # The grey sidewall is a distinct padded fabric shell under the white quilted face.
+    # Its 2-inch-class band remains visible along all four sides of the pillow.
+    gusset_center=center.copy(); gusset_center[1]-=.095
+    grey_gusset=superellipsoid(
+        f'Sleep_pillow_grey_gusset_{side}',tuple(gusset_center),
+        (gusset_half_width,.050,gusset_half_depth),'pillow',.60,112,72,taper=.10
+    )
     pillow=superellipsoid(
         f'Sleep_pillow_{side}',tuple(center),
         (half_width,half_height,half_depth),'sheet',.58,112,72,taper=.10
@@ -22,6 +31,7 @@ for side in (-1,1):
         PILLOW_TILT,(1.0,0.0,0.0),point=center
     )
     pillow.apply_transform(pillow_rotation)
+    grey_gusset.apply_transform(pillow_rotation)
 
     def pillow_surface_point(u,v,lift=.004):
         fullness=max(0.0,1.0-(abs(u)/half_width)**4-(abs(v)/half_depth)**4)
@@ -35,19 +45,21 @@ for side in (-1,1):
     crown_points=[]
     for angle in np.linspace(0.0,2.0*math.pi,112,endpoint=False):
         ca,sa=math.cos(angle),math.sin(angle)
-        u=half_width*.965*math.copysign(abs(ca)**.52,ca)
-        v=half_depth*.965*math.copysign(abs(sa)**.52,sa)
-        lower=np.array([center[0]+u,center[1]-.075,center[2]+v,1.0])
+        outer_u=gusset_half_width*.975*math.copysign(abs(ca)**.52,ca)
+        outer_v=gusset_half_depth*.975*math.copysign(abs(sa)**.52,sa)
+        inner_u=half_width*.975*math.copysign(abs(ca)**.52,ca)
+        inner_v=half_depth*.975*math.copysign(abs(sa)**.52,sa)
+        lower=np.array([center[0]+outer_u,center[1]-.135,center[2]+outer_v,1.0])
         gusset_points.append((pillow_rotation @ lower)[:3])
-        crown_points.append(pillow_surface_point(u*.975,v*.975,.001))
+        crown_points.append(pillow_surface_point(inner_u,inner_v,.001))
     gusset=curve_tube(f'Sleep_pillow_gusset_seam_{side}',gusset_points,.0045,'pillow')
     crown_welt=curve_tube(f'Sleep_pillow_crown_welt_{side}',crown_points,.0032,'pillow')
 
     # Crossed stitch rows follow the inflated top instead of floating above it.
     for family in (-1,1):
-        for row,offset in enumerate(np.linspace(-.235,.235,9)):
+        for row,offset in enumerate(np.linspace(-.245,.245,9)):
             points=[]
-            for u in np.linspace(-.47,.47,80):
+            for u in np.linspace(-.235,.235,80):
                 v=family*(u*half_depth/half_width)+offset
                 if (abs(u)/half_width)**4+(abs(v)/half_depth)**4 <= .88:
                     points.append(pillow_surface_point(u,v,.006))
@@ -60,35 +72,14 @@ for side in (-1,1):
     for corner_x in (-1,1):
         for corner_z in (-1,1):
             dart_local=[
-                (center[0]+corner_x*.42,center[1]+.112,center[2]+corner_z*.245),
-                (center[0]+corner_x*.465,center[1]+.128,center[2]+corner_z*.285),
-                (center[0]+corner_x*.485,center[1]+.112,center[2]+corner_z*.302)
+                (center[0]+corner_x*half_width*.78,center[1]+.105,center[2]+corner_z*half_depth*.72),
+                (center[0]+corner_x*half_width*.89,center[1]+.120,center[2]+corner_z*half_depth*.84),
+                (center[0]+corner_x*half_width*.95,center[1]+.105,center[2]+corner_z*half_depth*.92)
             ]
             dart=[(pillow_rotation @ np.array([*p,1.0]))[:3] for p in dart_local]
             dart_mesh=curve_tube(f'Sleep_pillow_corner_dart_{side}_{corner_x}_{corner_z}',dart,.0020,'pillow')
 
-# Soft accent pillows stay behind the main pair, with the same sewn corners
-# and quieter graphite fabric so the white side-sleeper pillows remain dominant.
-for side in (-1,1):
-    accent_center=np.array([side*.30,1.20,-1.245],dtype=float)
-    accent=superellipsoid(
-        f'Graphite_accent_pillow_{side}',tuple(accent_center),
-        (.34,.16,.22),'pillow',.58,80,52,taper=.12
-    )
-    accent_rotation=trimesh.transformations.rotation_matrix(
-        math.radians(side*7.0),(1.0,0.0,0.0),point=accent_center
-    )
-    accent.apply_transform(accent_rotation)
-    accent_welt_points=[]
-    for angle in np.linspace(0.0,2.0*math.pi,88,endpoint=False):
-        ca,sa=math.cos(angle),math.sin(angle)
-        p=np.array([
-            accent_center[0]+.325*math.copysign(abs(ca)**.55,ca),
-            accent_center[1]-.018,
-            accent_center[2]+.205*math.copysign(abs(sa)**.55,sa),1.0
-        ])
-        accent_welt_points.append((accent_rotation @ p)[:3])
-    accent_welt=curve_tube(f'Graphite_accent_welt_{side}',accent_welt_points,.003,'charcoal2')
+# The two quilted side-sleeper pillows are the only decorative pillows on the bed.
 
 # ----------------------- DIAMOND-TUFTED HEADBOARD -----------------------
 # Wide black upholstered shell and deeply padded front face.
