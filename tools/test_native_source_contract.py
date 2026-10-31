@@ -80,7 +80,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("sys.path.insert(0, TOOLS_DIR)", blender_importer)
         camera_patch = (ROOT / "tools/blender_bed_camera_patch.py").read_text(encoding="utf-8")
         self.assertIn("bed_pillow_detail", camera_patch)
-        self.assertIn("(2.8,2.7,4.8)", camera_patch)
+        self.assertIn("(3.3,4.25,2.8)", camera_patch)
         self.assertIn("refusing to render misleading close-up or back-facing camera angles", camera_patch)
 
 
