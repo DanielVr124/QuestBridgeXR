@@ -1621,6 +1621,40 @@ void RoomRenderer::createGeometry() {
 }
 
 void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; chooseEnvironment(); }
+
+std::array<float,3> RoomRenderer::ledZoneColor(int zone,float position) const {
+    if(zone<0||zone>=static_cast<int>(ledZones_.size())) return {0.0f,0.0f,0.0f};
+    const auto& led=ledZones_[static_cast<size_t>(zone)];
+    if(!led.enabled) return {0.0f,0.0f,0.0f};
+    const float t=led.gradient?std::clamp(position,0.0f,1.0f):0.0f;
+    const float brightness=std::clamp(led.brightness,0.0f,1.0f);
+    return {
+        std::clamp((led.primary[0]*(1.0f-t)+led.secondary[0]*t)*brightness,0.0f,1.0f),
+        std::clamp((led.primary[1]*(1.0f-t)+led.secondary[1]*t)*brightness,0.0f,1.0f),
+        std::clamp((led.primary[2]*(1.0f-t)+led.secondary[2]*t)*brightness,0.0f,1.0f)
+    };
+}
+std::array<float,3> RoomRenderer::ledZoneAverageColor(int zone) const {
+    return ledZoneColor(zone,0.5f);
+}
+void RoomRenderer::applyLedPreset(int preset) {
+    static const std::array<std::array<float,3>,6> presets{{
+        {{1.0f,.10f,.045f}}, {{.04f,.86f,.16f}}, {{.08f,.34f,1.0f}},
+        {{.78f,.84f,1.0f}}, {{.55f,.08f,1.0f}}, {{.02f,.78f,.82f}}
+    }};
+    static const std::array<std::array<float,3>,6> companions{{
+        {{1.0f,.32f,.04f}}, {{.24f,1.0f,.12f}}, {{.50f,.12f,1.0f}},
+        {{.48f,.62f,.92f}}, {{1.0f,.10f,.62f}}, {{.04f,.46f,.72f}}
+    }};
+    const int index=std::clamp(preset,0,5);
+    for(size_t zone=0;zone<ledZones_.size();++zone) {
+        ledZones_[zone].primary=presets[static_cast<size_t>((index+static_cast<int>(zone)%3)%6)];
+        ledZones_[zone].secondary=companions[static_cast<size_t>((index+static_cast<int>(zone)%3)%6)];
+        ledZones_[zone].gradient=false;
+        ledZones_[zone].enabled=true;
+    }
+    ledPreset_=index;
+}
 void RoomRenderer::chooseEnvironment() {
     const int previousIndex = activeEnvironmentIndex_;
     const int selectedIndex = environmentIndex(settings_.environment);
