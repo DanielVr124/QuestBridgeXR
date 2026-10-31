@@ -2358,7 +2358,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Place the supplied desk almost flush to both walls in the back-left corner.
     const float deskZ=backZ+0.43f;
     const float deskX=-halfW+1.32f;
-    const float monitorX=deskX;
+    const int monitorCount=std::clamp(settings_.monitorCount,1,3);
+    const float monitorBaseX=deskX-(monitorCount-1)*.335f;
+    const float monitorX=monitorCount==3?deskX:monitorBaseX;
     const float deskSurface=floorY+.75f;
     const float monitorZ=deskZ-0.31f; // display stand sits at the rear edge, close to the wall
 
@@ -2463,19 +2465,22 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     deskModel_.draw(pv.data(),deskPlacement,locMvp_,locModel_,locColor_,locTextured_,
                     locTexture_,locMaterial_,locRounded_,locUvScale_);
 
-    // The supplied 27-inch monitor is correctly sized in metres. Its root sits on
-    // the desktop; the display center is 0.276 m above the stand base.
-    const float monitorPlacement[16] = {
-        1,0,0,0, 0,1,0,0, 0,0,1,0, monitorX,deskSurface,monitorZ,1
-    };
-    monitorModel_.draw(pv.data(),monitorPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                       locTexture_,locMaterial_,locRounded_,locUvScale_);
+    // Place up to three identical 27-inch screens across the supplied corner desk.
+    // The central display remains the primary menu surface when a three-screen row is used.
     const bool streamOn=settings_.screenDestination=="monitor"||
                         settings_.screenDestination=="both";
-    if(streamOn) {
-        drawCurvedPanel(pv.data(),monitorX,deskSurface+.276f,monitorZ+.001f,
-                        .584f,.328f,.029f,
-                        hasVideo?videoTexture:videoFallbackTexture_,rgb(1,1,1),32);
+    for(int screen=0;screen<monitorCount;++screen) {
+        const float screenX=monitorBaseX+screen*.67f;
+        const float monitorPlacement[16] = {
+            1,0,0,0, 0,1,0,0, 0,0,1,0, screenX,deskSurface,monitorZ,1
+        };
+        monitorModel_.draw(pv.data(),monitorPlacement,locMvp_,locModel_,locColor_,locTextured_,
+                           locTexture_,locMaterial_,locRounded_,locUvScale_);
+        if(streamOn) {
+            drawCurvedPanel(pv.data(),screenX,deskSurface+.276f,monitorZ+.001f,
+                            .584f,.328f,.029f,
+                            hasVideo?videoTexture:videoFallbackTexture_,rgb(1,1,1),32);
+        }
     }
 
     // Bedroom TV centered beyond the foot of the bed and facing back toward it.
@@ -2618,8 +2623,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 panel(bodyX+.050f,menuY-.044f,.298f,.158f,rgb(.014f,.024f,.044f,1.0f));
                 label("CHOOSE ENVIRONMENT",bodyX-.080f,menuY+.020f,.00148f,cyan);
                 for(int item=0;item<4;++item) {
-                    const int index=(environmentDropdownIndex_+item+
-                        static_cast<int>(kEnvironmentNames.size())-1)%
+                    const int index=(environmentDropdownIndex_+item)%
                         static_cast<int>(kEnvironmentNames.size());
                     const float yy=menuY-.012f-item*.031f;
                     panel(bodyX+.050f,yy,.282f,.027f,item==0?selected:card);
@@ -2664,6 +2668,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
 void RoomRenderer::release() {
     deskModel_.release(); monitorModel_.release();
+    if(gFontAtlasTexture){glDeleteTextures(1,&gFontAtlasTexture);gFontAtlasTexture=0;gFontAtlasReady=false;}
     if(!initialized_&&!program_&&!vao_)return;
     if(program_)glDeleteProgram(program_);if(vignetteProgram_)glDeleteProgram(vignetteProgram_);if(vao_)glDeleteVertexArrays(1,&vao_);if(vbo_)glDeleteBuffers(1,&vbo_);
     if(planeTexture_)glDeleteVertexArrays(1,&planeTexture_);if(cubeTexture_)glDeleteBuffers(1,&cubeTexture_);
