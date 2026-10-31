@@ -1785,7 +1785,7 @@ void RoomRenderer::drawRoundedBox(const float* pv,float x,float y,float z,float 
 }
 void RoomRenderer::drawText(const float* pv, const char* text, float x, float y, float z,
                             float pixelSize, const std::array<float,4>& color,
-                            float curveCenterX, float curveWidth, float curveDepth) {
+                            float curveCenterX, float curveWidth, float curveDepth, float curveCenterY) {
     if (!text || !gFontAtlasReady || !gFontAtlasTexture) return;
     std::vector<Vertex> vertices;
     vertices.reserve(std::strlen(text) * 6u);
