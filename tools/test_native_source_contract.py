@@ -46,10 +46,19 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("if (sceneIndex == 29)", source)
         self.assertIn("city lights into softened, vertically stretched reflections", source)
         self.assertIn("const float bedX=halfW-2.0f, bedZ=-halfD+2.10f", source)
+        self.assertIn('bedModel_.load(assets,"models/arc_upholstered_bed.glb")', source)
+        self.assertIn("bedModel_.draw(pv.data(),bedPlacement", source)
+        self.assertIn("bedModel_.release()", source)
         self.assertIn("backZ+2.10f", source)
         self.assertIn("-halfD+2.10f", source)
         self.assertIn("halfW-2.0f", source)
         self.assertIn("const float tvX=bedX", source)
+        bed_start = source.index("const float bedX=halfW-2.0f", source.index("void RoomRenderer::renderEye"))
+        bed_end = source.index("// Place the supplied desk almost flush", bed_start)
+        bed_section = source[bed_start:bed_end]
+        self.assertIn("bedModel_.draw(pv.data(),bedPlacement", bed_section)
+        self.assertNotIn("drawPillow(pv.data(),bedX", bed_section)
+        self.assertNotIn("const float headboardZ=bedZ-1.48f", bed_section)
 
     def test_room_controls_keep_locomotion_but_have_no_hidden_click_shortcuts(self):
         source = (ROOT / "quest-client/app/src/main/cpp/main.cpp").read_text(encoding="utf-8")
