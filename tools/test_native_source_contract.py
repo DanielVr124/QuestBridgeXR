@@ -69,7 +69,7 @@ class NativeSourceContractTests(unittest.TestCase):
             "Headboard_diamond_tuft_", "Headboard_tuft_button_",
             "Headboard_silver_grey_perimeter", "Headboard_blue_violet_LED_reveal",
             "Footboard_diamond_tuft_", "Footboard_silver_grey_perimeter",
-            "Sleep_pillow_gusset_seam_", "Sleep_pillow_quilt_",
+            "Sleep_pillow_grey_gusset_", "Sleep_pillow_gusset_seam_", "Sleep_pillow_quilt_",
             "Headboard_tufted_backing"
         ):
             with self.subTest(bed_detail=design_marker):
