@@ -260,7 +260,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertNotIn("LedRemote", renderer)
         self.assertNotIn("remoteTopY", renderer)
         self.assertNotIn("remoteX=nx+", renderer)
-        self.assertIn("case 5:\\n                menuPage_=3;", renderer)
+        self.assertIn("case 5:\n                menuPage_=3;", renderer)
         self.assertIn('const char* tabs[5]={"COMPUTERS","ENVIRONMENT","DISPLAY","LED COLORS","COMFORT"}', renderer)
         self.assertIn('const char* envTitles[6]={"ENVIRONMENT","ROOM SIZE","ROOM MOVEMENT",', renderer)
         self.assertIn("std::array<LedZoneSettings,7> ledZones_", header)
