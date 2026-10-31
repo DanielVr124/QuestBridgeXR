@@ -45,7 +45,7 @@ jobs:
 
       - name: Install bed generator dependencies
         if: steps.changes.outputs.changed == 'true'
-        run: python -m pip install --disable-pip-version-check numpy pillow trimesh
+        run: python -m pip install --disable-pip-version-check numpy pillow scipy trimesh
 
       - name: Generate runtime and editable bed meshes
         if: steps.changes.outputs.changed == 'true'
