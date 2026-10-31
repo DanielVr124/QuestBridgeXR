@@ -2,6 +2,7 @@
 """Regression tests for the Blender bed review-camera patch."""
 from __future__ import annotations
 
+import gzip
 import pathlib
 import sys
 import unittest
@@ -26,9 +27,17 @@ camera_count = len(review_views)
         patched = patch_blender_review_cameras(source)
         self.assertEqual(patched.count("review_views = ["), 1)
         self.assertIn("bed_pillow_detail", patched)
-        self.assertIn("(5.5,4.3,6.2)", patched)
+        self.assertIn("(5.5,-4.3,4.0)", patched)
         self.assertIn("camera_count = len(review_views)", patched)
         self.assertNotIn("(9.1, 4.2, 7.8)", patched)
+
+    def test_patches_the_actual_gzip_packed_blender_scene(self):
+        packed_scene = ROOT / "tools" / "blender_import_bed.py.gz"
+        source = gzip.decompress(packed_scene.read_bytes()).decode("utf-8")
+        patched = patch_blender_review_cameras(source)
+        self.assertIn("bed_pillow_detail", patched)
+        self.assertIn("(3.3,4.25,2.8)", patched)
+        self.assertEqual(patched.count("review_views = ["), 1)
 
     def test_refuses_a_scene_without_the_expected_camera_list(self):
         with self.assertRaisesRegex(RuntimeError, "expected a review_views list"):
