@@ -1,14 +1,15 @@
 """Robust review-camera framing for the packed Blender bed scene.
 
 The original importer is gzip-packed, so its view coordinates can change without
-requiring a brittle whole-block string match. We replace only the review_views
-literal after verifying that it contains the four expected bed views.
+requiring a brittle whole-block string match. This patch refuses to render
+misleading close-up or back-facing camera angles unless the expected bed views
+are present in the source list.
 """
 from __future__ import annotations
 
 import re
 
-_REVIEW_VIEWS = re.compile(r"(?ms)^review_views\s*=\s*\[.*?^\]")
+_REVIEW_VIEWS = re.compile(r"(?ms)^review_views\s*=\s*\[.*?\]")
 _REQUIRED_VIEWS = {
     "bed_three_quarter",
     "bed_headboard",
