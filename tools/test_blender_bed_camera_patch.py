@@ -37,6 +37,9 @@ camera_count = len(review_views)
         patched = patch_blender_review_cameras(source)
         self.assertIn("bed_pillow_detail", patched)
         self.assertIn("(3.3,4.25,2.8)", patched)
+        self.assertIn("scene.cycles.samples=24", patched)
+        self.assertIn("scene.cycles.use_denoising=True", patched)
+        self.assertIn("scene.render.resolution_x=1440; scene.render.resolution_y=1080;", patched)
         self.assertEqual(patched.count("review_views = ["), 1)
 
     def test_refuses_a_scene_without_the_expected_camera_list(self):
