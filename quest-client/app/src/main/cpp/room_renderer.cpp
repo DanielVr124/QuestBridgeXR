@@ -2564,24 +2564,15 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     };
     bedModel_.draw(pv.data(),bedPlacement,locMvp_,locModel_,locColor_,locTextured_,
                    locTexture_,locMaterial_,locRounded_,locUvScale_);
-    // Concealed headboard light: the upholstered bezel lips project in front
-    // of this narrow source. A normal lying view sees the soft wall/bed bounce;
-    // looking straight at the headboard reveals only the recessed light channel.
-    const float emitterZ=bedZ-1.45f;
-    const float toLedX=bedX-cameraX;
-    const float toLedY=floorY+1.840f-cameraY;
-    const float toLedZ=emitterZ-cameraZ;
-    const float toLedLength=std::max(std::sqrt(toLedX*toLedX+toLedY*toLedY+toLedZ*toLedZ),0.001f);
-    const float viewForwardX=-camera[8],viewForwardY=-camera[9],viewForwardZ=-camera[10];
-    const float straightOn=(viewForwardX*toLedX+viewForwardY*toLedY+viewForwardZ*toLedZ)/toLedLength;
-    // The colored light bounce remains active while reclining, but the actual
-    // emitter is only revealed when the headset is aimed almost straight at it.
-    if(ledZones_[0].enabled&&straightOn>0.985f) {
-        drawGradientBar(0,bedX,floorY+.510f,emitterZ,2.10f,.010f,.010f,32);
-        drawGradientBar(0,bedX,floorY+1.840f,emitterZ,2.10f,.010f,.010f,32);
+    // RGB headboard strip is integrated into the padded outer frame and remains
+    // visible from normal viewing angles. Its colour follows the Headboard Glow zone.
+    const float emitterZ=bedZ-1.270f;
+    if(ledZones_[0].enabled) {
+        drawGradientBar(0,bedX,floorY+.405f,emitterZ,2.30f,.014f,.012f,40);
+        drawGradientBar(0,bedX,floorY+1.955f,emitterZ,2.30f,.014f,.012f,40);
         for(int edge=0;edge<2;++edge) {
-            const float x=bedX+(edge==0?-1.065f:1.065f);
-            drawGradientBarY(0,x,floorY+1.175f,emitterZ,.010f,1.33f,.010f,24);
+            const float x=bedX+(edge==0?-1.235f:1.235f);
+            drawGradientBarY(0,x,floorY+1.180f,emitterZ,.014f,1.52f,.012f,32);
         }
     }
     // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.

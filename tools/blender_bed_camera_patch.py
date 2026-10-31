@@ -31,9 +31,9 @@ NEW_VIEWS = """review_views = [
     # Wide three-quarter framing of the full platform, mattress and headboard.
     ('bed_three_quarter', (5.5,-4.3,4.0), (0,0,1.0), 42),
     # Headboard-facing view from its +Y side, with the tufting kept near eye level.
-    ('bed_headboard', (3.3,4.25,2.8), (0,1.2,1.25), 52),
-    # Close detail view of the headboard's diamond upholstery, tuft buttons and LED border.
-    ('bed_headboard_detail', (3.0,3.7,2.4), (0,1.25,1.35), 54),
+    ('bed_headboard', (0.0,4.7,2.15), (0,1.22,1.30), 48),
+    # Near-frontal detail of the diamond upholstery, crystal tuft buttons and RGB border.
+    ('bed_headboard_detail', (1.10,4.45,1.90), (0,1.25,1.32), 62),
     # Side silhouette view shows pillow depth, mattress height and frame trim.
     ('bed_side_profile', (6.5,0.0,2.65), (0,0,1.0), 48),
     # Footboard detail from the -Y side.

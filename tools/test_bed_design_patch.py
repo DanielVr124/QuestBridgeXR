@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""Regression checks that the custom design changes only the bed headboard."""
+"""Regression checks that the reference-matched design changes only the headboard."""
 from __future__ import annotations
-
 import gzip
 import pathlib
 import sys
@@ -19,27 +18,35 @@ class BedDesignPatchTests(unittest.TestCase):
         cls.source = gzip.decompress(compressed.read_bytes()).decode("utf-8")
         cls.patched = patch_bed_geometry(cls.source)
 
-    def test_headboard_is_one_smooth_upholstered_panel_with_recessed_led_channel(self):
+    def test_headboard_matches_black_diamond_tufted_led_reference(self):
         for token in (
             "Headboard_outer_shell",
-            "Headboard_single_upholstered_panel",
-            "Headboard_inner_lip_side_", "Headboard_inner_lip_edge_",
-            "Headboard_silver_grey_perimeter",
-            "Single smooth charcoal upholstered headboard panel",
+            "Headboard_quilt_backing",
+            "Headboard_diamond_tuft_",
+            "Headboard_diamond_stitch_",
+            "Headboard_tuft_button_base_",
+            "Headboard_crystal_tuft_button_",
+            "Headboard_side_frame_",
+            "Headboard_top_rail",
+            "Headboard_bottom_rail",
+            "Black upholstered diamond-tufted headboard",
+            "materials['headboard_crystal']",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
-        self.assertIn("(0,1.175,-1.255),(2.08,1.31,.22)", self.patched)
-        self.assertIn("'charcoal',.38", self.patched)
+        self.assertIn("diamond_rx=.225;diamond_ry=.169", self.patched)
+        self.assertIn("metallicFactor=0.78", self.patched)
+        self.assertIn("roughnessFactor=0.17", self.patched)
 
-    def test_no_diamond_tufts_or_buttons_remain_on_the_headboard(self):
+    def test_smooth_single_panel_and_old_vertical_channels_are_removed(self):
         for token in (
-            "Headboard_diamond_tuft_",
-            "Headboard_tuft_button_",
-            "Headboard_tufted_backing",
+            "Headboard_single_upholstered_panel",
+            "Headboard_inner_lip_side_",
+            "Headboard_inner_lip_edge_",
+            "Headboard_silver_grey_perimeter",
             "Headboard_channel_",
             "Headboard_channel_stitch_",
-            "Headboard_blue_violet_LED_reveal", "materials['led']=PBRMaterial",
+            "Single smooth charcoal upholstered headboard panel",
         ):
             with self.subTest(token=token):
                 self.assertNotIn(token, self.patched)
@@ -69,9 +76,7 @@ class BedDesignPatchTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertNotIn(token, self.patched)
 
-    def test_original_headboard_wings_and_mounting_are_retained(self):
-        self.assertIn("Headboard_top_rail", self.patched)
-        self.assertIn("Headboard_side_bolster_", self.patched)
+    def test_original_bed_frame_and_headboard_mounts_are_retained(self):
         self.assertIn("Headboard_mount_", self.patched)
         self.assertIn("original bed frame, mattress and bedding retained", self.patched)
 
