@@ -43,6 +43,13 @@ root.children.link(studio_collection)
 
 # Import the generated source meshes with their packed fabric textures.
 bpy.ops.import_scene.gltf(filepath=str(args.source))
+# Pack the embedded GLB images so the saved .blend is portable and self-contained.
+for image in bpy.data.images:
+    if image.source == 'FILE':
+        try:
+            image.pack()
+        except RuntimeError:
+            pass
 for obj in list(bpy.context.scene.objects):
     if obj.type == 'MESH':
         for collection in list(obj.users_collection):
@@ -106,6 +113,7 @@ scene.camera = camera
 scene.render.engine = 'CYCLES'
 scene.cycles.device = 'CPU'
 scene.cycles.samples = 48
+scene.cycles.use_denoising = True
 scene.render.resolution_x = 1800
 scene.render.resolution_y = 1350
 scene.render.resolution_percentage = 100
@@ -132,6 +140,20 @@ if model_collection.objects:
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.render.parent.mkdir(parents=True, exist_ok=True)
 bpy.ops.wm.save_as_mainfile(filepath=str(args.output))
-bpy.ops.render.render(write_still=True)
+
+# Render a small set of useful inspection angles from the saved editable scene.
+views = [
+    ('three_quarter', (4.4, 3.1, 4.0), (0, .95, 0)),
+    ('headboard', (3.3, 2.55, -4.15), (0, 1.18, -1.32)),
+    ('side_profile', (4.3, 2.2, -.1), (0, .9, .05)),
+    ('foot_detail', (3.0, 1.9, 3.8), (0, .82, 1.05)),
+]
+for suffix, location, target in views:
+    camera.location = location
+    aim(camera, target)
+    output = args.render if suffix == 'three_quarter' else args.render.with_name(
+        f'{args.render.stem}_{suffix}{args.render.suffix}')
+    scene.render.filepath = str(output)
+    bpy.ops.render.render(write_still=True)
+    print(f'Rendered Blender view ({suffix}): {output}')
 print(f'Saved Blender project: {args.output}')
-print(f'Rendered studio preview: {args.render}')
