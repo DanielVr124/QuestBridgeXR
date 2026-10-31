@@ -225,7 +225,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("stbtt_BakeFontBitmap", renderer)
         self.assertIn("Roboto-Regular.ttf", renderer)
         self.assertIn("COMPUTERS", renderer)
-        self.assertIn("ROOM SETTINGS", renderer)
+        self.assertIn("ENVIRONMENT", renderer)
         self.assertIn("RECONNECT TO PC", renderer)
         self.assertIn("room_.setConnectionState(network_.connected()", source)
         self.assertNotIn("yawPivot", renderer)
