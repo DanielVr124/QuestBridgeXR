@@ -99,6 +99,67 @@ jobs:
           test -s art/bed/renders/bed_side_profile.png
           test -s art/bed/renders/bed_foot_three_quarter.png
 
+      - name: Render whole-room tour and LED colour variants
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          "$HOME/.cache/blender-4.5.15/blender" --background \
+            --python tools/render_room_showcase.py -- \
+            --bed art/bed/arc_upholstered_bed_editable.glb \
+            --desk quest-client/app/src/main/assets/models/arc_gaming_desk.glb \
+            --monitor quest-client/app/src/main/assets/models/arc27_curved_monitor.glb \
+            --output-dir art/room-showcase
+          test -s art/room-showcase/room_showcase_scene.blend
+          test -s art/room-showcase/renders/01_room_entry_wide.png
+          test -s art/room-showcase/renders/07_headboard_reclined_view.png
+          test -s art/room-showcase/renders/20_desk_triple_monitor_option.png
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw, ImageFont
+          from zipfile import ZipFile, ZIP_DEFLATED
+          root = Path("art/room-showcase")
+          renders = sorted((root / "renders").glob("*.png"))
+          font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+          font = ImageFont.truetype(font_path, 16) if Path(font_path).exists() else ImageFont.load_default()
+          def sheet(name, files, cols=4, cell=(360, 245)):
+              rows = (len(files) + cols - 1) // cols
+              canvas = Image.new("RGB", (cols * cell[0], rows * cell[1]), (12, 16, 28))
+              draw = ImageDraw.Draw(canvas)
+              for i, path in enumerate(files):
+                  image = Image.open(path).convert("RGB")
+                  image.thumbnail((cell[0] - 12, cell[1] - 42), Image.Resampling.LANCZOS)
+                  x = (i % cols) * cell[0] + (cell[0] - image.width) // 2
+                  y = (i // cols) * cell[1] + 4
+                  canvas.paste(image, (x, y))
+                  label = path.stem.replace("_", " ")
+                  draw.text(((i % cols) * cell[0] + 8, (i // cols) * cell[1] + cell[1] - 31),
+                            label[:44], fill=(232, 239, 255), font=font)
+              canvas.save(root / name, quality=92)
+          detail = [p for p in renders if "__" not in p.name and p.stem not in ("20_desk_triple_monitor_option",)]
+          variants = [p for p in renders if "__" in p.name]
+          sheet("gallery_room_tour.png", detail)
+          sheet("gallery_led_variants.png", variants, cols=3, cell=(440, 280))
+          sheet("gallery_complete.png", renders, cols=4)
+          out = Path("dist/QuestBridgeXR-Room-Showcase-Renders.zip")
+          out.parent.mkdir(parents=True, exist_ok=True)
+          with ZipFile(out, "w", ZIP_DEFLATED, compresslevel=6) as z:
+              for path in sorted(root.rglob("*")):
+                  if path.is_file():
+                      z.write(path, path.relative_to(root.parent).as_posix())
+          print("Room showcase images:", len(renders), "zip:", out.stat().st_size)
+          PY
+
+      - name: Upload whole-room render set
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuestBridgeXR-Room-Showcase-Renders
+          path: |
+            art/room-showcase
+            dist/QuestBridgeXR-Room-Showcase-Renders.zip
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Package Blender project, source and renders
         if: steps.changes.outputs.changed == 'true'
         run: |
@@ -145,6 +206,7 @@ jobs:
           path: |
             dist/QuestBridgeXR-Bed-Model-Blender-Source.zip
             dist/QuestBridgeXR-Bed-Model-Blender-Source.zip.sha256
+            dist/QuestBridgeXR-Room-Showcase-Renders.zip
           if-no-files-found: error
           retention-days: 30
 
