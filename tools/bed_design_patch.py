@@ -8,64 +8,170 @@ from __future__ import annotations
 OLD_GEOMETRY = "# ----------------------- PILLOWS AND HEADBOARD -----------------------\n# Two substantial sleep pillows plus smaller slate accent cushions, each independently modeled.\nfor side in (-1,1):\n    x=side*.49\n    superellipsoid(f'Sleep_pillow_{side}',(x,1.095,-1.115),(.52,.175,.335),'sheet',.48,72,44,taper=.34)\n    # Fine seam along the pillow's visible front crown.\n    curve_tube(f'Sleep_pillow_piping_{side}',[(x+u,1.19,-1.405+.025*math.cos(u*2.2)) for u in np.linspace(-.43,.43,28)],.0024,'pillow')\nfor side in (-1,1):\n    x=side*.285\n    superellipsoid(f'Slate_accent_cushion_{side}',(x,1.215,-.795),(.37,.155,.245),'pillow',.50,64,40,taper=.26)\n# A compact lumbar cushion in muted steel blue to layer the pillows.\nsuperellipsoid('Lumbar_cushion',(0,1.245,-.57),(.46,.135,.155),'throw',.53,64,36,taper=.30)\n\n# Structural headboard shell and seven individual, vertically channeled upholstered pads.\n# The channels have eased shoulders, a softly bowed face, and visible shadow seams.\nsuperellipsoid('Headboard_back_shell',(0,1.185,-1.575),(1.29,.925,.115),'charcoal2',.50,88,52)\nsuperellipsoid('Headboard_top_rail',(0,2.035,-1.475),(1.245,.085,.125),'charcoal',.55,72,36)\nfor i in range(7):\n    x=(i-3)*.354\n    superellipsoid(f'Headboard_channel_{i+1:02d}',(x,1.275,-1.435),(.174,.735,.112),'charcoal',.50,64,44,taper=.18)\n    # Delicate stitched inset down the centre of every padded section.\n    curve_tube(f'Headboard_channel_stitch_{i+1:02d}',[(x,0.72+j*.043,-1.326+.006*math.cos(j*.18)) for j in range(29)],.00115,'charcoal2')\n# Side wings roll forward just a little, framing the upholstered centre panel.\nfor side in (-1,1):\n    superellipsoid(f'Headboard_side_bolster_{side}',(side*1.205,1.255,-1.415),(.105,.77,.135),'charcoal2',.50,56,36)\n# Rear support brackets are hidden in normal view but add a credible connection to the frame.\nfor side in (-1,1):\n    boxsoft(f'Headboard_mount_{side}',(side*.92,.74,-1.53),(.105,.48,.13),'underside',.40)\n"
 
 NEW_GEOMETRY = """# ----------------------- PILLOWS AND HEADBOARD -----------------------
-# Two genuinely boxy side-sleeper pillows.  Each has a deep gusset, softened
-# corners, a tailored perimeter welt and a fine diamond-quilted cotton top.
-PILLOW_TILT = math.radians(15.0)
+# Box-gusset side-sleeper pillows: a true rounded-rectangle footprint,
+# a separately meshed domed cotton crown, and a full-depth sewn side wall.
+# The crown is puffed in the centre and gently relaxed at the sewn perimeter.
+PILLOW_TILT = math.radians(10.0)
+PILLOW_HALF_WIDTH = .535
+PILLOW_HALF_DEPTH = .325
+PILLOW_EDGE_TOP = .028
+PILLOW_EDGE_BOTTOM = -.128
+PILLOW_CROWN = .168
+PILLOW_CORNER_EXPONENT = 4.2
+PILLOW_RING_SEGMENTS = 112
+PILLOW_RING_ROWS = 20
+
+def pillow_outline(u, v, scale=1.0):
+    # Superellipse perimeter gives visible pillow corners without a hard box.
+    power = 2.0 / PILLOW_CORNER_EXPONENT
+    return (
+        PILLOW_HALF_WIDTH * scale * math.copysign(abs(math.cos(u))**power, math.cos(u)),
+        PILLOW_HALF_DEPTH * scale * math.copysign(abs(math.sin(u))**power, math.sin(u))
+    )
+
+def pillow_crown_y(x, z):
+    gauge = (
+        (abs(x) / PILLOW_HALF_WIDTH)**PILLOW_CORNER_EXPONENT
+        + (abs(z) / PILLOW_HALF_DEPTH)**PILLOW_CORNER_EXPONENT
+    )
+    radius = min(1.0, max(0.0, gauge**(1.0/PILLOW_CORNER_EXPONENT)))
+    falloff = max(0.0, 1.0-radius*radius)**.72
+    # Small cloth relaxations break up the mathematically smooth dome, but fade
+    # to zero at the seam so the crown welds cleanly into the gusset wall.
+    wrinkle = .0032 * math.sin(18.0*x+4.5*z) * math.sin(16.0*z-3.2*x)
+    wrinkle *= radius**3 * math.sqrt(max(0.0,1.0-radius))
+    return PILLOW_EDGE_TOP + PILLOW_CROWN*falloff + wrinkle
+
 for side in (-1,1):
-    center=np.array([side*.515,1.105,-1.075],dtype=float)
-    half_width,half_height,half_depth=.535,.205,.325
-    pillow=superellipsoid(
-        f'Sleep_pillow_{side}',tuple(center),
-        (half_width,half_height,half_depth),'sheet',.58,112,72,taper=.10
-    )
+    pillow_center=np.array([side*.515,1.08,-1.06],dtype=float)
     pillow_rotation=trimesh.transformations.rotation_matrix(
-        PILLOW_TILT,(1.0,0.0,0.0),point=center
+        PILLOW_TILT,(1.0,0.0,0.0)
     )
-    pillow.apply_transform(pillow_rotation)
+    def pillow_world(x,y,z):
+        local=np.array([x,y,z],dtype=float)
+        return pillow_rotation[:3,:3] @ local + pillow_center
 
-    def pillow_surface_point(u,v,lift=.004):
-        fullness=max(0.0,1.0-(abs(u)/half_width)**4-(abs(v)/half_depth)**4)
-        crown=half_height*.91*math.pow(fullness,.43)
-        local=np.array([center[0]+u,center[1]+crown+lift,center[2]+v,1.0])
-        return (pillow_rotation @ local)[:3]
+    # Domed top shell, formed from concentric rounded-rectangle rings.
+    # The dense radial topology supports the soft cloth crown and visible quilting.
+    top_vertices=[pillow_world(0.0,pillow_crown_y(0.0,0.0),0.0)]
+    top_uv=[(.5,.5)]
+    for ring in range(1,PILLOW_RING_ROWS+1):
+        radius=ring/PILLOW_RING_ROWS
+        for segment in range(PILLOW_RING_SEGMENTS):
+            angle=2.0*math.pi*segment/PILLOW_RING_SEGMENTS
+            ox,oz=pillow_outline(angle,radius)
+            top_vertices.append(pillow_world(ox,pillow_crown_y(ox,oz),oz))
+            top_uv.append((.5+ox/(2*PILLOW_HALF_WIDTH),.5+oz/(2*PILLOW_HALF_DEPTH)))
+    top_faces=[]
+    first_ring=1
+    for segment in range(PILLOW_RING_SEGMENTS):
+        nxt=(segment+1)%PILLOW_RING_SEGMENTS
+        top_faces.append((0,first_ring+nxt,first_ring+segment))
+    for ring in range(PILLOW_RING_ROWS-1):
+        inner=1+ring*PILLOW_RING_SEGMENTS
+        outer=inner+PILLOW_RING_SEGMENTS
+        for segment in range(PILLOW_RING_SEGMENTS):
+            nxt=(segment+1)%PILLOW_RING_SEGMENTS
+            a=inner+segment; b=inner+nxt
+            c=outer+nxt; d=outer+segment
+            top_faces.extend([(a,b,c),(a,c,d)])
+    add_mesh(f'Sleep_pillow_top_{side}',top_vertices,top_faces,top_uv,'sheet')
 
-    # A full-height side gusset is called out by a stitched lower seam and
-    # a second welt line just under the crown.  Both follow rounded box corners.
-    gusset_points=[]
-    crown_points=[]
-    for angle in np.linspace(0.0,2.0*math.pi,112,endpoint=False):
-        ca,sa=math.cos(angle),math.sin(angle)
-        u=half_width*.965*math.copysign(abs(ca)**.52,ca)
-        v=half_depth*.965*math.copysign(abs(sa)**.52,sa)
-        lower=np.array([center[0]+u,center[1]-.075,center[2]+v,1.0])
-        gusset_points.append((pillow_rotation @ lower)[:3])
-        crown_points.append(pillow_surface_point(u*.975,v*.975,.001))
-    gusset=curve_tube(f'Sleep_pillow_gusset_seam_{side}',gusset_points,.0045,'pillow')
-    crown_welt=curve_tube(f'Sleep_pillow_crown_welt_{side}',crown_points,.0032,'pillow')
+    # Deep continuous gusset sidewall. Its middle bows out slightly like a
+    # filled pillow case, while the top/bottom seams stay neatly tucked in.
+    gusset_vertices=[]; gusset_uv=[]
+    gusset_rows=14
+    for row in range(gusset_rows+1):
+        t=row/gusset_rows
+        y=PILLOW_EDGE_BOTTOM+(PILLOW_EDGE_TOP-PILLOW_EDGE_BOTTOM)*t
+        bulge=.022*math.sin(math.pi*t)
+        for segment in range(PILLOW_RING_SEGMENTS):
+            angle=2.0*math.pi*segment/PILLOW_RING_SEGMENTS
+            ox,oz=pillow_outline(angle,1.0+bulge)
+            gusset_vertices.append(pillow_world(ox,y,oz))
+            gusset_uv.append((segment/PILLOW_RING_SEGMENTS,t))
+    gusset_faces=[]
+    for row in range(gusset_rows):
+        inner=row*PILLOW_RING_SEGMENTS
+        outer=inner+PILLOW_RING_SEGMENTS
+        for segment in range(PILLOW_RING_SEGMENTS):
+            nxt=(segment+1)%PILLOW_RING_SEGMENTS
+            a=inner+segment; b=inner+nxt
+            c=outer+nxt; d=outer+segment
+            gusset_faces.extend([(a,b,c),(a,c,d)])
+    add_mesh(f'Sleep_pillow_box_gusset_{side}',gusset_vertices,gusset_faces,gusset_uv,'sheet')
 
-    # Crossed stitch rows follow the inflated top instead of floating above it.
+    # Slightly crowned underside closes the pillow shell and keeps its thickness
+    # believable when viewed from a low VR camera.
+    bottom_vertices=[pillow_world(0.0,PILLOW_EDGE_BOTTOM-.018,0.0)]
+    bottom_uv=[(.5,.5)]
+    for ring in range(1,PILLOW_RING_ROWS+1):
+        radius=ring/PILLOW_RING_ROWS
+        for segment in range(PILLOW_RING_SEGMENTS):
+            angle=2.0*math.pi*segment/PILLOW_RING_SEGMENTS
+            ox,oz=pillow_outline(angle,radius)
+            y=PILLOW_EDGE_BOTTOM-.018*(1.0-radius*radius)
+            bottom_vertices.append(pillow_world(ox,y,oz))
+            bottom_uv.append((.5+ox/(2*PILLOW_HALF_WIDTH),.5+oz/(2*PILLOW_HALF_DEPTH)))
+    bottom_faces=[]
+    for segment in range(PILLOW_RING_SEGMENTS):
+        nxt=(segment+1)%PILLOW_RING_SEGMENTS
+        bottom_faces.append((0,1+segment,1+nxt))
+    for ring in range(PILLOW_RING_ROWS-1):
+        inner=1+ring*PILLOW_RING_SEGMENTS
+        outer=inner+PILLOW_RING_SEGMENTS
+        for segment in range(PILLOW_RING_SEGMENTS):
+            nxt=(segment+1)%PILLOW_RING_SEGMENTS
+            a=inner+segment; b=inner+nxt
+            c=outer+nxt; d=outer+segment
+            bottom_faces.extend([(a,c,b),(a,d,c)])
+    add_mesh(f'Sleep_pillow_underside_{side}',bottom_vertices,bottom_faces,bottom_uv,'sheet')
+
+    def pillow_top_world(x,z,lift=.004):
+        return pillow_world(x,pillow_crown_y(x,z)+lift,z)
+
+    # Raised welt at the top edge and a second stitched seam at the lower edge
+    # make the deep gusset obvious from the front/side camera.
+    top_welt=[]
+    lower_gusset_seam=[]
+    for segment in range(144):
+        angle=2.0*math.pi*segment/144
+        ox,oz=pillow_outline(angle,.985)
+        top_welt.append(pillow_top_world(ox,oz,.002))
+        bx,bz=pillow_outline(angle,.985)
+        lower_gusset_seam.append(pillow_world(bx,PILLOW_EDGE_BOTTOM+.018,bz))
+    curve_tube(f'Sleep_pillow_top_welt_{side}',top_welt,.0042,'linen')
+    curve_tube(f'Sleep_pillow_lower_gusset_seam_{side}',lower_gusset_seam,.0034,'linen')
+
+    # Diamond quilting follows the actual puffed crown, so it stays attached to
+    # the mesh rather than floating above or disappearing beneath the fabric.
     for family in (-1,1):
-        for row,offset in enumerate(np.linspace(-.235,.235,9)):
+        for row,offset in enumerate(np.linspace(-.235,.235,7)):
             points=[]
-            for u in np.linspace(-.47,.47,80):
-                v=family*(u*half_depth/half_width)+offset
-                if (abs(u)/half_width)**4+(abs(v)/half_depth)**4 <= .88:
-                    points.append(pillow_surface_point(u,v,.006))
+            for x in np.linspace(-.48,.48,96):
+                z=family*.58*x+offset
+                gauge=(abs(x)/PILLOW_HALF_WIDTH)**PILLOW_CORNER_EXPONENT + (abs(z)/PILLOW_HALF_DEPTH)**PILLOW_CORNER_EXPONENT
+                if gauge<=.84:
+                    points.append(pillow_top_world(x,z,.003))
             if len(points)>3:
-                stitch=curve_tube(
-                    f'Sleep_pillow_quilt_{side}_{family}_{row:02d}',
-                    points,.0018,'pillow'
+                curve_tube(
+                    f'Sleep_pillow_diamond_quilt_{side}_{family}_{row:02d}',
+                    points,.0018,'linen'
                 )
-    # A few gently eased corner darts make the case read as sewn fabric.
+
+    # Short eased darts at the four corners reinforce the tailored, sewn case.
     for corner_x in (-1,1):
         for corner_z in (-1,1):
-            dart_local=[
-                (center[0]+corner_x*.42,center[1]+.112,center[2]+corner_z*.245),
-                (center[0]+corner_x*.465,center[1]+.128,center[2]+corner_z*.285),
-                (center[0]+corner_x*.485,center[1]+.112,center[2]+corner_z*.302)
-            ]
-            dart=[(pillow_rotation @ np.array([*p,1.0]))[:3] for p in dart_local]
-            dart_mesh=curve_tube(f'Sleep_pillow_corner_dart_{side}_{corner_x}_{corner_z}',dart,.0020,'pillow')
+            points=[]
+            for step in range(12):
+                t=step/11.0
+                x=corner_x*(.37+.105*t)
+                z=corner_z*(.235+.065*t)
+                points.append(pillow_top_world(x,z,.0035))
+            curve_tube(
+                f'Sleep_pillow_corner_dart_{side}_{corner_x}_{corner_z}',
+                points,.0021,'linen'
+            )
 
 # Soft accent pillows stay behind the main pair, with the same sewn corners
 # and quieter graphite fabric so the white side-sleeper pillows remain dominant.
