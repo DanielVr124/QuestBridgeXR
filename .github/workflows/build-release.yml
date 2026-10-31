@@ -25,7 +25,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install bed asset generator dependencies
-        run: python -m pip install --upgrade pip numpy Pillow trimesh
+        run: python -m pip install --upgrade pip numpy Pillow scipy trimesh
 
       - name: Generate optimized and editable bed GLBs
         run: python art/bed/generate_bed_asset.py
