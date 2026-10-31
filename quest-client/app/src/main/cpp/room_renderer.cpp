@@ -2631,6 +2631,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                      side<0?rgb(ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]):rgb(ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]),0,0.0f);
         drawSphere(pv.data(),nx,floorY+.91f,nz,.07f,.075f,.07f,
                    side<0?rgb(ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]):rgb(ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]),7);
+        // A compact segmented halo lets each bedside zone show its own gradient.
+        const int bedsideZone=side<0?5:6;
+        if(ledZones_[static_cast<size_t>(bedsideZone)].enabled) {
+            for(int segment=0;segment<16;++segment) {
+                const float t=(static_cast<float>(segment)+.5f)/16.0f;
+                const float angle=t*2.0f*kPi;
+                const auto halo=ledZoneColor(bedsideZone,t);
+                drawSphere(pv.data(),nx+std::cos(angle)*.090f,floorY+1.045f,
+                           nz+std::sin(angle)*.090f,.013f,.010f,.013f,
+                           rgb(halo[0],halo[1],halo[2]),7);
+            }
+        }
         if(side>0) {
             const float remoteX=nx+.20f,remoteZ=nz+.17f,remoteY=floorY+.720f;
             drawGroundShadow(pv.data(),remoteX,floorY+.709f,remoteZ,.17f,.27f,.18f);
