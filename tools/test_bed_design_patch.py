@@ -34,9 +34,12 @@ class BedDesignPatchTests(unittest.TestCase):
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
-        self.assertIn("diamond_rx=.225;diamond_ry=.169", self.patched)
-        self.assertIn("metallicFactor=0.78", self.patched)
-        self.assertIn("roughnessFactor=0.17", self.patched)
+        self.assertIn("diamond_rx=.225;diamond_ry=.155", self.patched)
+        self.assertIn("radial_steps=20", self.patched)
+        self.assertIn("angular_steps=64", self.patched)
+        self.assertIn("math.cos(.5*math.pi*radius)**2", self.patched)
+        self.assertIn("metallicFactor=0.60", self.patched)
+        self.assertIn("roughnessFactor=0.12", self.patched)
 
     def test_smooth_single_panel_and_old_vertical_channels_are_removed(self):
         for token in (
