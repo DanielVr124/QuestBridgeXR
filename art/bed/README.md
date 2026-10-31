@@ -1,13 +1,13 @@
-# QuestBridge XR — diamond-tufted LED headboard
+# QuestBridge XR — smooth upholstered LED headboard
 
-This update changes **only the existing headboard** to match the user's reference: black upholstered diamond tufting, recessed pull buttons, satin-silver perimeter trim, and a controllable LED reveal.
+This update changes **only the existing headboard**. The diamond-tufted cushions have been removed and replaced with one continuous, smooth charcoal upholstered rectangular panel. A visible LED diffuser sits directly around the panel's inner perimeter, with satin-silver trim around the outside.
 
 ## What changes
 
-- The existing channel-upholstered headboard is replaced with a softly rounded black upholstered panel.
-- Individual padded diamond shapes and recessed tuft buttons create the diamond-tufted finish.
-- A satin-silver border frames the headboard, with an inset LED strip using the existing bedside RGB remote's six presets: red, green, blue, white, purple and cyan.
-- The original headboard side bolsters and mounting brackets are retained.
+- The old channel/diamond details are replaced by one single softly bevelled upholstered panel.
+- The panel fills the headboard face up to the LED diffuser; there are no decorative diamonds, tuft buttons, or gaps between separate cushions.
+- A continuous pale LED diffuser is mounted directly along the panel edge. The existing bedside RGB remote continues to control its color presets.
+- Satin-silver outer trim, the original headboard side bolsters, top rail, and mounting brackets are retained.
 
 ## What stays exactly as it was
 
@@ -16,17 +16,17 @@ This update changes **only the existing headboard** to match the user's referenc
 - The bed's position and anchor in the room, its collision footprint, bedside furniture, TV, monitor, window, and other room objects.
 - The existing head-tracking, turning, locomotion, and LED-remote interaction code.
 
-The product reference includes a coordinated footboard, but this implementation deliberately uses only the headboard portion because that is the only requested change.
+The product reference includes a coordinated footboard and diamond details, but this implementation deliberately uses only a smooth headboard panel because that is the requested design.
 
 ## Reference direction
 
-- [4 EVER WINNER LED diamond-tufted bed at Walmart](https://www.walmart.com/ip/4-EVER-WINNER-Queen-Size-LED-Bed-Frame-with-Headboard-Upholstered-Platform-Bed-Frame-with-LED-Lights-Diamond-Tufted-Headboard-and-Footboard-Black/18538571356) — used only as a visual reference for the headboard's black diamond tufting, silver-grey border and integrated LED accent.
+- [4 EVER WINNER LED bed frame at Walmart](https://www.walmart.com/ip/4-EVER-WINNER-Queen-Size-LED-Bed-Frame-with-Headboard-Upholstered-Platform-Bed-Frame-with-LED-Lights-Diamond-Tufted-Headboard-and-Footboard-Black/18538571356) — used only as a reference for the black upholstered headboard, integrated LED accent, and silver-grey border.
 
 No third-party 3D bed mesh is used.
 
 ## Dimensions and coordinates
 
-The new headboard reuses the existing headboard's footprint and mounting coordinates. The overall bed dimensions and room placement are not intentionally changed.
+The new panel remains inside the existing headboard footprint and uses the original bed anchor and mounting coordinates. The overall bed dimensions and room placement are not intentionally changed.
 
 ## Blender project
 
