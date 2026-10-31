@@ -2067,8 +2067,8 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
     const float frontZ=halfD;
     const float bedX=halfW-2.0f;
     const float bedZ=-halfD+2.10f;
-    const float remoteX=bedX+1.68f;
-    const float remoteZ=bedZ-.79f;
+    const float remoteX=bedX+1.73f;
+    const float remoteZ=bedZ-.77f;
 
     const XrQuaternionf roomYaw{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
     const XrQuaternionf roomOrientation=quatMul(roomYaw,controllerPose.orientation);
@@ -2119,9 +2119,9 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
         if(t>0.0f&&t<nearest) {
             const float hitX=origin[0]+direction[0]*t;
             const float hitZ=origin[2]+direction[2]*t;
-            if(std::fabs(hitX-remoteX)<=.088f&&std::fabs(hitZ-remoteZ)<=.146f) {
+            if(std::fabs(hitX-remoteX)<=.083f&&std::fabs(hitZ-remoteZ)<=.136f) {
                 const int column=hitX<remoteX?0:1;
-                const int row=std::clamp(static_cast<int>(std::lround((hitZ-remoteZ)/.067f))+1,0,2);
+                const int row=std::clamp(static_cast<int>(std::lround((hitZ-remoteZ)/.060f))+1,0,2);
                 nearest=t;
                 selectedPreset=row*2+column;
                 target=Target::LedRemote;
@@ -2486,11 +2486,11 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawSphere(pv.data(),nx,floorY+.91f,nz,.07f,.075f,.07f,
                    side<0?accentBlue:accentViolet,7);
         if(side>0) {
-            const float remoteX=nx+.15f,remoteZ=nz+.15f,remoteY=floorY+.720f;
+            const float remoteX=nx+.20f,remoteZ=nz+.17f,remoteY=floorY+.720f;
             drawGroundShadow(pv.data(),remoteX,floorY+.709f,remoteZ,.17f,.27f,.18f);
-            drawRoundedBox(pv.data(),remoteX,remoteY,remoteZ,.16f,.026f,.28f,
+            drawRoundedBox(pv.data(),remoteX,remoteY,remoteZ,.15f,.026f,.26f,
                            rgb(.035f,.043f,.064f),0.0f,5);
-            drawRoundedBox(pv.data(),remoteX,remoteY+.015f,remoteZ,.144f,.006f,.258f,
+            drawRoundedBox(pv.data(),remoteX,remoteY+.015f,remoteZ,.134f,.006f,.238f,
                            rgb(.075f,.092f,.135f),0.0f,4);
             const std::array<std::array<float,3>,6> swatches{{
                 {{1.0f,.08f,.055f}},{{.04f,.95f,.16f}},
@@ -2498,15 +2498,15 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 {{.62f,.08f,1.0f}},{{.02f,.86f,.90f}}
             }};
             for(int row=0;row<3;++row) for(int column=0;column<2;++column) {
-                const float bx=remoteX+(column==0?-.037f:.037f);
-                const float bz=remoteZ+(row-1)*.067f;
-                drawCylinder(pv.data(),bx,remoteY+.023f,bz,.046f,.008f,
+                const float bx=remoteX+(column==0?-.033f:.033f);
+                const float bz=remoteZ+(row-1)*.060f;
+                drawCylinder(pv.data(),bx,remoteY+.023f,bz,.040f,.008f,
                              rgb(.018f,.024f,.040f),4);
                 const auto& swatch=swatches[row*2+column];
-                drawCylinder(pv.data(),bx,remoteY+.029f,bz,.038f,.008f,
+                drawCylinder(pv.data(),bx,remoteY+.029f,bz,.032f,.008f,
                              rgb(swatch[0],swatch[1],swatch[2]),7);
             }
-            drawSphere(pv.data(),remoteX,remoteY+.031f,remoteZ-.112f,.010f,.006f,.010f,
+            drawSphere(pv.data(),remoteX,remoteY+.031f,remoteZ-.102f,.010f,.006f,.010f,
                        ledPreset_==2?rgb(.08f,.78f,1.0f):rgb(.72f,.78f,.92f),7);
         }
     }
