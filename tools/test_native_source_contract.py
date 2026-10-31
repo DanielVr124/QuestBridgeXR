@@ -67,7 +67,7 @@ class NativeSourceContractTests(unittest.TestCase):
         bed_design = (ROOT / "tools/bed_design_patch.py").read_text(encoding="utf-8")
         for design_marker in (
             "Headboard_single_upholstered_panel",
-            "Headboard_silver_grey_perimeter", "Headboard_blue_violet_LED_reveal",
+            "Headboard_inner_lip_side_", "Headboard_inner_lip_edge_",
             "Headboard_side_bolster_", "Headboard_mount_",
             "Sleep_pillow_piping_", "Slate_accent_cushion_", "Lumbar_cushion"
         ):
