@@ -2068,7 +2068,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
     const float bedX=halfW-2.0f;
     const float bedZ=-halfD+2.10f;
     const float remoteX=bedX+1.68f;
-    const float remoteZ=bedZ-.84f;
+    const float remoteZ=bedZ-.79f;
 
     const XrQuaternionf roomYaw{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
     const XrQuaternionf roomOrientation=quatMul(roomYaw,controllerPose.orientation);
@@ -2486,7 +2486,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawSphere(pv.data(),nx,floorY+.91f,nz,.07f,.075f,.07f,
                    side<0?accentBlue:accentViolet,7);
         if(side>0) {
-            const float remoteX=nx+.15f,remoteZ=nz+.10f,remoteY=floorY+.720f;
+            const float remoteX=nx+.15f,remoteZ=nz+.15f,remoteY=floorY+.720f;
             drawGroundShadow(pv.data(),remoteX,floorY+.709f,remoteZ,.17f,.27f,.18f);
             drawRoundedBox(pv.data(),remoteX,remoteY,remoteZ,.16f,.026f,.28f,
                            rgb(.035f,.043f,.064f),0.0f,5);
@@ -2500,10 +2500,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             for(int row=0;row<3;++row) for(int column=0;column<2;++column) {
                 const float bx=remoteX+(column==0?-.037f:.037f);
                 const float bz=remoteZ+(row-1)*.067f;
-                drawCylinder(pv.data(),bx,remoteY+.023f,bz,.036f,.008f,
+                drawCylinder(pv.data(),bx,remoteY+.023f,bz,.046f,.008f,
                              rgb(.018f,.024f,.040f),4);
                 const auto& swatch=swatches[row*2+column];
-                drawCylinder(pv.data(),bx,remoteY+.029f,bz,.028f,.008f,
+                drawCylinder(pv.data(),bx,remoteY+.029f,bz,.038f,.008f,
                              rgb(swatch[0],swatch[1],swatch[2]),7);
             }
             drawSphere(pv.data(),remoteX,remoteY+.031f,remoteZ-.112f,.010f,.006f,.010f,
