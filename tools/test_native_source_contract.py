@@ -69,7 +69,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("void RoomRenderer::drawCurvedPanel", renderer)
         self.assertNotIn("const float curve=.082f", renderer)
         self.assertIn("void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float centerZ", renderer)
-        self.assertIn("const float windowWallX=halfW+.012f", renderer)
+        self.assertIn("const float windowWallX=halfW-.015f", renderer)
         self.assertIn("const float monitorZ=deskZ-0.31f", renderer)
         self.assertIn("for(int screen=0;screen<monitorCount;++screen)", renderer)
         self.assertNotIn("Twin metal uprights", renderer)
