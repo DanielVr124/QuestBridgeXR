@@ -58,7 +58,6 @@ private:
     void chooseEnvironment();
     std::array<float,3> ledZoneColor(int zone, float position) const;
     std::array<float,3> ledZoneAverageColor(int zone) const;
-    void applyLedPreset(int preset);
     void drawBox(const float* projectionView, float x, float y, float z,
                  float sx, float sy, float sz, const std::array<float, 4>& color,
                  float yaw = 0.0f, int material = 0);
@@ -199,7 +198,6 @@ private:
     bool reconnectRequested_ = false;
     bool roomLightsOn_ = true;
     bool previousRoomTrigger_ = false;
-    int ledPreset_ = 2;
     bool pcConnected_ = false;
     bool pcStreaming_ = false;
     std::string pcHostIp_ = "Not configured";
