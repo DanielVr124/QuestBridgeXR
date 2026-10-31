@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 
-_REVIEW_VIEWS = re.compile(r"(?ms)^review_views\\s*=\\s*\\[.*?^\\]")
+_REVIEW_VIEWS = re.compile(r"(?ms)^review_views\s*=\s*\[.*?^\]")
 _REQUIRED_VIEWS = {
     "bed_three_quarter",
     "bed_headboard",
@@ -41,7 +41,7 @@ def patch_blender_review_cameras(source: str) -> str:
 
     match = matches[0]
     original = match.group(0)
-    present = set(re.findall(r"\\(\\s*['\\\"]([^'\\\"]+)['\\\"]\\s*,", original))
+    present = set(re.findall(r"\(\s*'([^']+)'\s*,", original))
     missing = _REQUIRED_VIEWS - present
     if missing:
         names = ", ".join(sorted(missing))
