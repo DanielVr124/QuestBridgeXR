@@ -201,6 +201,25 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertLess(glb_loader.index("cgltf_load_buffers(&options,data,nullptr)"),
                         glb_loader.index("cgltf_accessor_unpack_floats(pos"))
 
+    def test_room_light_switch_and_led_remote_are_real_interactions(self):
+        renderer = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
+        header = (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8")
+        main = (ROOT / "quest-client/app/src/main/cpp/main.cpp").read_text(encoding="utf-8")
+        self.assertIn("void RoomRenderer::handleRoomInteraction", renderer)
+        self.assertIn("roomLightsOn_", header)
+        self.assertIn("previousRoomTrigger_", header)
+        self.assertIn("ledPreset_", header)
+        self.assertIn("uRoomAmbientIntensity", renderer)
+        self.assertIn("glUniform1f(locCeilingLightIntensity_,1.55f*roomLightScale)", renderer)
+        self.assertIn("const float lightSwitchFaceZ=frontZ-.132f", renderer)
+        self.assertIn("const float remoteTopY=floorY+.746f", renderer)
+        self.assertIn("selectedPreset=row*2+column", renderer)
+        self.assertIn("room_.handleRoomInteraction(roomPointerPose,roomTriggerPressed)", main)
+        self.assertLess(main.index("room_.handleRoomInteraction(roomPointerPose,roomTriggerPressed)"),
+                        main.index("if (!config_.controllersEnabled) return;"))
+        # Keep the existing movement and turn path intact while adding the independent trigger ray.
+        self.assertIn("room_.updateLocomotion(moveX, moveY, turnX, dt, headPose)", main)
+
     def test_fake_vr_bridge_is_connected_and_default_off(self):
         host = (ROOT / "host/src/main.cpp").read_text(encoding="utf-8")
         config = (ROOT / "config/fake_vr.ini").read_text(encoding="utf-8")
