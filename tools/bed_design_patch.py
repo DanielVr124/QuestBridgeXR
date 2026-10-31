@@ -41,7 +41,6 @@ for side in (-1,1):
         gusset_points.append((pillow_rotation @ lower)[:3])
         crown_points.append(pillow_surface_point(u*.975,v*.975,.001))
     gusset=curve_tube(f'Sleep_pillow_gusset_seam_{side}',gusset_points,.0045,'pillow')
-    gusset.apply_transform(pillow_rotation)
     crown_welt=curve_tube(f'Sleep_pillow_crown_welt_{side}',crown_points,.0032,'pillow')
 
     # Crossed stitch rows follow the inflated top instead of floating above it.
@@ -212,7 +211,7 @@ def patch_bed_geometry(source: str) -> str:
         )
     source = source.replace(OLD_GEOMETRY, NEW_GEOMETRY, 1)
     old_design = "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',"
-    new_design = "'design':'Wide sculpted charcoal wingback headboard, two propped hotel pillows, silver cotton bedding, graphite duvet, midnight ribbed throw',"
+    new_design = "'design':'Black diamond-tufted LED headboard and matching footboard, silver-grey perimeter trim, quilted gusset pillows, graphite duvet and midnight-blue throw',"
     if source.count(old_design) != 1:
         raise RuntimeError("Bed metadata design marker changed; update the design patch.")
     return source.replace(old_design, new_design, 1)
