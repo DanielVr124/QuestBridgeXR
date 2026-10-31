@@ -133,7 +133,7 @@ jobs:
               for path in files:
                   if not path.is_file():
                       raise FileNotFoundError(path)
-                  z.write(path, path.relative_to(root))
+                  z.write(path, path.as_posix())
           digest = hashlib.sha256(out.read_bytes()).hexdigest()
           out.with_suffix(out.suffix + '.sha256').write_text(f'{digest}  {out.name}\n')
           print('Created', out, 'bytes=', out.stat().st_size)
