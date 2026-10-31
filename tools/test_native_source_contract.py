@@ -75,6 +75,11 @@ class NativeSourceContractTests(unittest.TestCase):
             with self.subTest(bed_detail=design_marker):
                 self.assertIn(design_marker, bed_design)
         self.assertIn("The Big One Quilted Side Sleeper Pillow", (ROOT / "art/bed/README.md").read_text(encoding="utf-8"))
+        camera_patch = (ROOT / "tools/blender_bed_camera_patch.py").read_text(encoding="utf-8")
+        self.assertIn("bed_pillow_detail", camera_patch)
+        self.assertIn("(2.8,2.7,4.8)", camera_patch)
+        self.assertIn("refusing to render misleading close-up or back-facing camera angles", camera_patch)
+
 
     def test_room_controls_keep_locomotion_but_have_no_hidden_click_shortcuts(self):
         source = (ROOT / "quest-client/app/src/main/cpp/main.cpp").read_text(encoding="utf-8")
