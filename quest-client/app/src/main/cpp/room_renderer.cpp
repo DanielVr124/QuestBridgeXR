@@ -21,6 +21,8 @@
 
 namespace {
 constexpr float kPi = 3.14159265358979323846f;
+// Matches the imported arc27_curved_monitor.glb screen node's ~0.05 rad pitch.
+constexpr float kMonitorScreenPitch = 0.05f;
 constexpr int kFontAtlasSize = 512;
 constexpr int kFontFirstCharacter = 32;
 constexpr int kFontCharacterCount = 96;
@@ -1783,19 +1785,26 @@ void RoomRenderer::drawRoundedBox(const float* pv,float x,float y,float z,float 
 }
 void RoomRenderer::drawText(const float* pv, const char* text, float x, float y, float z,
                             float pixelSize, const std::array<float,4>& color,
-                            float curveCenterX, float curveWidth, float curveDepth) {
+                            float curveCenterX, float curveWidth, float curveDepth, float curveCenterY) {
     if (!text || !gFontAtlasReady || !gFontAtlasTexture) return;
     std::vector<Vertex> vertices;
     vertices.reserve(std::strlen(text) * 6u);
     const float scale = std::max(pixelSize, 0.0001f) * 0.25f;
     float penX = 0.0f, penY = 0.0f;
-    auto curvedZ = [&](float worldX) {
-        if (curveWidth <= 0.0001f || curveDepth <= 0.0f) return z;
-        const float normalized = std::clamp((worldX - curveCenterX) / (curveWidth * 0.5f), -1.0f, 1.0f);
-        return z - curveDepth * (1.0f - normalized * normalized);
-    };
+    const float pitchCos = std::cos(kMonitorScreenPitch);
+    const float pitchSin = std::sin(kMonitorScreenPitch);
     auto add = [&](float px, float py, float u, float v) {
-        vertices.push_back({px, py, curvedZ(px), u, v});
+        float projectedY = py;
+        float projectedZ = z;
+        if (curveWidth > 0.0001f && curveDepth > 0.0f) {
+            const float normalized = std::clamp((px - curveCenterX) / (curveWidth * 0.5f), -1.0f, 1.0f);
+            // The GLB's screen recesses at the center and bends toward the viewer at its edges.
+            const float localZ = curveDepth * normalized * normalized;
+            const float localY = py - curveCenterY;
+            projectedY = curveCenterY + pitchCos * localY + pitchSin * localZ;
+            projectedZ = z - pitchSin * localY + pitchCos * localZ;
+        }
+        vertices.push_back({px, projectedY, projectedZ, u, v});
     };
     for (int i = 0; text[i] != '\0'; ++i) {
         unsigned char character = static_cast<unsigned char>(text[i]);
@@ -1861,11 +1870,17 @@ void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
     segments = std::clamp(segments, 8, 48);
     std::vector<Vertex> vertices;
     vertices.reserve(static_cast<size_t>(segments) * 6u);
+    const float pitchCos = std::cos(kMonitorScreenPitch);
+    const float pitchSin = std::sin(kMonitorScreenPitch);
     auto point = [&](float u, float v) {
         const float localX = (u - 0.5f) * width;
         const float normalized = 2.0f * u - 1.0f;
-        const float localZ = -curveDepth * (1.0f - normalized * normalized);
-        return Vertex{localX, (v - 0.5f) * height, localZ, u, 1.0f - v};
+        // Match the monitor glass: shallow concave center, with both edges projecting forward.
+        const float localZ = curveDepth * normalized * normalized;
+        const float localY = (v - 0.5f) * height;
+        const float pitchedY = pitchCos * localY + pitchSin * localZ;
+        const float pitchedZ = -pitchSin * localY + pitchCos * localZ;
+        return Vertex{localX, pitchedY, pitchedZ, u, 1.0f - v};
     };
     for (int i = 0; i < segments; ++i) {
         const float u0 = static_cast<float>(i) / static_cast<float>(segments);
@@ -2479,7 +2494,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         monitorModel_.draw(pv.data(),monitorPlacement,locMvp_,locModel_,locColor_,locTextured_,
                            locTexture_,locMaterial_,locRounded_,locUvScale_);
         if(streamOn) {
-            drawCurvedPanel(pv.data(),screenX,deskSurface+.276f,monitorZ+.001f,
+            drawCurvedPanel(pv.data(),screenX,deskSurface+.280f,monitorZ+.001f,
                             .584f,.328f,.029f,
                             hasVideo?videoTexture:videoFallbackTexture_,rgb(1,1,1),32);
         }
@@ -2539,7 +2554,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Full monitor UI with persistent navigation and distinct virtual-desktop-style pages.
     if (menuVisible_) {
         const float uiCurve=.029f,uiWidth=.574f,uiHeight=.322f;
-        const float menuY=deskSurface+.276f,menuZ=monitorZ+.002f;
+        const float menuY=deskSurface+.280f,menuZ=monitorZ+.001f;
         const float navX=monitorX-.216f,bodyX=monitorX+.063f,bodyWidth=.405f;
         const auto background=rgb(.010f,.015f,.030f,.985f);
         const auto header=rgb(.018f,.028f,.052f,.99f);
@@ -2556,7 +2571,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             drawCurvedPanel(pv.data(),x,y,menuZ,w,h,uiCurve,0,tint,32);
         };
         auto label=[&](const char* value,float x,float y,float size,const std::array<float,4>& tint) {
-            drawText(pv.data(),value,x,y,menuZ+.0015f,size,tint,monitorX,uiWidth,uiCurve);
+            drawText(pv.data(),value,x,y,menuZ+.0015f,size,tint,monitorX,uiWidth,uiCurve,menuY);
         };
         auto prettyName=[](const std::string& value) {
             std::string out=value;

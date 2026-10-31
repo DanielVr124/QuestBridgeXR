@@ -72,7 +72,8 @@ private:
                       int material = 0, float pitch = 0.0f);
     void drawText(const float* projectionView, const char* text, float x, float y, float z,
                   float pixelSize, const std::array<float, 4>& color,
-                  float curveCenterX = 0.0f, float curveWidth = 0.0f, float curveDepth = 0.0f);
+                  float curveCenterX = 0.0f, float curveWidth = 0.0f, float curveDepth = 0.0f,
+                  float curveCenterY = 0.0f);
     void drawSphere(const float* projectionView, float x, float y, float z,
                     float sx, float sy, float sz, const std::array<float, 4>& color,
                     int material = 0);
