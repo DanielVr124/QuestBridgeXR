@@ -32,8 +32,8 @@ NEW_VIEWS = """review_views = [
     ('bed_three_quarter', (5.5,-4.3,4.0), (0,0,1.0), 42),
     # Headboard-facing view from its +Y side, with the tufting kept near eye level.
     ('bed_headboard', (3.3,4.25,2.8), (0,1.2,1.25), 52),
-    # Close fabric view from the headboard end: domed crowns, grey welt and full box-gusset depth.
-    ('bed_pillow_detail', (3.0,3.7,2.4), (0,.95,1.15), 54),
+    # Close detail view of the headboard's diamond upholstery, tuft buttons and LED border.
+    ('bed_headboard_detail', (3.0,3.7,2.4), (0,1.25,1.35), 54),
     # Side silhouette view shows pillow depth, mattress height and frame trim.
     ('bed_side_profile', (6.5,0.0,2.65), (0,0,1.0), 48),
     # Footboard detail from the -Y side.
