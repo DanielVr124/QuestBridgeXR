@@ -2469,7 +2469,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.
     for(int side : {-1,1}) {
         const float nx=bedX+side*1.53f, nz=bedZ-.94f;
-        drawRoundedBox(pv.data(),nx,floorY+.405f,nz,.52f,.70f,.56f,bedBase,0.0f,5);
+        drawRoundedBox(pv.data(),nx,floorY+.405f,nz,.52f,.60f,.56f,bedBase,0.0f,5);
         drawRoundedBox(pv.data(),nx,floorY+.68f,nz,.56f,.055f,.60f,bedMetal,0.0f,4);
         for(int drawer=0;drawer<2;++drawer) {
             const float dy=floorY+.34f+drawer*.22f;
