@@ -2341,6 +2341,16 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                     segmentWidth*1.08f,sy,sz,rgb(color[0],color[1],color[2]),0.0f,7);
         }
     };
+    auto drawGradientBarY=[&](int zone,float x,float y,float z,float sx,float sy,float sz,int segments=24) {
+        if(zone<0||zone>=static_cast<int>(ledZones_.size())||!ledZones_[static_cast<size_t>(zone)].enabled) return;
+        const float segmentHeight=sy/static_cast<float>(segments);
+        for(int segment=0;segment<segments;++segment) {
+            const float t=(static_cast<float>(segment)+0.5f)/static_cast<float>(segments);
+            const auto color=ledZoneColor(zone,t);
+            drawBox(pv.data(),x,y-sy*.5f+segmentHeight*(segment+.5f),z,
+                    sx,segmentHeight*1.08f,sz,rgb(color[0],color[1],color[2]),0.0f,7);
+        }
+    };
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
     std::array<float,4> floor = rgb(.09f,.12f,.18f);
     std::array<float,4> wood = rgb(.22f,.18f,.22f);
@@ -2408,8 +2418,6 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform1i(locRoughnessAtlas_,3);
     glUniform1i(locHasRoughnessAtlas_,roughnessAtlasTexture_?1:0);
     glActiveTexture(GL_TEXTURE0);
-    const float roomLightScale=roomLightsOn_?1.0f:0.0f;
-    glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?1.0f:0.075f);
     const float roomLightScale=roomLightsOn_?1.0f:0.0f;
     glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?1.0f:0.075f);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
@@ -2601,7 +2609,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawGradientBar(0,bedX,floorY+1.875f,emitterZ,2.14f,.012f,.010f,32);
         for(int edge=0;edge<2;++edge) {
             const float x=bedX+(edge==0?-1.075f:1.075f);
-            drawGradientBar(0,x,floorY+1.175f,emitterZ,.012f,1.40f,.010f,24);
+            drawGradientBarY(0,x,floorY+1.175f,emitterZ,.010f,1.40f,.012f,24);
         }
     }
     // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.
@@ -2891,12 +2899,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         panel(navX,menuY-.006f,.132f,.270f,navBase);
         panel(monitorX-.143f,menuY-.006f,.0025f,.270f,rgb(.09f,.16f,.25f,1.0f));
         label("LIBRARY",navX-.050f,menuY+.105f,.00135f,muted);
-        const char* tabs[4]={"COMPUTERS","SETTINGS","DISPLAY","COMFORT"};
-        const float tabY[4]={menuY+.061f,menuY+.012f,menuY-.037f,menuY-.086f};
-        for(int i=0;i<4;++i) {
-            panel(navX,tabY[i],.119f,.041f,i==menuPage_?selected:navBase);
-            if(i==menuPage_) panel(navX-.055f,tabY[i],.004f,.026f,blue);
-            label(tabs[i],navX-.048f,tabY[i]-.001f,.00160f,i==menuPage_?white:muted);
+        const char* tabs[5]={"COMPUTERS","ENVIRONMENT","DISPLAY","LIGHTING","COMFORT"};
+        const float tabY[5]={menuY+.061f,menuY+.015f,menuY-.031f,menuY-.077f,menuY-.123f};
+        for(int i=0;i<5;++i) {
+            panel(navX,tabY[i],.119f,.037f,i==menuPage_?selected:navBase);
+            if(i==menuPage_) panel(navX-.055f,tabY[i],.004f,.024f,blue);
+            label(tabs[i],navX-.048f,tabY[i]-.001f,.00142f,i==menuPage_?white:muted);
         }
         label("LEFT STICK  NAVIGATE",navX-.050f,menuY-.135f,.00105f,muted);
         const float contentTop=menuY+.092f;
@@ -2916,7 +2924,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             label("Check the PC IP in QuestBridge Studio if offline.",
                   bodyX-.184f,menuY-.125f,.00130f,muted);
         } else if(menuPage_==1) {
-            label("ROOM SETTINGS",bodyX-.184f,contentTop,.00205f,white);
+            label("ENVIRONMENT",bodyX-.184f,contentTop,.00205f,white);
             label("Change the room and how you move around it",bodyX-.184f,
                   contentTop-.024f,.00130f,muted);
             const std::string sizeValue=settings_.roomSize=="small"?"SMALL":
@@ -2952,6 +2960,70 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             drawRow(2,menuY-.070f,"VIRTUAL SCREENS",count);
             label("Your selected output updates the room display.",
                   bodyX-.184f,menuY-.132f,.00135f,muted);
+        } else if(menuPage_==3) {
+            const auto& zone=ledZones_[static_cast<size_t>(lightingZoneIndex_)];
+            const char* zoneNames[7]={"HEADBOARD","CEILING COVE","LEFT WALL","RIGHT WALL","REAR ACCENT","LEFT BEDSIDE","RIGHT BEDSIDE"};
+            label(lightingColorPickerOpen_?"COLOR PICKER":"ROOM LIGHTING",
+                  bodyX-.184f,contentTop,.00205f,white);
+            if(lightingColorPickerOpen_) {
+                label(lightingColorTarget_==0?"PRIMARY COLOR":"SECONDARY COLOR",
+                      bodyX-.184f,contentTop-.025f,.00132f,cyan);
+                const float centerX=bodyX+.095f,centerY=menuY-.008f,radius=.060f;
+                // A vivid hue ring with a saturation/value selector inside.
+                for(int swatch=0;swatch<30;++swatch) {
+                    const float hue=static_cast<float>(swatch)/30.0f;
+                    const float angle=hue*2.0f*kPi-kPi*.5f;
+                    const auto hueColor=hsvToRgb(hue,1.0f,1.0f);
+                    panel(centerX+std::cos(angle)*radius,centerY+std::sin(angle)*radius,
+                          .012f,.012f,rgb(hueColor[0],hueColor[1],hueColor[2]));
+                }
+                const float markerRadius=radius*(.12f+.74f*lightingPickerSaturation_);
+                const float markerAngle=lightingPickerHue_*2.0f*kPi-kPi*.5f;
+                const auto selectedColor=hsvToRgb(lightingPickerHue_,lightingPickerSaturation_,lightingPickerValue_);
+                panel(centerX+std::cos(markerAngle)*markerRadius,
+                      centerY+std::sin(markerAngle)*markerRadius,.017f,.017f,
+                      rgb(selectedColor[0],selectedColor[1],selectedColor[2]));
+                panel(centerX,centerY,.024f,.024f,
+                      rgb(selectedColor[0],selectedColor[1],selectedColor[2]));
+                char hueText[32],satText[32],valueText[32];
+                std::snprintf(hueText,sizeof(hueText),"HUE  %03.0f",lightingPickerHue_*360.0f);
+                std::snprintf(satText,sizeof(satText),"SAT  %02.0f%%",lightingPickerSaturation_*100.0f);
+                std::snprintf(valueText,sizeof(valueText),"BRIGHT  %02.0f%%",lightingPickerValue_*100.0f);
+                label(hueText,bodyX+.190f,menuY+.025f,.00138f,white);
+                label(satText,bodyX+.190f,menuY-.006f,.00138f,muted);
+                label(valueText,bodyX+.190f,menuY-.037f,.00138f,muted);
+                label("LEFT STICK  HUE / SATURATION",bodyX-.184f,menuY-.105f,.00120f,muted);
+                label("RIGHT STICK  BRIGHTNESS",bodyX-.184f,menuY-.130f,.00120f,muted);
+                label("A  DONE",bodyX+.185f,menuY-.130f,.00120f,blue);
+            } else {
+                label("Choose a zone, then set solid color or a two-color gradient.",
+                      bodyX-.184f,contentTop-.024f,.00122f,muted);
+                const float rows[6]={menuY+.046f,menuY+.009f,menuY-.028f,menuY-.065f,menuY-.102f,menuY-.139f};
+                const char* titles[6]={"LIGHT ZONE","COLOR MODE","PRIMARY COLOR","SECONDARY","BRIGHTNESS","ZONE POWER"};
+                char brightness[24];std::snprintf(brightness,sizeof(brightness),"%d%%",static_cast<int>(zone.brightness*100.0f+.5f));
+                const std::string values[6]={
+                    zoneNames[lightingZoneIndex_],zone.gradient?"GRADIENT":"SOLID",
+                    "EDIT COLOR",zone.gradient?"EDIT COLOR":"ONLY FOR GRADIENT",
+                    brightness,zone.enabled?"ON":"OFF"
+                };
+                for(int row=0;row<6;++row) {
+                    panel(bodyX,rows[row],bodyWidth,.032f,menuSelection_==row?selected:card);
+                    label(titles[row],bodyX-.184f,rows[row]+.003f,.00148f,white);
+                    label(values[row].c_str(),bodyX+.060f,rows[row]+.003f,.00140f,
+                          row==5?(zone.enabled?green:amber):blue);
+                }
+                const auto primary=zone.primary;
+                const auto secondary=zone.gradient?zone.secondary:zone.primary;
+                panel(bodyX+.170f,rows[2],.018f,.018f,rgb(primary[0],primary[1],primary[2]));
+                panel(bodyX+.170f,rows[3],.018f,.018f,rgb(secondary[0],secondary[1],secondary[2]));
+                // A miniature left-to-right preview makes the selected blend obvious.
+                for(int swatch=0;swatch<20;++swatch) {
+                    const float t=(swatch+.5f)/20.0f;
+                    const auto color=ledZoneColor(lightingZoneIndex_,t);
+                    panel(bodyX-.085f+swatch*.0088f,menuY-.170f,.009f,.010f,
+                          rgb(color[0],color[1],color[2]));
+                }
+            }
         } else {
             label("COMFORT",bodyX-.184f,contentTop,.00205f,white);
             label("Tune turning and room comfort",bodyX-.184f,
@@ -2966,8 +3038,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             label("Use the right stick to adjust highlighted values.",
                   bodyX-.184f,menuY-.145f,.00127f,muted);
         }
-        label("A  SELECT",monitorX-.270f,menuY-.151f,.00120f,muted);
-        label("LEFT / RIGHT  TABS",monitorX-.145f,menuY-.151f,.00120f,muted);
+        if(!lightingColorPickerOpen_) {
+            label("A  SELECT",monitorX-.270f,menuY-.151f,.00120f,muted);
+            label("LEFT / RIGHT  TABS",monitorX-.145f,menuY-.151f,.00120f,muted);
+        }
         glDisable(GL_BLEND);
         glDepthMask(GL_TRUE);
     }
