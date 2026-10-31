@@ -50,6 +50,9 @@ class BedDesignPatchTests(unittest.TestCase):
             "Sleep_pillow_diamond_quilt_",
             "Sleep_pillow_corner_dart_",
             "PILLOW_TILT = math.radians(10.0)",
+            "def pillow_outline(u, scale=1.0):",
+            "PILLOW_HALF_WIDTH * scale",
+            "PILLOW_HALF_DEPTH * scale",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
