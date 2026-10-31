@@ -33,26 +33,26 @@ boxsoft(
 for side in (-1,1):
     superellipsoid(
         f'Headboard_outer_lip_side_{side}',
-        (side*1.285,1.185,-1.205),
-        (.075,.835,.105),'charcoal2',.48,72,44
+        (side*1.365,1.185,-1.205),
+        (.045,.835,.105),'charcoal2',.48,72,44
     )
     superellipsoid(
         f'Headboard_inner_lip_side_{side}',
-        (side*1.165,1.185,-1.205),
-        (.045,.745,.105),'charcoal',.52,72,44
+        (side*1.155,1.185,-1.205),
+        (.04,.745,.105),'charcoal',.52,72,44
     )
 
-for name,y in (('top',2.015),('bottom',.355)):
+for name,y in (('top',2.115),('bottom',.245)):
     superellipsoid(
         f'Headboard_outer_lip_edge_{name}',
         (0,y,-1.205),
-        (1.285,.075,.105),'charcoal2',.48,88,40
+        (1.365,.045,.105),'charcoal2',.48,88,40
     )
-for name,y in (('top',1.925),('bottom',.445)):
+for name,y in (('top',1.845),('bottom',.525)):
     superellipsoid(
         f'Headboard_inner_lip_edge_{name}',
         (0,y,-1.205),
-        (1.165,.045,.105),'charcoal',.52,88,40
+        (1.155,.04,.105),'charcoal',.52,88,40
     )
 
 # A subtle upholstered seam follows the single panel's perimeter, not its face.
