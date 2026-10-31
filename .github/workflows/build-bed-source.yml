@@ -95,7 +95,7 @@ jobs:
           test -s art/bed/arc_upholstered_bed.blend
           test -s art/bed/renders/bed_three_quarter.png
           test -s art/bed/renders/bed_headboard.png
-          test -s art/bed/renders/bed_pillow_detail.png
+          test -s art/bed/renders/bed_headboard_detail.png
           test -s art/bed/renders/bed_side_profile.png
           test -s art/bed/renders/bed_foot_three_quarter.png
 
@@ -115,7 +115,7 @@ jobs:
               Path('art/bed/README.md'),
               Path('art/bed/renders/bed_three_quarter.png'),
               Path('art/bed/renders/bed_headboard.png'),
-              Path('art/bed/renders/bed_pillow_detail.png'),
+              Path('art/bed/renders/bed_headboard_detail.png'),
               Path('art/bed/renders/bed_side_profile.png'),
               Path('art/bed/renders/bed_foot_three_quarter.png'),
               Path('tools/generate_bed_asset.py'),
