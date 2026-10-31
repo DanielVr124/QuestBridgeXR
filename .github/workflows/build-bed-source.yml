@@ -162,6 +162,7 @@ jobs:
           target_commitish: main
           prerelease: true
           make_latest: false
+          overwrite_files: true
           files: |
             dist/QuestBridgeXR-Bed-Model-Blender-Source.zip
             dist/QuestBridgeXR-Bed-Model-Blender-Source.zip.sha256
