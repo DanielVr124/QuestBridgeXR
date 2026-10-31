@@ -92,7 +92,6 @@ struct ClientConfig {
     uint32_t incompleteFrameTimeoutMs = 120;
     uint32_t receiveBufferKiB = 4096;
     RoomSettings room{};
-    bool roomMovementEnabled = true;
 };
 
 bool parseBool(const std::string& text, bool fallback) {
@@ -237,7 +236,7 @@ ClientConfig loadConfig(android_app* app) {
         else if (key == "room_controls_enabled") cfg.room.roomControlsEnabled = parseBool(value, cfg.room.roomControlsEnabled);
         else if (key == "sitting_toggle_enabled") cfg.room.sittingToggleEnabled = parseBool(value, cfg.room.sittingToggleEnabled);
         else if (key == "sitting_head_drop_m") cfg.room.sittingHeadDropM = parseFloatInRange(value, cfg.room.sittingHeadDropM, 0.1f, 0.75f);
-        else if (key == "room_movement_enabled") cfg.roomMovementEnabled = parseBool(value, cfg.roomMovementEnabled);
+        else if (key == "room_movement_enabled") cfg.room.roomMovementEnabled = parseBool(value, cfg.room.roomMovementEnabled);
         else if (key == "movement_speed") cfg.room.movementSpeed = parseFloatInRange(value, cfg.room.movementSpeed, 0.1f, 4.0f);
         else if (key == "smooth_turn") cfg.room.smoothTurn = parseBool(value, cfg.room.smoothTurn);
         else if (key == "turn_speed") cfg.room.turnSpeed = parseFloatInRange(value, cfg.room.turnSpeed, 0.2f, 3.5f);
@@ -331,6 +330,13 @@ public:
     }
 
     bool connected() const { return connected_; }
+
+    void requestReconnect() {
+        if (socket_ < 0) return;
+        connected_ = false;
+        sendHello();
+        nextHello_ = Clock::now() + std::chrono::seconds(1);
+    }
 
     void tick(VideoDecoder& video) {
         const auto now = Clock::now();
@@ -977,14 +983,14 @@ private:
         // so preserve that sign unless the user explicitly enables inversion.
         float moveX = applyDeadzone(std::clamp(config_.invertThumbstickX ? -move.x : move.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
         float moveY = applyDeadzone(std::clamp(config_.invertThumbstickY ? -move.y : move.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
-        const float turnX = applyDeadzone(std::clamp(turn.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
+        float turnX = applyDeadzone(std::clamp(turn.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
         if (room_.menuVisible()) {
-            room_.handleMenuInput(move.y, menuSelectEdge);
+            room_.handleMenuInput(move.x, move.y, turn.x, menuSelectEdge);
             moveX = 0.0f;
             moveY = 0.0f;
+            turnX = 0.0f;
         }
-        // Walking can be disabled independently; turning must remain available in either mode.
-        if (!config_.roomMovementEnabled) { moveX = 0.0f; moveY = 0.0f; }
+        if (room_.consumeReconnectRequest()) network_.requestReconnect();
         room_.updateLocomotion(moveX, moveY, turnX, dt, headPose);
 
         if (!config_.controllersEnabled) return;
@@ -1046,6 +1052,7 @@ private:
             if (XR_SUCCEEDED(located) && viewCount == views_.size()) {
                 sendTracking(frameState.predictedDisplayTime);
                 video_.pumpOutput();
+                room_.setConnectionState(network_.connected(), config_.hostIp, video_.hasFrame());
                 bool allEyesRendered = true;
                 for (uint32_t eye = 0; eye < viewCount; ++eye) {
                     auto& sc = swapchains_[eye];
@@ -1088,7 +1095,7 @@ private:
                     }
 
                     projectionViews_[eye] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
-                    projectionViews_[eye].pose = views_[eye].pose;
+                    projectionViews_[eye].pose = room_.projectionPose(views_[eye].pose);
                     projectionViews_[eye].fov = views_[eye].fov;
                     projectionViews_[eye].subImage.swapchain = sc.handle;
                     projectionViews_[eye].subImage.imageRect.offset = {0, 0};

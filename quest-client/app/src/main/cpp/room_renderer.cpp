@@ -11,6 +11,9 @@
 #include <iterator>
 #include <vector>
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "third_party/stb_truetype.h"
+
 #define QBX_LOG_TAG "QuestBridgeRoom"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, QBX_LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, QBX_LOG_TAG, __VA_ARGS__)
@@ -18,6 +21,12 @@
 
 namespace {
 constexpr float kPi = 3.14159265358979323846f;
+constexpr int kFontAtlasSize = 512;
+constexpr int kFontFirstCharacter = 32;
+constexpr int kFontCharacterCount = 96;
+GLuint gFontAtlasTexture = 0;
+std::array<stbtt_bakedchar, kFontCharacterCount> gFontCharacters{};
+bool gFontAtlasReady = false;
 constexpr std::array<const char*, 208> kEnvironmentNames = {
 
 
@@ -579,6 +588,59 @@ float headYaw(const XrPosef& pose) {
     return std::atan2(2.0f*(q.w*q.y + q.x*q.z), 1.0f - 2.0f*(q.y*q.y + q.x*q.x));
 }
 std::array<float,4> rgb(float r,float g,float b,float a=1.0f) { return {r,g,b,a}; }
+
+bool loadRoomFontAtlas() {
+    if (gFontAtlasReady && gFontAtlasTexture) return true;
+    const char* candidates[] = {
+        "/system/fonts/Roboto-Regular.ttf",
+        "/system/fonts/Roboto-Medium.ttf",
+        "/system/fonts/NotoSans-Regular.ttf"
+    };
+    std::vector<unsigned char> fontBytes;
+    for (const char* path : candidates) {
+        std::ifstream input(path, std::ios::binary);
+        if (!input.good()) continue;
+        input.seekg(0, std::ios::end);
+        const std::streamsize size = input.tellg();
+        if (size <= 0) continue;
+        input.seekg(0, std::ios::beg);
+        fontBytes.resize(static_cast<size_t>(size));
+        input.read(reinterpret_cast<char*>(fontBytes.data()), size);
+        if (input.good()) {
+            LOGI("Using smooth UI font: %s", path);
+            break;
+        }
+        fontBytes.clear();
+    }
+    if (fontBytes.empty()) {
+        LOGE("No Android system font could be opened; smooth menu text is unavailable");
+        return false;
+    }
+    std::vector<unsigned char> pixels(static_cast<size_t>(kFontAtlasSize * kFontAtlasSize), 0);
+    const int baked = stbtt_BakeFontBitmap(fontBytes.data(), 0, 30.0f,
+        pixels.data(), kFontAtlasSize, kFontAtlasSize,
+        kFontFirstCharacter, kFontCharacterCount, gFontCharacters.data());
+    if (baked <= 0) {
+        LOGE("Could not bake the Android UI font atlas");
+        return false;
+    }
+    glGenTextures(1, &gFontAtlasTexture);
+    glBindTexture(GL_TEXTURE_2D, gFontAtlasTexture);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_ONE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_ONE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_ONE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_RED);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, kFontAtlasSize, kFontAtlasSize,
+                 0, GL_RED, GL_UNSIGNED_BYTE, pixels.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
+    gFontAtlasReady = gFontAtlasTexture != 0;
+    return gFontAtlasReady;
+}
 }
 
 GLuint RoomRenderer::compileShader(GLenum type, const char* source) {
@@ -1171,6 +1233,7 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     if(vvs&&vfs){vignetteProgram_=glCreateProgram();glAttachShader(vignetteProgram_,vvs);glAttachShader(vignetteProgram_,vfs);glLinkProgram(vignetteProgram_);GLint vok=GL_FALSE;glGetProgramiv(vignetteProgram_,GL_LINK_STATUS,&vok);if(vok!=GL_TRUE){glDeleteProgram(vignetteProgram_);vignetteProgram_=0;}}
     if(vvs)glDeleteShader(vvs);if(vfs)glDeleteShader(vfs);
     createGeometry();
+    if (!loadRoomFontAtlas()) LOGE("QuestBridge menu will not render text without a system font");
     const bool deskLoaded=deskModel_.load(assets,"models/arc_gaming_desk.glb");
     const bool monitorLoaded=monitorModel_.load(assets,"models/arc27_curved_monitor.glb");
     LOGI("custom furniture GLB status: desk=%d monitor=%d",deskLoaded?1:0,monitorLoaded?1:0);
@@ -1520,27 +1583,128 @@ void RoomRenderer::cycleEnvironment() {
 void RoomRenderer::toggleMenu() {
     menuVisible_ = !menuVisible_;
     previousMenuNavigation_ = false;
+    previousMenuHorizontal_ = false;
+    previousMenuAdjust_ = false;
+    environmentDropdownOpen_ = false;
     if (menuVisible_) menuSelection_ = 0;
 }
 
-void RoomRenderer::handleMenuInput(float vertical, bool selectPressed) {
-    if (!menuVisible_) return;
-    const bool navigating = std::fabs(vertical) > 0.55f;
-    if (navigating && !previousMenuNavigation_) {
-        menuSelection_ = (menuSelection_ + (vertical > 0.0f ? 3 : 1)) % 4;
-    }
-    previousMenuNavigation_ = navigating;
-    if (!selectPressed) return;
-    switch (menuSelection_) {
-    case 0: cycleEnvironment(); break;
-    case 1: cycleScreenDestination(); break;
-    case 2: settings_.showTv = !settings_.showTv; break;
-    case 3: menuVisible_ = false; break;
-    default: break;
-    }
+void RoomRenderer::setConnectionState(bool connected, const std::string& hostIp, bool streaming) {
+    pcConnected_ = connected;
+    pcStreaming_ = streaming;
+    pcHostIp_ = hostIp.empty() ? "Not configured" : hostIp;
 }
 
-void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,float yaw,int material) {
+bool RoomRenderer::consumeReconnectRequest() {
+    const bool requested = reconnectRequested_;
+    reconnectRequested_ = false;
+    return requested;
+}
+
+void RoomRenderer::handleMenuInput(float horizontal, float vertical, float adjust, bool selectPressed) {
+    if (!menuVisible_) return;
+    const bool navigatingVertical = std::fabs(vertical) > 0.58f;
+    const bool navigatingHorizontal = std::fabs(horizontal) > 0.68f;
+    const bool adjusting = std::fabs(adjust) > 0.70f;
+
+    if (navigatingHorizontal && !previousMenuHorizontal_ && !environmentDropdownOpen_) {
+        menuPage_ = (menuPage_ + (horizontal > 0.0f ? 1 : 3)) % 4;
+        menuSelection_ = 0;
+    } else if (navigatingVertical && !previousMenuNavigation_) {
+        if (environmentDropdownOpen_) {
+            environmentDropdownIndex_ = (environmentDropdownIndex_ +
+                (vertical > 0.0f ? static_cast<int>(kEnvironmentNames.size()) - 1 : 1)) %
+                static_cast<int>(kEnvironmentNames.size());
+        } else {
+            const int rowCounts[4] = {1, 5, 3, 4};
+            const int count = rowCounts[menuPage_];
+            menuSelection_ = (menuSelection_ + (vertical > 0.0f ? count - 1 : 1)) % count;
+        }
+    }
+
+    auto adjustSelected = [&](int direction) {
+        if (menuPage_ == 1) {
+            if (menuSelection_ == 0) {
+                environmentDropdownIndex_ = (environmentDropdownIndex_ +
+                    (direction > 0 ? 1 : static_cast<int>(kEnvironmentNames.size()) - 1)) %
+                    static_cast<int>(kEnvironmentNames.size());
+                settings_.environment = kEnvironmentNames[environmentDropdownIndex_];
+                chooseEnvironment();
+            } else if (menuSelection_ == 1) {
+                const char* sizes[] = {"small", "medium", "large"};
+                const int index = settings_.roomSize == "small" ? 0 : (settings_.roomSize == "large" ? 2 : 1);
+                settings_.roomSize = sizes[(index + (direction > 0 ? 1 : 2)) % 3];
+            } else if (menuSelection_ == 3) {
+                settings_.movementSpeed = std::clamp(settings_.movementSpeed + direction * 0.10f, 0.30f, 3.00f);
+            }
+        } else if (menuPage_ == 2) {
+            if (menuSelection_ == 0) {
+                const char* modes[] = {"monitor", "tv", "both"};
+                const int index = settings_.screenDestination == "tv" ? 1 :
+                    (settings_.screenDestination == "both" ? 2 : 0);
+                settings_.screenDestination = modes[(index + (direction > 0 ? 1 : 2)) % 3];
+            } else if (menuSelection_ == 2) {
+                settings_.monitorCount = std::clamp(settings_.monitorCount + direction, 1, 3);
+            }
+        } else if (menuPage_ == 3) {
+            if (menuSelection_ == 1) {
+                settings_.turnSpeed = std::clamp(settings_.turnSpeed + direction * 0.10f, 0.2f, 3.5f);
+            } else if (menuSelection_ == 2) {
+                settings_.snapTurnDegrees = std::clamp(settings_.snapTurnDegrees + direction * 15.0f, 15.0f, 60.0f);
+            }
+        }
+    };
+
+    if (adjusting && !previousMenuAdjust_) {
+        if (environmentDropdownOpen_) {
+            environmentDropdownIndex_ = (environmentDropdownIndex_ +
+                (adjust > 0.0f ? 1 : static_cast<int>(kEnvironmentNames.size()) - 1)) %
+                static_cast<int>(kEnvironmentNames.size());
+        } else {
+            adjustSelected(adjust > 0.0f ? 1 : -1);
+        }
+    }
+
+    if (selectPressed) {
+        if (environmentDropdownOpen_) {
+            settings_.environment = kEnvironmentNames[environmentDropdownIndex_];
+            chooseEnvironment();
+            environmentDropdownOpen_ = false;
+        } else if (menuPage_ == 0) {
+            reconnectRequested_ = true;
+        } else if (menuPage_ == 1) {
+            switch (menuSelection_) {
+            case 0:
+                environmentDropdownOpen_ = true;
+                environmentDropdownIndex_ = activeEnvironmentIndex_;
+                break;
+            case 1: adjustSelected(1); break;
+            case 2: settings_.roomMovementEnabled = !settings_.roomMovementEnabled; break;
+            case 4:
+                moveX_ = 0.0f;
+                moveZ_ = 0.0f;
+                virtualYaw_ = 0.0f;
+                snapCooldown_ = 0.0f;
+                previousTurnRight_ = previousTurnLeft_ = false;
+                break;
+            default: break;
+            }
+        } else if (menuPage_ == 2) {
+            if (menuSelection_ == 0) adjustSelected(1);
+            else if (menuSelection_ == 1) settings_.showTv = !settings_.showTv;
+            else if (menuSelection_ == 2) adjustSelected(1);
+        } else if (menuPage_ == 3) {
+            if (menuSelection_ == 0) settings_.smoothTurn = !settings_.smoothTurn;
+            else if (menuSelection_ == 3) settings_.comfortVignette = !settings_.comfortVignette;
+            else if (menuSelection_ == 1 || menuSelection_ == 2) adjustSelected(1);
+        }
+    }
+    previousMenuNavigation_ = navigatingVertical;
+    previousMenuHorizontal_ = navigatingHorizontal;
+    previousMenuAdjust_ = adjusting;
+}
+
+void RoomRenderer::drawBox(void RoomRenderer::drawBox(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,float yaw,int material) {
     Mat4 projectionView{}; std::copy(pv, pv + projectionView.size(), projectionView.begin());
     Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,sz))); Mat4 mvp=mul(projectionView,model);
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
@@ -1568,9 +1732,9 @@ void RoomRenderer::drawPillow(const float* pv,float x,float y,float z,float sx,f
 }
 
 void RoomRenderer::drawCurtainPanel(const float* pv,float x,float y,float z,float width,float height,
-                                      const std::array<float,4>& color) {
+                                      const std::array<float,4>& color,float yaw) {
     Mat4 projectionView{};std::copy(pv,pv+projectionView.size(),projectionView.begin());
-    const Mat4 model=mul(translation(x,y,z),scaling(width,height,1.0f));
+    const Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(width,height,1.0f)));
     const Mat4 mvp=mul(projectionView,model);
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
     glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
@@ -1618,86 +1782,59 @@ void RoomRenderer::drawRoundedBox(const float* pv,float x,float y,float z,float 
     glBindVertexArray(0);
 }
 void RoomRenderer::drawText(const float* pv, const char* text, float x, float y, float z,
-                            float pixelSize, const std::array<float,4>& color) {
-    if (!text) return;
-    auto glyph = [](char c) {
-        switch (c) {
-        case 'A': return std::array<uint8_t,7>{14,17,17,31,17,17,17};
-        case 'B': return std::array<uint8_t,7>{30,17,17,30,17,17,30};
-        case 'C': return std::array<uint8_t,7>{14,17,16,16,16,17,14};
-        case 'D': return std::array<uint8_t,7>{30,17,17,17,17,17,30};
-        case 'E': return std::array<uint8_t,7>{31,16,16,30,16,16,31};
-        case 'F': return std::array<uint8_t,7>{31,16,16,30,16,16,16};
-        case 'G': return std::array<uint8_t,7>{14,17,16,23,17,17,15};
-        case 'H': return std::array<uint8_t,7>{17,17,17,31,17,17,17};
-        case 'I': return std::array<uint8_t,7>{14,4,4,4,4,4,14};
-        case 'J': return std::array<uint8_t,7>{7,2,2,2,18,18,12};
-        case 'K': return std::array<uint8_t,7>{17,18,20,24,20,18,17};
-        case 'L': return std::array<uint8_t,7>{16,16,16,16,16,16,31};
-        case 'M': return std::array<uint8_t,7>{17,27,21,21,17,17,17};
-        case 'N': return std::array<uint8_t,7>{17,25,21,19,17,17,17};
-        case 'O': return std::array<uint8_t,7>{14,17,17,17,17,17,14};
-        case 'P': return std::array<uint8_t,7>{30,17,17,30,16,16,16};
-        case 'Q': return std::array<uint8_t,7>{14,17,17,17,21,18,13};
-        case 'R': return std::array<uint8_t,7>{30,17,17,30,20,18,17};
-        case 'S': return std::array<uint8_t,7>{15,16,16,14,1,1,30};
-        case 'T': return std::array<uint8_t,7>{31,4,4,4,4,4,4};
-        case 'U': return std::array<uint8_t,7>{17,17,17,17,17,17,14};
-        case 'V': return std::array<uint8_t,7>{17,17,17,17,17,10,4};
-        case 'W': return std::array<uint8_t,7>{17,17,17,21,21,21,10};
-        case 'X': return std::array<uint8_t,7>{17,17,10,4,10,17,17};
-        case 'Y': return std::array<uint8_t,7>{17,17,10,4,4,4,4};
-        case 'Z': return std::array<uint8_t,7>{31,1,2,4,8,16,31};
-        case ':': return std::array<uint8_t,7>{0,4,4,0,4,4,0};
-        case '-': return std::array<uint8_t,7>{0,0,0,31,0,0,0};
-        default: return std::array<uint8_t,7>{0,0,0,0,0,0,0};
-        }
-    };
+                            float pixelSize, const std::array<float,4>& color,
+                            float curveCenterX, float curveWidth, float curveDepth) {
+    if (!text || !gFontAtlasReady || !gFontAtlasTexture) return;
     std::vector<Vertex> vertices;
-    vertices.reserve(std::strlen(text) * 30u * 6u);
-    auto addVertex = [&](float px, float py) { vertices.push_back({px, py, z, 0.0f, 0.0f}); };
-    for (int index = 0; text[index] != '\0'; ++index) {
-        const char character = text[index] == '_' ? ' ' : static_cast<char>(std::toupper(static_cast<unsigned char>(text[index])));
-        const auto rows = glyph(character);
-        for (int row = 0; row < 7; ++row) for (int col = 0; col < 5; ++col) {
-            if ((rows[row] & (1u << (4 - col))) == 0) continue;
-            const float x0 = x + static_cast<float>(index) * pixelSize * 6.0f + col * pixelSize;
-            const float y0 = y - row * pixelSize;
-            const float x1 = x0 + pixelSize * 0.78f;
-            const float y1 = y0 - pixelSize * 0.78f;
-            addVertex(x0,y0); addVertex(x1,y0); addVertex(x1,y1);
-            addVertex(x0,y0); addVertex(x1,y1); addVertex(x0,y1);
-        }
+    vertices.reserve(std::strlen(text) * 6u);
+    const float scale = std::max(pixelSize, 0.0001f) * 0.25f;
+    float penX = 0.0f, penY = 0.0f;
+    auto curvedZ = [&](float worldX) {
+        if (curveWidth <= 0.0001f || curveDepth <= 0.0f) return z;
+        const float normalized = std::clamp((worldX - curveCenterX) / (curveWidth * 0.5f), -1.0f, 1.0f);
+        return z - curveDepth * (1.0f - normalized * normalized);
+    };
+    auto add = [&](float px, float py, float u, float v) {
+        vertices.push_back({px, py, curvedZ(px), u, v});
+    };
+    for (int i = 0; text[i] != '\0'; ++i) {
+        unsigned char character = static_cast<unsigned char>(text[i]);
+        if (character == '\n') { penX = 0.0f; penY += 34.0f; continue; }
+        if (character < kFontFirstCharacter || character >= kFontFirstCharacter + kFontCharacterCount)
+            character = '?';
+        stbtt_aligned_quad q{};
+        stbtt_GetBakedQuad(gFontCharacters.data(), kFontAtlasSize, kFontAtlasSize,
+                           character - kFontFirstCharacter, &penX, &penY, &q, 1);
+        const float x0=x+q.x0*scale, x1=x+q.x1*scale;
+        const float y0=y-q.y0*scale, y1=y-q.y1*scale;
+        add(x0,y0,q.s0,q.t0); add(x1,y0,q.s1,q.t0); add(x1,y1,q.s1,q.t1);
+        add(x0,y0,q.s0,q.t0); add(x1,y1,q.s1,q.t1); add(x0,y1,q.s0,q.t1);
     }
     if (vertices.empty()) return;
     if (!textVao_) {
-        glGenVertexArrays(1, &textVao_);
-        glGenBuffers(1, &textVbo_);
-        glBindVertexArray(textVao_);
-        glBindBuffer(GL_ARRAY_BUFFER, textVbo_);
+        glGenVertexArrays(1,&textVao_); glGenBuffers(1,&textVbo_);
+        glBindVertexArray(textVao_); glBindBuffer(GL_ARRAY_BUFFER,textVbo_);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
+        glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,sizeof(Vertex),nullptr);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                              reinterpret_cast<void*>(3 * sizeof(float)));
+        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,sizeof(Vertex),reinterpret_cast<void*>(3*sizeof(float)));
         glBindVertexArray(0);
     }
-    glUniformMatrix4fv(locMvp_, 1, GL_FALSE, pv);
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,pv);
     const Mat4 textModel=identity();
     glUniformMatrix4fv(locModel_,1,GL_FALSE,textModel.data());
-    glUniform4fv(locColor_, 1, color.data());
-    glUniform1i(locTextured_, 0);
-    glUniform1i(locMaterial_,-1);
-    glUniform1i(locRounded_,0);
-    glBindVertexArray(textVao_);
-    glBindBuffer(GL_ARRAY_BUFFER, textVbo_);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_DYNAMIC_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(vertices.size()));
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glUniform4fv(locColor_,1,color.data());
+    glUniform1i(locTextured_,1); glUniform1i(locMaterial_,-1); glUniform1i(locRounded_,0);
+    glUniform2f(locUvScale_,1.0f,1.0f);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,gFontAtlasTexture);
+    glUniform1i(locTexture_,0);
+    glBindVertexArray(textVao_); glBindBuffer(GL_ARRAY_BUFFER,textVbo_);
+    glBufferData(GL_ARRAY_BUFFER,vertices.size()*sizeof(Vertex),vertices.data(),GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_TRIANGLES,0,static_cast<GLsizei>(vertices.size()));
+    glBindVertexArray(0); glBindBuffer(GL_ARRAY_BUFFER,0); glBindTexture(GL_TEXTURE_2D,0);
 }
 
-void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,int material) {
+void RoomRenderer::drawSphere(void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,float sy,float sz,const std::array<float,4>& color,int material) {
     Mat4 projectionView{}; std::copy(pv,pv+projectionView.size(),projectionView.begin());
     const Mat4 model=mul(translation(x,y,z),scaling(sx,sy,sz));
     const Mat4 mvp=mul(projectionView,model);
@@ -1727,7 +1864,7 @@ void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
     auto point = [&](float u, float v) {
         const float localX = (u - 0.5f) * width;
         const float normalized = 2.0f * u - 1.0f;
-        const float localZ = curveDepth * (1.0f - normalized * normalized);
+        const float localZ = -curveDepth * (1.0f - normalized * normalized);
         return Vertex{localX, (v - 0.5f) * height, localZ, u, 1.0f - v};
     };
     for (int i = 0; i < segments; ++i) {
@@ -1792,47 +1929,56 @@ void RoomRenderer::drawGroundShadow(const float* pv,float x,float y,float z,
     glDisable(GL_BLEND);
     glBindTexture(GL_TEXTURE_2D,0);
 }
-void RoomRenderer::drawEnvironmentWindow(const float* pv,float halfW,float floorY,float backZ,GLuint tex,float windowW,float windowH) {
-    (void)halfW;
+void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float centerZ,float floorY,
+                                         GLuint tex,float windowW,float windowH,float yaw) {
     const float windowY=floorY+2.4f;
-    // A broad window with warm wooden frame rails. The photo becomes the outside view; all nearby surfaces are real 3D geometry.
-    drawPlane(pv,0,windowY,backZ+0.035f,windowW,windowH,tex,rgb(1,1,1));
+    auto point=[&](float localX,float localY,float localZ) {
+        const float co=std::cos(yaw),si=std::sin(yaw);
+        return std::array<float,3>{wallX+co*localX+si*localZ,localY,
+                                   centerZ-si*localX+co*localZ};
+    };
+    auto box=[&](float lx,float ly,float lz,float sx,float sy,float sz,
+                 const std::array<float,4>& color,int material=0) {
+        const auto p=point(lx,ly,lz);
+        drawBox(pv,p[0],p[1],p[2],sx,sy,sz,color,yaw,material);
+    };
+    auto rounded=[&](float lx,float ly,float lz,float sx,float sy,float sz,
+                     const std::array<float,4>& color,int material=0) {
+        const auto p=point(lx,ly,lz);
+        drawRoundedBox(pv,p[0],p[1],p[2],sx,sy,sz,color,yaw,material);
+    };
+    // Right-wall glazing sits beside the bed; local +Z faces into the room.
+    const auto glass=point(0,windowY,0.035f);
+    drawPlane(pv,glass[0],glass[1],glass[2],windowW,windowH,tex,rgb(1,1,1),yaw);
     const auto frame=rgb(.018f,.025f,.045f);
     const float t=0.062f;
-    drawBox(pv,0,windowY+windowH*.5f+t*.5f,backZ+0.015f,windowW+2*t,t,0.12f,frame);
-    drawBox(pv,0,windowY-windowH*.5f-t*.5f,backZ+0.015f,windowW+2*t,t,0.12f,frame);
-    drawBox(pv,-windowW*.5f-t*.5f,windowY,backZ+0.015f,t,windowH,0.12f,frame);
-    drawBox(pv,windowW*.5f+t*.5f,windowY,backZ+0.015f,t,windowH,0.12f,frame);
-    drawBox(pv,0,windowY,backZ+0.005f,0.035f,windowH,0.10f,frame);
-
-    // Divided-light sash, deep interior sill, apron and small brass window catches.
+    box(0,windowY+windowH*.5f+t*.5f,0.015f,windowW+2*t,t,0.12f,frame);
+    box(0,windowY-windowH*.5f-t*.5f,0.015f,windowW+2*t,t,0.12f,frame);
+    box(-windowW*.5f-t*.5f,windowY,0.015f,t,windowH,0.12f,frame);
+    box(windowW*.5f+t*.5f,windowY,0.015f,t,windowH,0.12f,frame);
+    box(0,windowY,0.005f,0.035f,windowH,0.10f,frame);
     const auto sash=rgb(.052f,.068f,.11f);
-    const float sashZ=backZ+.092f;
+    const float sashZ=.092f;
     for(int pane=-1;pane<=1;++pane) {
         if(pane==0) continue;
-        drawRoundedBox(pv, pane*windowW*.25f,windowY,sashZ,
-                       .026f,windowH-.055f,.065f,sash,0.0f,1);
+        rounded(pane*windowW*.25f,windowY,sashZ,.026f,windowH-.055f,.065f,sash,1);
     }
-    drawRoundedBox(pv,0,windowY+windowH*.12f,sashZ,
-                   windowW-.045f,.026f,.065f,sash,0.0f,1);
+    rounded(0,windowY+windowH*.12f,sashZ,windowW-.045f,.026f,.065f,sash,1);
     const float sillY=windowY-windowH*.5f-.065f;
-    drawRoundedBox(pv,0,sillY,backZ+.12f,windowW+.24f,.085f,.25f,frame,0.0f,5);
-    drawRoundedBox(pv,0,sillY-.10f,backZ+.075f,windowW+.12f,.13f,.09f,sash,0.0f,5);
-    // Thin emissive reveals make the dark aluminium glazing legible without looking like neon tubes.
+    rounded(0,sillY,.12f,windowW+.24f,.085f,.25f,frame,5);
+    rounded(0,sillY-.10f,.075f,windowW+.12f,.13f,.09f,sash,5);
     if(activeEnvironmentIndex_==29) {
-        drawBox(pv,0,windowY+windowH*.5f+.018f,backZ+.086f,windowW*.96f,.009f,.012f,
-                rgb(.12f,.30f,1.0f),0.0f,7);
-        drawBox(pv,0,windowY-windowH*.5f-.018f,backZ+.086f,windowW*.96f,.008f,.010f,
-                rgb(.58f,.10f,1.0f),0.0f,7);
+        box(0,windowY+windowH*.5f+.018f,.086f,windowW*.96f,.009f,.012f,rgb(.12f,.30f,1.0f),7);
+        box(0,windowY-windowH*.5f-.018f,.086f,windowW*.96f,.008f,.010f,rgb(.58f,.10f,1.0f),7);
     }
     const auto brass=rgb(.62f,.47f,.23f);
     for(int side : {-1,1}) {
-        drawSphere(pv,side*(windowW*.5f-.10f),sillY+.075f,backZ+.225f,
-                   .018f,.018f,.010f,brass,4);
+        const auto p=point(side*(windowW*.5f-.10f),sillY+.075f,.225f);
+        drawSphere(pv,p[0],p[1],p[2],.018f,.018f,.010f,brass,4);
     }
 }
 
-void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
+void RoomRenderer::updateLocomotion(void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
     if(dt<0.0f||dt>0.1f)dt=0.0f;
     const float yaw=headYaw(headPose)+virtualYaw_;
     const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
@@ -1840,8 +1986,8 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     // Match makeView(): OpenXR local forward (-Z) rotates toward -X for +yaw.
     const float forwardX=-std::sin(yaw), forwardZ=-std::cos(yaw);
     const float rightX=std::cos(yaw), rightZ=-std::sin(yaw);
-    const float stepX=(rightX*leftX+forwardX*leftY)*speed*dt;
-    const float stepZ=(rightZ*leftX+forwardZ*leftY)*speed*dt;
+    const float stepX=settings_.roomMovementEnabled?(rightX*leftX+forwardX*leftY)*speed*dt:0.0f;
+    const float stepZ=settings_.roomMovementEnabled?(rightZ*leftX+forwardZ*leftY)*speed*dt:0.0f;
 
     float halfW=3.0f,halfD=3.8f;
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}
@@ -1853,13 +1999,13 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     float targetX=std::clamp(playerX+stepX,-halfW+0.34f,halfW-0.34f);
     float targetZ=std::clamp(playerZ+stepZ,-halfD+0.34f,halfD-0.34f);
 
-    const float deskX=-halfW+1.48f, deskZ=-halfD+1.35f;
+    const float deskX=-halfW+1.32f, deskZ=-halfD+0.43f;
     const float bedX=halfW-2.0f, bedZ=-halfD+2.10f;
     auto overlaps=[](float x,float z,float cx,float cz,float rx,float rz) {
         return std::fabs(x-cx)<rx && std::fabs(z-cz)<rz;
     };
     auto collides=[&](float x,float z) {
-        return overlaps(x,z,deskX,deskZ,1.48f,.66f) ||
+        return overlaps(x,z,deskX,deskZ,1.36f,.52f) ||
                overlaps(x,z,bedX,bedZ,1.30f,1.72f) ||
                overlaps(x,z,bedX-1.53f,bedZ-.94f,.52f,.54f) ||
                overlaps(x,z,bedX+1.53f,bedZ-.94f,.52f,.54f);
@@ -1889,6 +2035,14 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     }
 }
 
+XrPosef RoomRenderer::projectionPose(const XrPosef& viewPose) const {
+    XrPosef adjusted=viewPose;
+    const XrQuaternionf virtualTurn{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
+    adjusted.orientation=quatMul(virtualTurn,viewPose.orientation);
+    adjusted.position.x+=moveX_;
+    adjusted.position.z+=moveZ_;
+    return adjusted;
+}
 
 void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,GLuint videoTexture,bool hasVideo) {
     if(!initialized_)return;
@@ -2057,32 +2211,40 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const auto knob=doorFacePoint(-.48f,floorY+1.12f,-.105f);
     drawSphere(pv.data(),knob[0],knob[1],knob[2],.045f,.045f,.045f,brass,4);
 
-    // The penthouse gets a near-wall-to-wall glazing system instead of a small picture window.
-    const float roomWindowWidth=std::min(halfW*1.78f,
-        settings_.roomSize=="small"?3.7f:(settings_.roomSize=="large"?10.5f:7.35f));
-    const float roomWindowHeight=activeEnvironmentIndex_==29?2.88f:
-        (activeEnvironmentIndex_==1?2.55f:activeEnvironmentIndex_>=3?2.15f:1.8f);
-    drawEnvironmentWindow(pv.data(),halfW,floorY,backZ,env,roomWindowWidth,roomWindowHeight);
+    // A wide glazing bay occupies the right wall immediately beside the bed.
+    const float roomWindowWidth=std::min(3.50f,halfD*.78f);
+    const float roomWindowHeight=activeEnvironmentIndex_==1?2.55f:2.15f;
+    const float windowWallX=halfW+.012f;
+    const float windowCenterZ=-halfD+2.10f;
+    const float windowYaw=-kPi*.5f;
+    drawEnvironmentWindow(pv.data(),windowWallX,windowCenterZ,floorY,env,
+                          roomWindowWidth,roomWindowHeight,windowYaw);
 
-    // Tailored drapery softens the window opening: repeated fabric folds and a weighted hem.
+    // Curtains follow the same rotated plane and frame the bed-side window.
     const float curtainY=floorY+2.40f;
-    const float curtainZ=backZ+0.13f;
-    const float curtainWidth=std::max(0.18f,roomWindowWidth*0.18f);
+    const float curtainWidth=std::max(.18f,roomWindowWidth*.18f);
     const auto curtainFabric=activeEnvironmentIndex_==29?rgb(.035f,.043f,.075f):rgb(.43f,.40f,.37f);
+    auto rightWallPoint=[&](float localX,float localY,float localZ) {
+        return std::array<float,3>{windowWallX+std::sin(windowYaw)*localZ,localY,
+                                   windowCenterZ-std::sin(windowYaw)*localX};
+    };
     for(int side : {-1,1}) {
-        const float curtainCenter=side*(roomWindowWidth*.5f+curtainWidth*.36f);
-        const float curtainPanelWidth=curtainWidth*.76f;
-        const float curtainHeight=roomWindowHeight*1.18f;
-        drawCurtainPanel(pv.data(),curtainCenter,curtainY,curtainZ,
-                         curtainPanelWidth,curtainHeight,curtainFabric);
-        // Weighted hems and a narrow leading-edge welt hold the drape's tailored outline.
-        drawRoundedBox(pv.data(),curtainCenter,curtainY-curtainHeight*.49f,curtainZ,
-                       curtainPanelWidth,.028f,.060f,curtainFabric,0.0f,3);
-        drawRoundedBox(pv.data(),curtainCenter-side*curtainPanelWidth*.49f,curtainY,curtainZ,
-                       .018f,curtainHeight*.96f,.045f,curtainFabric,0.0f,3);
+        const float centerLocalX=side*(roomWindowWidth*.5f+curtainWidth*.36f);
+        const float panelWidth=curtainWidth*.76f;
+        const float panelHeight=roomWindowHeight*1.18f;
+        const auto center=rightWallPoint(centerLocalX,curtainY,.13f);
+        drawCurtainPanel(pv.data(),center[0],center[1],center[2],
+                         panelWidth,panelHeight,curtainFabric,windowYaw);
+        const auto hem=rightWallPoint(centerLocalX,curtainY-panelHeight*.49f,.13f);
+        drawRoundedBox(pv.data(),hem[0],hem[1],hem[2],panelWidth,.028f,.060f,
+                       curtainFabric,windowYaw,3);
+        const auto welt=rightWallPoint(centerLocalX-side*panelWidth*.49f,curtainY,.13f);
+        drawRoundedBox(pv.data(),welt[0],welt[1],welt[2],.018f,panelHeight*.96f,.045f,
+                       curtainFabric,windowYaw,3);
     }
-    drawRoundedBox(pv.data(),0,curtainY+roomWindowHeight*.59f,curtainZ,
-                   roomWindowWidth+curtainWidth*.9f,.065f,.12f,wood,0.0f,1);
+    const auto rail=rightWallPoint(0,curtainY+roomWindowHeight*.59f,.13f);
+    drawRoundedBox(pv.data(),rail[0],rail[1],rail[2],roomWindowWidth+curtainWidth*.9f,
+                   .065f,.12f,wood,windowYaw,1);
 
     // A leafy floor plant and ceramic planter bring a natural material break to the back corner.
     const float plantX=-halfW+.62f, plantZ=frontZ-.44f;
@@ -2193,12 +2355,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                    side<0?accentBlue:accentViolet,7);
     }
 
-    const float deskZ=backZ+1.35f;
-    // Supplied desk GLB spans 2.60 m x 0.82 m and has a 0.75 m desktop.
-    const float deskX=-halfW+1.48f;
+    // Place the supplied desk almost flush to both walls in the back-left corner.
+    const float deskZ=backZ+0.43f;
+    const float deskX=-halfW+1.32f;
     const float monitorX=deskX;
     const float deskSurface=floorY+.75f;
-    const float monitorZ=deskZ;
+    const float monitorZ=deskZ-0.31f; // display stand sits at the rear edge, close to the wall
 
     // Soft contact shadows sit beneath the actual desk and relocated plant only.
     drawGroundShadow(pv.data(),deskX,floorY+0.004f,deskZ,2.70f,1.02f,.38f);
@@ -2367,42 +2529,135 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         glUseProgram(vignetteProgram_);glBindVertexArray(planeTexture_);glDrawArrays(GL_TRIANGLES,0,6);glBindVertexArray(0);
         glUseProgram(0);glDisable(GL_BLEND);glEnable(GL_DEPTH_TEST);
     }
-    // Flat 2D controls follow the physical monitor's curved 27-inch glass.
+    // Full monitor UI with persistent navigation and distinct virtual-desktop-style pages.
     if (menuVisible_) {
-        const float menuY=deskSurface+.276f;
-        const float menuZ=monitorZ+.001f;
-        const auto panel=rgb(.018f,.024f,.046f,.98f);
-        const auto row=rgb(.055f,.070f,.115f,.98f);
-        const auto selected=rgb(.075f,.19f,.34f,1.0f);
-        const auto blue=rgb(.16f,.58f,1.0f,1.0f);
-        const auto text=rgb(.88f,.92f,1.0f,1.0f);
+        const float uiCurve=.029f,uiWidth=.574f,uiHeight=.322f;
+        const float menuY=deskSurface+.276f,menuZ=monitorZ+.002f;
+        const float navX=monitorX-.216f,bodyX=monitorX+.063f,bodyWidth=.405f;
+        const auto background=rgb(.010f,.015f,.030f,.985f);
+        const auto header=rgb(.018f,.028f,.052f,.99f);
+        const auto navBase=rgb(.018f,.026f,.048f,.98f);
+        const auto card=rgb(.035f,.050f,.082f,.98f);
+        const auto selected=rgb(.045f,.145f,.265f,1.0f);
+        const auto blue=rgb(.20f,.61f,1.0f,1.0f);
+        const auto cyan=rgb(.20f,.82f,1.0f,1.0f);
+        const auto white=rgb(.91f,.94f,1.0f,1.0f);
+        const auto muted=rgb(.48f,.56f,.70f,1.0f);
+        const auto green=rgb(.24f,.88f,.62f,1.0f);
+        const auto amber=rgb(1.0f,.68f,.28f,1.0f);
+        auto panel=[&](float x,float y,float w,float h,const std::array<float,4>& tint) {
+            drawCurvedPanel(pv.data(),x,y,menuZ,w,h,uiCurve,0,tint,32);
+        };
+        auto label=[&](const char* value,float x,float y,float size,const std::array<float,4>& tint) {
+            drawText(pv.data(),value,x,y,menuZ+.0015f,size,tint,monitorX,uiWidth,uiCurve);
+        };
+        auto prettyName=[](const std::string& value) {
+            std::string out=value;
+            std::replace(out.begin(),out.end(),'_',' ');
+            std::transform(out.begin(),out.end(),out.begin(),
+                           [](unsigned char ch){return static_cast<char>(std::toupper(ch));});
+            return out;
+        };
+        auto drawRow=[&](int index,float y,const char* title,const std::string& value) {
+            panel(bodyX,y,bodyWidth,.040f,menuSelection_==index?selected:card);
+            label(title,bodyX-.184f,y+.005f,.00185f,white);
+            label(value.c_str(),bodyX+.045f,y+.005f,.00175f,blue);
+        };
+
         glDisable(GL_DEPTH_TEST);
+        glDepthMask(GL_FALSE);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(program_);
-
-        drawCurvedPanel(pv.data(),monitorX,menuY,menuZ,.566f,.314f,.029f,0,panel,32);
-        drawCurvedPanel(pv.data(),monitorX,menuY+.132f,menuZ,.546f,.004f,.029f,0,blue,32);
-        drawText(pv.data(),"QUESTBRIDGE",monitorX-.073f,menuY+.111f,menuZ+.030f,.0022f,text);
-        drawText(pv.data(),kEnvironmentNames[activeEnvironmentIndex_],
-                 monitorX+.105f,menuY+.111f,menuZ+.030f,.00145f,blue);
-
-        const char* labels[4]={"ENVIRONMENT","DISPLAY MODE","TV VISIBILITY","CLOSE MENU"};
-        const float rowY[4]={menuY+.061f,menuY+.008f,menuY-.045f,menuY-.098f};
+        panel(monitorX,menuY,uiWidth,uiHeight,background);
+        panel(monitorX,menuY+.139f,uiWidth-.010f,.038f,header);
+        label("QUESTBRIDGE",monitorX-.270f,menuY+.132f,.00245f,white);
+        label("XR STREAMING",monitorX-.122f,menuY+.132f,.00155f,muted);
+        label(pcConnected_?"PC ONLINE":"PC OFFLINE",monitorX+.130f,menuY+.132f,.00160f,
+              pcConnected_?green:amber);
+        panel(navX,menuY-.006f,.132f,.270f,navBase);
+        panel(monitorX-.143f,menuY-.006f,.0025f,.270f,rgb(.09f,.16f,.25f,1.0f));
+        label("LIBRARY",navX-.050f,menuY+.105f,.00135f,muted);
+        const char* tabs[4]={"COMPUTERS","SETTINGS","DISPLAY","COMFORT"};
+        const float tabY[4]={menuY+.061f,menuY+.012f,menuY-.037f,menuY-.086f};
         for(int i=0;i<4;++i) {
-            drawCurvedPanel(pv.data(),monitorX,rowY[i],menuZ,.544f,.047f,.029f,
-                            0,i==menuSelection_?selected:row,32);
-            drawText(pv.data(),labels[i],monitorX-.247f,rowY[i]+.008f,menuZ+.030f,.00245f,text);
-            if(i==0) drawText(pv.data(),"NEXT",monitorX+.145f,rowY[i]+.008f,menuZ+.030f,.0022f,blue);
-            else if(i==1) {
-                const char* mode=settings_.screenDestination=="monitor"?"MONITOR":
-                    (settings_.screenDestination=="tv"?"TV":"BOTH");
-                drawText(pv.data(),mode,monitorX+.145f,rowY[i]+.008f,menuZ+.030f,.0022f,blue);
-            } else if(i==2) {
-                drawText(pv.data(),settings_.showTv?"ON":"OFF",monitorX+.205f,rowY[i]+.008f,menuZ+.030f,.0022f,blue);
-            }
+            panel(navX,tabY[i],.119f,.041f,i==menuPage_?selected:navBase);
+            if(i==menuPage_) panel(navX-.055f,tabY[i],.004f,.026f,blue);
+            label(tabs[i],navX-.048f,tabY[i]-.001f,.00160f,i==menuPage_?white:muted);
         }
+        label("LEFT STICK  NAVIGATE",navX-.050f,menuY-.135f,.00105f,muted);
+        const float contentTop=menuY+.092f;
+        if(menuPage_==0) {
+            label("COMPUTERS",bodyX-.184f,contentTop,.00205f,white);
+            label("Connect to your Windows PC",bodyX-.184f,contentTop-.025f,.00145f,muted);
+            panel(bodyX,menuY+.005f,bodyWidth,.105f,card);
+            label("WINDOWS PC",bodyX-.178f,menuY+.038f,.00175f,white);
+            label(pcHostIp_.c_str(),bodyX-.178f,menuY+.010f,.00165f,muted);
+            label(pcConnected_?"CONNECTED":"WAITING FOR CONNECTION",bodyX+.025f,
+                  menuY+.038f,.00155f,pcConnected_?green:amber);
+            label(pcStreaming_?"VIDEO STREAM ACTIVE":"WAITING FOR VIDEO",bodyX+.025f,
+                  menuY+.010f,.00135f,pcStreaming_?cyan:muted);
+            panel(bodyX,menuY-.075f,bodyWidth,.045f,menuSelection_==0?selected:card);
+            label("RECONNECT TO PC",bodyX-.175f,menuY-.080f,.00180f,white);
+            label("A",bodyX+.165f,menuY-.080f,.00175f,blue);
+            label("Check the PC IP in QuestBridge Studio if offline.",
+                  bodyX-.184f,menuY-.125f,.00130f,muted);
+        } else if(menuPage_==1) {
+            label("ROOM SETTINGS",bodyX-.184f,contentTop,.00205f,white);
+            label("Change the room and how you move around it",bodyX-.184f,
+                  contentTop-.024f,.00130f,muted);
+            const std::string sizeValue=settings_.roomSize=="small"?"SMALL":
+                (settings_.roomSize=="large"?"LARGE":"MEDIUM");
+            char speed[24];std::snprintf(speed,sizeof(speed),"%.1f M/S",settings_.movementSpeed);
+            drawRow(0,menuY+.034f,"ENVIRONMENT",prettyName(settings_.environment));
+            drawRow(1,menuY-.010f,"ROOM SIZE",sizeValue);
+            drawRow(2,menuY-.054f,"ROOM MOVEMENT",settings_.roomMovementEnabled?"ON":"OFF");
+            drawRow(3,menuY-.098f,"MOVE SPEED",speed);
+            drawRow(4,menuY-.142f,"RESET POSITION","RESET");
+            if(environmentDropdownOpen_) {
+                panel(bodyX+.050f,menuY-.044f,.298f,.158f,rgb(.014f,.024f,.044f,1.0f));
+                label("CHOOSE ENVIRONMENT",bodyX-.080f,menuY+.020f,.00148f,cyan);
+                for(int item=0;item<4;++item) {
+                    const int index=(environmentDropdownIndex_+item+
+                        static_cast<int>(kEnvironmentNames.size())-1)%
+                        static_cast<int>(kEnvironmentNames.size());
+                    const float yy=menuY-.012f-item*.031f;
+                    panel(bodyX+.050f,yy,.282f,.027f,item==0?selected:card);
+                    const std::string display=prettyName(kEnvironmentNames[index]);
+                    label(display.c_str(),bodyX-.080f,yy-.004f,.00130f,item==0?white:muted);
+                }
+                label("A  APPLY",bodyX+.100f,menuY-.143f,.00125f,blue);
+            }
+        } else if(menuPage_==2) {
+            label("DISPLAY",bodyX-.184f,contentTop,.00205f,white);
+            label("Choose where your PC screen appears",bodyX-.184f,
+                  contentTop-.024f,.00135f,muted);
+            const std::string output=settings_.screenDestination=="tv"?"TV ONLY":
+                (settings_.screenDestination=="both"?"MONITOR + TV":"MONITOR");
+            char count[24];std::snprintf(count,sizeof(count),"%d",settings_.monitorCount);
+            drawRow(0,menuY+.034f,"SCREEN OUTPUT",output);
+            drawRow(1,menuY-.018f,"BEDROOM TV",settings_.showTv?"VISIBLE":"HIDDEN");
+            drawRow(2,menuY-.070f,"VIRTUAL SCREENS",count);
+            label("Your selected output updates the room display.",
+                  bodyX-.184f,menuY-.132f,.00135f,muted);
+        } else {
+            label("COMFORT",bodyX-.184f,contentTop,.00205f,white);
+            label("Tune turning and room comfort",bodyX-.184f,
+                  contentTop-.024f,.00135f,muted);
+            char turnSpeed[24],snap[24];
+            std::snprintf(turnSpeed,sizeof(turnSpeed),"%.1f",settings_.turnSpeed);
+            std::snprintf(snap,sizeof(snap),"%.0f DEG",settings_.snapTurnDegrees);
+            drawRow(0,menuY+.034f,"TURN MODE",settings_.smoothTurn?"SMOOTH":"SNAP");
+            drawRow(1,menuY-.010f,"TURN SPEED",turnSpeed);
+            drawRow(2,menuY-.054f,"SNAP ANGLE",snap);
+            drawRow(3,menuY-.098f,"COMFORT VIGNETTE",settings_.comfortVignette?"ON":"OFF");
+            label("Use the right stick to adjust highlighted values.",
+                  bodyX-.184f,menuY-.145f,.00127f,muted);
+        }
+        label("A  SELECT",monitorX-.270f,menuY-.151f,.00120f,muted);
+        label("LEFT / RIGHT  TABS",monitorX-.145f,menuY-.151f,.00120f,muted);
         glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
     }
     glBindTexture(GL_TEXTURE_2D,0);glBindVertexArray(0);glUseProgram(0);glDisable(GL_DEPTH_TEST);
 }
