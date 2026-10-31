@@ -23,18 +23,14 @@ class BedDesignPatchTests(unittest.TestCase):
         for token in (
             "Headboard_outer_shell",
             "Headboard_single_upholstered_panel",
+            "Headboard_inner_lip_side_", "Headboard_inner_lip_edge_",
             "Headboard_silver_grey_perimeter",
-            "Headboard_blue_violet_LED_reveal",
             "Single smooth charcoal upholstered headboard panel",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
         self.assertIn("(0,1.175,-1.255),(2.15,1.38,.22)", self.patched)
-        self.assertIn("headboard_led_outline", self.patched)
-        self.assertIn("headboard_led_outline,.012,'led'", self.patched)
-        self.assertIn("materials['led']=PBRMaterial", self.patched)
-        self.assertIn("emissiveFactor=[0.22,0.38,1.0]", self.patched)
-        self.assertIn("Bed_Headboard_LED_reveal", self.patched)
+        self.assertIn("'charcoal',.38", self.patched)
 
     def test_no_diamond_tufts_or_buttons_remain_on_the_headboard(self):
         for token in (
@@ -43,6 +39,7 @@ class BedDesignPatchTests(unittest.TestCase):
             "Headboard_tufted_backing",
             "Headboard_channel_",
             "Headboard_channel_stitch_",
+            "Headboard_blue_violet_LED_reveal", "materials['led']=PBRMaterial",
         ):
             with self.subTest(token=token):
                 self.assertNotIn(token, self.patched)
