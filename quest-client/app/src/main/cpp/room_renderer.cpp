@@ -1238,9 +1238,11 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     if(vvs)glDeleteShader(vvs);if(vfs)glDeleteShader(vfs);
     createGeometry();
     if (!loadRoomFontAtlas()) LOGE("QuestBridge menu will not render text without a system font");
+    const bool bedLoaded=bedModel_.load(assets,"models/arc_upholstered_bed.glb");
     const bool deskLoaded=deskModel_.load(assets,"models/arc_gaming_desk.glb");
     const bool monitorLoaded=monitorModel_.load(assets,"models/arc27_curved_monitor.glb");
-    LOGI("custom furniture GLB status: desk=%d monitor=%d",deskLoaded?1:0,monitorLoaded?1:0);
+    LOGI("custom furniture GLB status: bed=%d desk=%d monitor=%d",
+         bedLoaded?1:0,deskLoaded?1:0,monitorLoaded?1:0);
     environmentTextures_[0]=loadRgbAsset(assets,"environments/blossom.rgb");
     environmentTextures_[1]=loadRgbAsset(assets,"environments/night_city.rgb");
     environmentTextures_[2]=loadRgbAsset(assets,"environments/golden_city.rgb");
@@ -2405,67 +2407,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const auto trimDark = rgb(.012f,.018f,.034f);
     const auto silver = rgb(.22f,.27f,.39f);
 
-    // -------------------------------------------------------------------------
-    // Penthouse bedroom: low upholstered platform, layered mattress, soft duvet,
-    // separate pillows, tailored headboard, bedside storage and practical lamps.
-    // Geometry stays inside the existing room bounds and is fully walkable around.
-    // -------------------------------------------------------------------------
+    // Blender-authored upholstered bed asset. The room anchor and footprint stay
+    // identical to the previous bed so the existing room layout/collision remain stable.
     const float bedX=halfW-2.0f;
     const float bedZ=backZ+2.10f;
     const auto bedBase=rgb(.018f,.024f,.043f);
-    const auto bedLinen=rgb(.11f,.125f,.19f);
-    const auto duvet=rgb(.043f,.052f,.086f);
-    const auto pillowLinen=rgb(.20f,.22f,.30f);
     const auto bedMetal=rgb(.16f,.20f,.30f);
     drawGroundShadow(pv.data(),bedX,floorY+.004f,bedZ,3.20f,4.05f,.42f);
-    // A low dark rug extends beyond the platform on all four sides.
-    drawRoundedBox(pv.data(),bedX,floorY+.018f,bedZ,3.12f,.032f,3.92f,
-                   rgb(.035f,.043f,.073f),0.0f,3);
-    // Floating plinth, inset perimeter reveal and satin metal corner feet.
-    drawRoundedBox(pv.data(),bedX,floorY+.245f,bedZ,2.42f,.34f,3.20f,bedBase,0.0f,5);
-    drawRoundedBox(pv.data(),bedX,floorY+.095f,bedZ+.015f,2.30f,.035f,3.04f,
-                   rgb(.035f,.046f,.078f),0.0f,5);
-    drawBox(pv.data(),bedX,floorY+.105f,bedZ+1.46f,2.12f,.012f,.012f,accentViolet,0.0f,7);
-    for(int side : {-1,1}) {
-        drawBox(pv.data(),bedX+side*1.19f,floorY+.115f,bedZ,
-                .012f,.012f,2.80f,accentBlue,0.0f,7);
-        for(int end : {-1,1}) {
-            drawCylinder(pv.data(),bedX+side*1.02f,floorY+.055f,bedZ+end*1.34f,
-                         .075f,.095f,bedMetal,4);
-        }
-    }
-    // Mattress foundation and a slightly crowned duvet, with stitched edge piping.
-    drawPillow(pv.data(),bedX,floorY+.465f,bedZ,2.20f,.30f,2.94f,
-               rgb(.18f,.20f,.27f),0.0f,0.0f,3);
-    drawPillow(pv.data(),bedX,floorY+.665f,bedZ+.24f,2.06f,.18f,2.18f,
-               duvet,0.0f,0.0f,3);
-    drawPillow(pv.data(),bedX,floorY+.775f,bedZ+1.03f,2.02f,.09f,.66f,
-               bedLinen,0.0f,0.0f,3);
-    for(int side : {-1,1}) {
-        drawBox(pv.data(),bedX+side*.99f,floorY+.735f,bedZ+.24f,
-                .012f,.010f,1.78f,side<0?accentBlue:accentViolet,0.0f,7);
-    }
-    // Two full pillows and two smaller accent cushions, with real separation and overlap.
-    for(int side : {-1,1}) {
-        drawPillow(pv.data(),bedX+side*.49f,floorY+.835f,bedZ-.91f,
-                   .91f,.17f,.60f,pillowLinen,side*.035f,0.0f,3);
-        drawPillow(pv.data(),bedX+side*.28f,floorY+.905f,bedZ-.72f,
-                   .47f,.15f,.43f,upholstery,-side*.06f,0.0f,3);
-    }
-    // Tall upholstered headboard with inset panels, fine welt and a central reveal.
-    const float headboardZ=bedZ-1.48f;
-    drawRoundedBox(pv.data(),bedX,floorY+.955f,headboardZ,2.48f,1.32f,.17f,
-                   bedBase,0.0f,5);
-    drawRoundedBox(pv.data(),bedX,floorY+.98f,headboardZ+.095f,2.31f,1.13f,.035f,
-                   rgb(.065f,.083f,.135f),0.0f,3);
-    for(int panel=-1;panel<=1;++panel) {
-        drawRoundedBox(pv.data(),bedX+panel*.72f,floorY+.99f,headboardZ+.119f,
-                       .68f,1.02f,.018f,rgb(.075f,.092f,.15f),0.0f,3);
-        drawBox(pv.data(),bedX+panel*.72f,floorY+.99f,headboardZ+.132f,
-                .008f,.91f,.004f,bedMetal,0.0f,4);
-    }
-    drawBox(pv.data(),bedX,floorY+1.59f,headboardZ+.12f,2.28f,.012f,.012f,
-            accentViolet,0.0f,7);
+    const float bedPlacement[16] = {
+        1,0,0,0, 0,1,0,0, 0,0,1,0, bedX,floorY,bedZ,1
+    };
+    bedModel_.draw(pv.data(),bedPlacement,locMvp_,locModel_,locColor_,locTextured_,
+                   locTexture_,locMaterial_,locRounded_,locUvScale_);
     // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.
     for(int side : {-1,1}) {
         const float nx=bedX+side*1.53f, nz=bedZ-.94f;
@@ -2823,7 +2776,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 }
 
 void RoomRenderer::release() {
-    deskModel_.release(); monitorModel_.release();
+    bedModel_.release(); deskModel_.release(); monitorModel_.release();
     if(gFontAtlasTexture){glDeleteTextures(1,&gFontAtlasTexture);gFontAtlasTexture=0;gFontAtlasReady=false;}
     if(!initialized_&&!program_&&!vao_)return;
     if(program_)glDeleteProgram(program_);if(vignetteProgram_)glDeleteProgram(vignetteProgram_);if(vao_)glDeleteVertexArrays(1,&vao_);if(vbo_)glDeleteBuffers(1,&vbo_);
