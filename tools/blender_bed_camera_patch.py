@@ -17,7 +17,7 @@ _REQUIRED_VIEWS = {
     "bed_side_profile",
     "bed_foot_three_quarter",
 }
-_CYCLES_SAMPLES = re.compile(r"(?m)^scene\.cycles\.samples\s*=\s*\d+\s*$")
+_CYCLES_SAMPLES = re.compile(r"scene\.cycles\.samples\s*=\s*\d+")
 _RENDER_RESOLUTION = re.compile(
     r"(?m)^scene\.render\.resolution_x\s*=\s*\d+;\s*"
     r"scene\.render\.resolution_y\s*=\s*\d+;\s*"
