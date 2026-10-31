@@ -57,6 +57,11 @@ class NativeSourceContractTests(unittest.TestCase):
         bed_end = source.index("// Place the supplied desk almost flush", bed_start)
         bed_section = source[bed_start:bed_end]
         self.assertIn("bedModel_.draw(pv.data(),bedPlacement", bed_section)
+        self.assertIn('locUvScale_,&bedLedTint,"LED_reveal"', bed_section)
+        glb_model = (ROOT / "quest-client/app/src/main/cpp/glb_model.cpp").read_text(encoding="utf-8")
+        self.assertIn("copy.nodeName=node->name?node->name:\"\"", glb_model)
+        self.assertIn("p.nodeName.find(emissiveNodeMarker)", glb_model)
+        self.assertIn("emissiveOverride?7:-1", glb_model)
         self.assertNotIn("drawPillow(pv.data(),bedX", bed_section)
         self.assertNotIn("const float headboardZ=bedZ-1.48f", bed_section)
         bed_design = (ROOT / "tools/bed_design_patch.py").read_text(encoding="utf-8")
