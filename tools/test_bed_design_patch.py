@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression checks that only the headboard changes to the single-panel recessed-glow design."""
+"""Regression checks for the bed-only headboard and pillow restoration."""
 from __future__ import annotations
 import gzip
 import pathlib
@@ -8,7 +8,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from bed_design_patch import OLD_GEOMETRY, patch_bed_geometry
+from bed_design_patch import OLD_GEOMETRY, NEW_GEOMETRY, patch_bed_geometry
 
 
 class BedDesignPatchTests(unittest.TestCase):
@@ -18,60 +18,69 @@ class BedDesignPatchTests(unittest.TestCase):
         cls.source = gzip.decompress(compressed.read_bytes()).decode("utf-8")
         cls.patched = patch_bed_geometry(cls.source)
 
-    def test_headboard_is_one_smooth_panel_with_recessed_hidden_angle_glow(self):
+    def test_headboard_uses_five_softly_eased_filled_panels(self):
         for token in (
-            "Headboard_single_upholstered_panel",
-            "Headboard_outer_shell",
-            "Headboard_rear_backing",
+            "Headboard_back_shell",
+            "Headboard_quilt_backing",
+            "Headboard_filled_panel_",
             "Headboard_outer_lip_side_",
             "Headboard_inner_lip_side_",
             "Headboard_outer_lip_edge_",
             "Headboard_inner_lip_edge_",
-            "Headboard_panel_perimeter_seam",
-            "Single smooth charcoal upholstered headboard panel",
-            "original bed frame, mattress and bedding retained",
+            "Headboard_mount_",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
-        self.assertIn("taper=.08", self.patched)
-        self.assertIn("No exposed LED tape, bulbs, diamond tufting or decorative buttons", self.patched)
-        self.assertIn("m.vertex_normals  # cache smooth per-vertex normals for GLB export", self.patched)
-        self.assertIn("merged.vertex_normals  # include normals in optimized runtime batches", self.patched)
+        self.assertIn("(.225,.705,.112)", self.patched)
+        self.assertIn("taper=.10", self.patched)
+        self.assertIn("nested recessed RGB perimeter channel", self.patched)
 
-    def test_diamonds_buttons_channels_and_visible_strip_geometry_are_absent(self):
+    def test_old_bed_base_and_bedding_are_not_replaced(self):
+        # The patch is an exact replacement of the original pillow/headboard block.
+        restored = self.patched.replace(NEW_GEOMETRY, OLD_GEOMETRY, 1)
+        restored = restored.replace(
+            "        m.vertex_normals  # cache smooth per-vertex normals for GLB export\n", "", 1
+        )
+        restored = restored.replace(
+            "    merged.vertex_normals  # include normals in optimized runtime batches\n", "", 1
+        )
+        restored = restored.replace(
+            "'design':'Original bed platform, frame, mattress and bedding retained; five softly padded charcoal headboard sections with gently eased rectangular edges, a nested recessed RGB perimeter channel and refreshed fabric pillows',",
+            "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',",
+            1
+        )
+        self.assertEqual(restored, self.source)
+        for token in ("mattress", "duvet", "throw", "footboard", "platform"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.patched.lower())
+
+    def test_only_pillows_and_headboard_change_inside_geometry_block(self):
         for token in (
+            "Sleep_pillow_", "Sleep_pillow_piping_", "Sleep_pillow_corner_fold_",
+            "Slate_accent_cushion_", "Slate_accent_piping_",
+            "Lumbar_cushion", "Lumbar_cushion_seam",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, NEW_GEOMETRY)
+        self.assertIn("Bed platform, rails, legs, foot end", NEW_GEOMETRY)
+        self.assertIn("mattress, fitted sheet", NEW_GEOMETRY)
+        self.assertIn("duvet and throw untouched", NEW_GEOMETRY)
+
+    def test_previous_standalone_single_panel_and_diamond_button_design_are_absent(self):
+        for token in (
+            "Headboard_single_upholstered_panel",
             "Headboard_diamond_tuft_",
-            "Headboard_diamond_stitch_",
             "Headboard_tuft_button_",
             "Headboard_crystal_tuft_button_",
-            "headboard_crystal",
             "Headboard_channel_",
-            "Headboard_channel_stitch_",
             "Headboard_LED_strip",
         ):
             with self.subTest(token=token):
                 self.assertNotIn(token, self.patched)
 
-    def test_original_sleep_pillows_and_bedding_geometry_are_preserved(self):
-        original_pillows = OLD_GEOMETRY.split("# Structural headboard shell")[0]
-        self.assertIn(original_pillows, self.patched)
-        for token in ("Sleep_pillow_piping_", "Slate_accent_cushion_", "Lumbar_cushion", "Sleep_pillow_"):
-            with self.subTest(token=token):
-                self.assertIn(token, self.patched)
-
-    def test_no_new_footboard_or_replacement_pillow_system_is_added(self):
-        for token in (
-            "Footboard_outer_shell", "Footboard_tufted_backing",
-            "Footboard_diamond_tuft_", "Footboard_tuft_button_",
-            "Sleep_pillow_box_gusset_", "Sleep_pillow_diamond_quilt_",
-            "Graphite_accent_pillow_",
-        ):
-            with self.subTest(token=token):
-                self.assertNotIn(token, self.patched)
-
-    def test_original_bed_frame_and_headboard_mounts_are_retained(self):
-        self.assertIn("Headboard_mount_", self.patched)
-        self.assertIn("original bed frame, mattress and bedding retained", self.patched)
+    def test_smooth_vertex_normals_are_exported(self):
+        self.assertIn("m.vertex_normals  # cache smooth per-vertex normals for GLB export", self.patched)
+        self.assertIn("merged.vertex_normals  # include normals in optimized runtime batches", self.patched)
 
 
 if __name__ == "__main__":

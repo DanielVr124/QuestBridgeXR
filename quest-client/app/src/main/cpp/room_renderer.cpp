@@ -2564,10 +2564,17 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     };
     bedModel_.draw(pv.data(),bedPlacement,locMvp_,locModel_,locColor_,locTextured_,
                    locTexture_,locMaterial_,locRounded_,locUvScale_);
-    // RGB headboard strip is integrated into the padded outer frame and remains
-    // visible from normal viewing angles. Its colour follows the Headboard Glow zone.
+    // The recessed headboard emitter is masked from a reclined view by the
+    // padded frame lips. Keep its colour bounce active, but reveal the narrow
+    // LED channel only when the headset is aimed almost straight at the headboard.
     const float emitterZ=bedZ-1.270f;
-    if(ledZones_[0].enabled) {
+    const float toLedX=bedX-cameraX;
+    const float toLedY=floorY+1.180f-cameraY;
+    const float toLedZ=emitterZ-cameraZ;
+    const float toLedLength=std::max(std::sqrt(toLedX*toLedX+toLedY*toLedY+toLedZ*toLedZ),0.001f);
+    const float viewForwardX=-camera[8],viewForwardY=-camera[9],viewForwardZ=-camera[10];
+    const float straightOn=(viewForwardX*toLedX+viewForwardY*toLedY+viewForwardZ*toLedZ)/toLedLength;
+    if(ledZones_[0].enabled&&straightOn>0.985f) {
         drawGradientBar(0,bedX,floorY+.405f,emitterZ,2.30f,.014f,.012f,40);
         drawGradientBar(0,bedX,floorY+1.955f,emitterZ,2.30f,.014f,.012f,40);
         for(int edge=0;edge<2;++edge) {
