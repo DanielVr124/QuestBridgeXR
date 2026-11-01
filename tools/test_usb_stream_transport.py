@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import pathlib
+import socket
 import sys
+import threading
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -15,6 +17,7 @@ from stream_test_video import (
     frame_tcp_packet,
     make_packet,
     pop_tcp_packets,
+    usb_control_relay,
 )
 
 
@@ -66,6 +69,52 @@ class UsbStreamTransportTests(unittest.TestCase):
         self.assertEqual(int.from_bytes(framed[:4], "little"), len(packet))
         self.assertEqual(framed[4:], packet)
         self.assertEqual(len(packet), HEADER.size + 1)
+
+    def test_bidirectional_usb_relay_bridges_quest_packets_and_host_replies(self):
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        quest = socket.create_connection(listener.getsockname(), timeout=2)
+        pc_client, _ = listener.accept()
+        quest.settimeout(2)
+        listener.close()
+
+        relay = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        relay.bind(("127.0.0.1", 0))
+        relay.setblocking(False)
+        host = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        host.bind(("127.0.0.1", 0))
+        host.settimeout(2)
+
+        stop = threading.Event()
+        send_lock = threading.Lock()
+        relay_thread = threading.Thread(
+            target=usb_control_relay,
+            args=(pc_client, relay, host.getsockname(), send_lock, stop),
+            daemon=True,
+        )
+        relay_thread.start()
+        outbound = make_packet(1, 21, b"quest-hello")
+        response = make_packet(2, 22, b"windows-host-ack")
+        try:
+            quest.sendall(frame_tcp_packet(outbound))
+            received, relay_peer = host.recvfrom(2048)
+            self.assertEqual(received, outbound)
+            host.sendto(response, relay_peer)
+
+            pending = bytearray()
+            replies = []
+            while not replies:
+                pending.extend(quest.recv(4096))
+                replies = pop_tcp_packets(pending)
+            self.assertEqual(replies, [response])
+        finally:
+            stop.set()
+            quest.close()
+            pc_client.close()
+            relay.close()
+            host.close()
+            relay_thread.join(timeout=2)
 
 
 if __name__ == "__main__":
