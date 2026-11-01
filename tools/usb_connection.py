@@ -244,7 +244,7 @@ def probe_usb_connection(
             checks.append(_check("WARN", "QuestBridge process", f"Could not check whether the app is running: {exc}"))
 
         # These logs distinguish "ADB can see the headset" from the Quest app
-        # actually completing its UDP handshake and receiving stream metadata.
+        # completing either the UDP/LAN or framed TCP-over-ADB handshake.
         try:
             log_result = subprocess.run(
                 [executable, "-s", device.serial, "logcat", "-d", "-t", "1200", "-s", "QuestBridgeXR:I"],
