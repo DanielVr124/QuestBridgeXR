@@ -56,6 +56,7 @@ private:
     struct Vertex { float x, y, z, u, v; };
     GLuint compileShader(GLenum type, const char* source);
     GLuint loadRgbAsset(AAssetManager* assets, const char* filename);
+    GLuint loadPanoramaAsset(AAssetManager* assets, const char* filename);
     GLuint createProceduralEnvironment(int sceneIndex);
     void createGeometry();
     void chooseEnvironment();
@@ -94,7 +95,9 @@ private:
     void drawGroundShadow(const float* projectionView, float x, float y, float z,
                           float width, float depth, float opacity);
     void drawEnvironmentWindow(const float* projectionView, float wallX, float centerZ, float floorY,
-                               GLuint environmentTexture, float windowW, float windowH, float yaw);
+                               float windowW, float windowH, float yaw);
+    void drawPanoramaSkybox(const float* projectionView, float cameraX, float cameraY, float cameraZ,
+                            GLuint panoramaTexture);
 
     struct LedZoneSettings {
         std::array<float,3> primary{{0.08f,0.34f,1.0f}};
@@ -180,6 +183,7 @@ private:
     std::array<GLuint, 208> environmentTextures_{};
     int activeEnvironmentIndex_ = 0;
     GLuint videoFallbackTexture_ = 0;
+    GLuint mainRoomPanoramaTexture_ = 0;
     GLuint groundShadowTexture_ = 0;
     GLuint materialAtlasTexture_ = 0;
     GLuint normalAtlasTexture_ = 0;

@@ -13,6 +13,7 @@
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "third_party/stb_truetype.h"
+#include "third_party/stb_image.h"
 
 #define QBX_LOG_TAG "QuestBridgeRoom"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, QBX_LOG_TAG, __VA_ARGS__)
@@ -736,6 +737,93 @@ GLuint RoomRenderer::loadRgbAsset(AAssetManager* assets, const char* filename) {
 }
 
 
+GLuint RoomRenderer::loadPanoramaAsset(AAssetManager* assets, const char* filename) {
+    if (!assets) return 0;
+    AAsset* asset = AAssetManager_open(assets, filename, AASSET_MODE_BUFFER);
+    if (!asset) {
+        LOGW("main-room panorama asset missing: %s", filename);
+        return 0;
+    }
+
+    const off_t assetLength = AAsset_getLength(asset);
+    if (assetLength <= 0 || assetLength > 64 * 1024 * 1024) {
+        AAsset_close(asset);
+        LOGW("main-room panorama has an invalid size: %s", filename);
+        return 0;
+    }
+    std::vector<uint8_t> encoded(static_cast<size_t>(assetLength));
+    const int bytesRead = static_cast<int>(AAsset_read(asset, encoded.data(), encoded.size()));
+    AAsset_close(asset);
+    if (bytesRead <= 0) {
+        LOGW("could not read main-room panorama: %s", filename);
+        return 0;
+    }
+
+    int sourceWidth = 0, sourceHeight = 0, sourceChannels = 0;
+    stbi_uc* decoded = stbi_load_from_memory(
+        encoded.data(), bytesRead, &sourceWidth, &sourceHeight, &sourceChannels, 3);
+    if (!decoded || sourceWidth < 2 || sourceHeight < 2) {
+        if (decoded) stbi_image_free(decoded);
+        LOGW("could not decode main-room panorama: %s", filename);
+        return 0;
+    }
+
+    constexpr int kMaxPanoramaDimension = 2048;
+    const float scale = std::min(1.0f, static_cast<float>(kMaxPanoramaDimension) /
+        static_cast<float>(std::max(sourceWidth, sourceHeight)));
+    const int width = std::max(2, static_cast<int>(std::lround(sourceWidth * scale)));
+    const int height = std::max(2, static_cast<int>(std::lround(sourceHeight * scale)));
+    std::vector<uint8_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height) * 3);
+
+    // stb_image rows are top-down; the sphere UV convention starts at the bottom.
+    // Bilinear resampling flips vertically and also downscales oversized panoramas.
+    for (int y = 0; y < height; ++y) {
+        const float sourceY = (static_cast<float>(height - 1 - y) + 0.5f) *
+                              static_cast<float>(sourceHeight) / static_cast<float>(height) - 0.5f;
+        const float floorY = std::floor(sourceY);
+        const int y0 = std::clamp(static_cast<int>(floorY), 0, sourceHeight - 1);
+        const int y1 = std::min(y0 + 1, sourceHeight - 1);
+        const float fy = std::clamp(sourceY - floorY, 0.0f, 1.0f);
+        for (int x = 0; x < width; ++x) {
+            const float sourceX = (static_cast<float>(x) + 0.5f) *
+                                  static_cast<float>(sourceWidth) / static_cast<float>(width) - 0.5f;
+            const float floorX = std::floor(sourceX);
+            const int x0 = std::clamp(static_cast<int>(floorX), 0, sourceWidth - 1);
+            const int x1 = std::min(x0 + 1, sourceWidth - 1);
+            const float fx = std::clamp(sourceX - floorX, 0.0f, 1.0f);
+            const size_t destination = (static_cast<size_t>(y) * width + x) * 3;
+            for (int channel = 0; channel < 3; ++channel) {
+                const auto sample = [&](int sx, int sy) {
+                    return static_cast<float>(
+                        decoded[(static_cast<size_t>(sy) * sourceWidth + sx) * 3 + channel]);
+                };
+                const float upper = sample(x0, y0) * (1.0f - fx) + sample(x1, y0) * fx;
+                const float lower = sample(x0, y1) * (1.0f - fx) + sample(x1, y1) * fx;
+                const long value = std::lround(upper * (1.0f - fy) + lower * fy);
+                pixels[destination + channel] =
+                    static_cast<uint8_t>(std::clamp(value, 0L, 255L));
+            }
+        }
+    }
+    stbi_image_free(decoded);
+
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    if (!texture) return 0;
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    LOGI("loaded main-room panorama %s (%dx%d -> %dx%d)",
+         filename, sourceWidth, sourceHeight, width, height);
+    return texture;
+}
+
 GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
     // Procedural window scenery is generated on demand. The first three scenes use bundled assets.
     constexpr int width = 512;
@@ -1335,6 +1423,10 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     environmentTextures_[0]=loadRgbAsset(assets,"environments/blossom.rgb");
     environmentTextures_[1]=loadRgbAsset(assets,"environments/night_city.rgb");
     environmentTextures_[2]=loadRgbAsset(assets,"environments/golden_city.rgb");
+    mainRoomPanoramaTexture_=loadPanoramaAsset(assets,"environments/main_room_city_panorama.jpg");
+    if(!mainRoomPanoramaTexture_) {
+        LOGW("main-room city panorama is not bundled; the selected environment remains the window fallback");
+    }
     materialAtlasTexture_=loadRgbAsset(assets,"materials/room_surface_atlas.rgb");
     normalAtlasTexture_=loadRgbAsset(assets,"materials/room_normal_atlas.rgb");
     roughnessAtlasTexture_=loadRgbAsset(assets,"materials/room_roughness_atlas.rgb");
@@ -2069,6 +2161,40 @@ void RoomRenderer::drawSphere(const float* pv,float x,float y,float z,float sx,f
     glDrawArrays(GL_TRIANGLES,0,sphereVertexCount_);
     glBindVertexArray(0);
 }
+void RoomRenderer::drawPanoramaSkybox(const float* pv,float cameraX,float cameraY,float cameraZ,
+                                      GLuint panoramaTexture) {
+    if(!panoramaTexture || !sphereVao_ || sphereVertexCount_<=0) return;
+    Mat4 projectionView{};
+    std::copy(pv,pv+projectionView.size(),projectionView.begin());
+    // Keep the panorama at infinite apparent distance: it follows the eye's position
+    // but never introduces nearby-world parallax or changes the OpenXR view transform.
+    const Mat4 model=mul(translation(cameraX,cameraY,cameraZ),scaling(80.0f,80.0f,80.0f));
+    const Mat4 mvp=mul(projectionView,model);
+    glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
+    glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
+    glUniform4f(locColor_,1.0f,1.0f,1.0f,1.0f);
+    glUniform1i(locTextured_,1);
+    glUniform1i(locMaterial_,-1);
+    glUniform1i(locRounded_,0);
+    glUniform2f(locUvScale_,1.0f,1.0f);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D,panoramaTexture);
+    glUniform1i(locTexture_,0);
+
+    // The generated sphere has outward-facing triangles. Cull those front faces
+    // so only the inside surface is drawn; never write skybox depth over room geometry.
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+    glDepthMask(GL_FALSE);
+    glBindVertexArray(sphereVao_);
+    glDrawArrays(GL_TRIANGLES,0,sphereVertexCount_);
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D,0);
+    glDepthMask(GL_TRUE);
+    glCullFace(GL_BACK);
+    glDisable(GL_CULL_FACE);
+}
+
 void RoomRenderer::drawPlane(const float* pv,float x,float y,float z,float sx,float sy,GLuint texture,const std::array<float,4>& color,float yaw) {
     Mat4 projectionView{}; std::copy(pv, pv + projectionView.size(), projectionView.begin());
     Mat4 model=mul(translation(x,y,z),mul(rotateY(yaw),scaling(sx,sy,1)));Mat4 mvp=mul(projectionView,model);
@@ -2159,7 +2285,7 @@ void RoomRenderer::drawGroundShadow(const float* pv,float x,float y,float z,
     glBindTexture(GL_TEXTURE_2D,0);
 }
 void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float centerZ,float floorY,
-                                         GLuint tex,float windowW,float windowH,float yaw) {
+                                         float windowW,float windowH,float yaw) {
     const float windowY=floorY+2.4f;
     auto point=[&](float localX,float localY,float localZ) {
         const float co=std::cos(yaw),si=std::sin(yaw);
@@ -2176,9 +2302,16 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float cente
         const auto p=point(lx,ly,lz);
         drawRoundedBox(pv,p[0],p[1],p[2],sx,sy,sz,color,yaw,material);
     };
-    // Right-wall glazing sits beside the bed; local +Z faces into the room.
+    // A genuine opening in the wall reveals the distant panorama. The glass itself
+    // contributes only a faint cool tint, so the room beyond remains clearly visible.
     const auto glass=point(0,windowY,0.035f);
-    drawPlane(pv,glass[0],glass[1],glass[2],windowW,windowH,tex,rgb(1,1,1),yaw);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    drawPlane(pv,glass[0],glass[1],glass[2],windowW,windowH,0,
+              rgb(.72f,.82f,.96f,.045f),yaw);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
     const auto frame=rgb(.018f,.025f,.045f);
     const float t=0.062f;
     box(0,windowY+windowH*.5f+t*.5f,0.015f,windowW+2*t,t,0.12f,frame);
@@ -2640,6 +2773,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform1i(locRoughnessAtlas_,3);
     glUniform1i(locHasRoughnessAtlas_,roughnessAtlasTexture_?1:0);
     glActiveTexture(GL_TEXTURE0);
+    const GLuint roomSkyboxTexture=mainRoomPanoramaTexture_?mainRoomPanoramaTexture_:env;
+    drawPanoramaSkybox(pv.data(),cameraX,cameraY,cameraZ,roomSkyboxTexture);
     const float roomLightScale=roomLightsOn_?1.0f:0.0f;
     glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?1.0f:0.075f);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
@@ -2664,11 +2799,39 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform3f(locNeonPinkColor_,ledRear[0],ledRear[1],ledRear[2]);
     glUniform1f(locNeonPinkIntensity_,ledZones_[4].enabled?1.55f*roomLightScale:0.0f);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
+    // The right wall is split around the single window aperture. No other wall surface
+    // is transparent, and the existing room bounds and wall material are preserved.
+    const float roomWindowWidth=std::min(3.50f,halfD*.78f);
+    const float roomWindowHeight=activeEnvironmentIndex_==1?2.55f:2.15f;
+    const float windowCenterY=floorY+2.40f;
+    const float windowCenterZ=-halfD+2.10f;
+    const float windowMinY=windowCenterY-roomWindowHeight*.5f;
+    const float windowMaxY=windowCenterY+roomWindowHeight*.5f;
+    const float windowMinZ=windowCenterZ-roomWindowWidth*.5f;
+    const float windowMaxZ=windowCenterZ+roomWindowWidth*.5f;
+    const float rightWallX=halfW+0.05f;
+
     // Deep polished stone replaces the old matte plank floor and picks up colored light.
     drawBox(pv.data(),0,floorY-0.08f,0,halfW*2+0.1f,0.16f,halfD*2+0.1f,floor,0.0f,8);
     drawBox(pv.data(),0,ceilingY+0.05f,0,halfW*2+0.1f,0.1f,halfD*2+0.1f,wall,0.0f,2);
     drawBox(pv.data(),-halfW-0.05f,(floorY+ceilingY)*.5f,0,0.1f,ceilingY-floorY,halfD*2,wall,0.0f,2);
-    drawBox(pv.data(),halfW+0.05f,(floorY+ceilingY)*.5f,0,0.1f,ceilingY-floorY,halfD*2,wall,0.0f,2);
+
+    // Two full-height side sections meet the opaque upper and lower wall sections.
+    const float rearWallDepth=windowMinZ+halfD;
+    const float frontWallDepth=halfD-windowMaxZ;
+    if(rearWallDepth>0.02f) {
+        drawBox(pv.data(),rightWallX,(floorY+ceilingY)*.5f,
+                (-halfD+windowMinZ)*.5f,.1f,ceilingY-floorY,rearWallDepth,wall,0.0f,2);
+    }
+    if(frontWallDepth>0.02f) {
+        drawBox(pv.data(),rightWallX,(floorY+ceilingY)*.5f,
+                (windowMaxZ+halfD)*.5f,.1f,ceilingY-floorY,frontWallDepth,wall,0.0f,2);
+    }
+    drawBox(pv.data(),rightWallX,(floorY+windowMinY)*.5f,windowCenterZ,
+            .1f,windowMinY-floorY,roomWindowWidth+.035f,wall,0.0f,2);
+    drawBox(pv.data(),rightWallX,(windowMaxY+ceilingY)*.5f,windowCenterZ,
+            .1f,ceilingY-windowMaxY,roomWindowWidth+.035f,wall,0.0f,2);
+
     drawBox(pv.data(),0,(floorY+ceilingY)*.5f,backZ-0.05f,halfW*2,ceilingY-floorY,0.1f,wall,0.0f,2);
     // Front wall has a centered doorway, so looking around still feels like being inside a room.
     const float sidePanelWidth = std::max(0.25f, (halfW * 2.0f - 1.4f) * 0.5f);
@@ -2745,14 +2908,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                .010f,.010f,.010f,
                roomLightsOn_?rgb(1.0f,.58f,.16f):rgb(.045f,.055f,.075f),7);
 
-    // A wide glazing bay occupies the right wall immediately beside the bed.
-    const float roomWindowWidth=std::min(3.50f,halfD*.78f);
-    const float roomWindowHeight=activeEnvironmentIndex_==1?2.55f:2.15f;
-    // Place the glazing just inside the room's inner wall face so the solid wall cannot occlude it.
+    // Frame the single transparent opening beside the bed.
     const float windowWallX=halfW-.015f;
-    const float windowCenterZ=-halfD+2.10f;
     const float windowYaw=-kPi*.5f;
-    drawEnvironmentWindow(pv.data(),windowWallX,windowCenterZ,floorY,env,
+    drawEnvironmentWindow(pv.data(),windowWallX,windowCenterZ,floorY,
                           roomWindowWidth,roomWindowHeight,windowYaw);
 
     // Curtains follow the same rotated plane and frame the bed-side window.
@@ -3296,10 +3455,12 @@ void RoomRenderer::release() {
     if(pillowVao_)glDeleteVertexArrays(1,&pillowVao_);if(pillowVbo_)glDeleteBuffers(1,&pillowVbo_);
     if(curtainVao_)glDeleteVertexArrays(1,&curtainVao_);if(curtainVbo_)glDeleteBuffers(1,&curtainVbo_);
     if(cylinderVao_)glDeleteVertexArrays(1,&cylinderVao_);if(cylinderVbo_)glDeleteBuffers(1,&cylinderVbo_);
-    for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
+    for(auto t:environmentTextures_)if(t)glDeleteTextures(1,&t);
+    if(mainRoomPanoramaTexture_)glDeleteTextures(1,&mainRoomPanoramaTexture_);
+    if(videoFallbackTexture_)glDeleteTextures(1,&videoFallbackTexture_);
     if(groundShadowTexture_)glDeleteTextures(1,&groundShadowTexture_);
     if(materialAtlasTexture_)glDeleteTextures(1,&materialAtlasTexture_);
     if(normalAtlasTexture_)glDeleteTextures(1,&normalAtlasTexture_);
     if(roughnessAtlasTexture_)glDeleteTextures(1,&roughnessAtlasTexture_);
-    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=pillowVao_=pillowVbo_=curtainVao_=curtainVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=pillowVertexCount_=curtainVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);initialized_=false;
+    program_=vignetteProgram_=vao_=vbo_=planeTexture_=cubeTexture_=videoFallbackTexture_=groundShadowTexture_=materialAtlasTexture_=normalAtlasTexture_=roughnessAtlasTexture_=sphereVao_=sphereVbo_=textVao_=textVbo_=curvedVao_=curvedVbo_=0;roundedVao_=roundedVbo_=pillowVao_=pillowVbo_=curtainVao_=curtainVbo_=cylinderVao_=cylinderVbo_=0;sphereVertexCount_=roundedVertexCount_=pillowVertexCount_=curtainVertexCount_=cylinderVertexCount_=0;environmentTextures_.fill(0);mainRoomPanoramaTexture_=0;initialized_=false;
 }
