@@ -667,18 +667,64 @@ void CityWorld::buildChunk(int chunkX, int chunkZ, int lod) {
 bool CityWorld::collides(float worldX, float worldZ) const {
     const int chunkX=static_cast<int>(std::floor(worldX/kChunkSize));
     const int chunkZ=static_cast<int>(std::floor(worldZ/kChunkSize));
-    if (chunkX==0 && chunkZ==0) return false; // the central civic plaza is pedestrian-only
     const float localX=worldX-chunkX*kChunkSize;
     const float localZ=worldZ-chunkZ*kChunkSize;
-    if (localX<13.5f || localX>70.5f || localZ<13.5f || localZ>70.5f) return false;
     const std::uint32_t seed=hash(static_cast<std::uint32_t>(chunkX)*73856093u ^
-                                static_cast<std::uint32_t>(chunkZ)*19349663u ^ 0x9e3779b9u);
-    const bool greenBlock=! (chunkX==0 && chunkZ==0) && (hash(seed+0xB71u)%11u)==0u;
-    if (greenBlock) return false;
-    const float centers[2]={25.0f,59.0f};
-    for (float cx:centers) for (float cz:centers) {
-        if (std::fabs(localX-cx)<10.1f && std::fabs(localZ-cz)<10.6f) return true;
+                                  static_cast<std::uint32_t>(chunkZ)*19349663u ^ 0x9e3779b9u);
+    const bool plaza=chunkX==0 && chunkZ==0;
+    const bool greenBlock=!plaza && (hash(seed+0xB71u)%11u)==0u;
+
+    if(plaza) {
+        // Keep the fountain basin and the planted trees solid, but leave the square open.
+        if(std::fabs(localX-42.0f)<6.0f && std::fabs(localZ-42.0f)<6.0f) return true;
+        for(int i=0;i<8;++i) {
+            const float angle=i*2.0f*kPi/8.0f;
+            const float tx=42.0f+std::cos(angle)*25.0f;
+            const float tz=42.0f+std::sin(angle)*25.0f;
+            const float dx=localX-tx,dz=localZ-tz;
+            if(dx*dx+dz*dz<2.0f*2.0f) return true;
+        }
+        return false;
     }
+
+    // Parks use the same deterministic placement as their generated tree meshes.
+    if(greenBlock) {
+        for(int i=0;i<9;++i) {
+            const float tx=18.0f+random01(seed+i*13u)*48.0f;
+            const float tz=18.0f+random01(seed+i*37u)*48.0f;
+            const float scale=.80f+random01(seed+i*71u)*.45f;
+            const float dx=localX-tx,dz=localZ-tz;
+            const float radius=scale*.78f+.35f;
+            if(dx*dx+dz*dz<radius*radius) return true;
+        }
+        return false;
+    }
+
+    // Match each lot's procedural jitter and footprint so the invisible collider
+    // follows the visible building instead of an approximate, offset rectangle.
+    const int district=static_cast<int>(hash(seed+0xA51u)%5u);
+    const float centers[2]={25.0f,59.0f};
+    for(int row=0;row<2;++row) for(int col=0;col<2;++col) {
+        const std::uint32_t lotSeed=hash(seed+static_cast<std::uint32_t>(row*17+col*29));
+        const float cx=centers[col]+(random01(lotSeed)-.5f)*2.8f;
+        const float cz=centers[row]+(random01(lotSeed+11u)-.5f)*2.8f;
+        const int style=static_cast<int>((district+row+col)%5);
+        const float width=style==2?19.5f:17.5f;
+        const float depth=style==2?19.0f:18.5f;
+        if(std::fabs(localX-cx)<width*.5f+.55f &&
+           std::fabs(localZ-cz)<depth*.5f+.55f) return true;
+    }
+
+    // The curbside sedan and two planted street trees occupy the same spots as their meshes.
+    const float carX=35.0f+random01(seed+0x921u)*12.0f;
+    if(std::fabs(localX-carX)<3.45f && std::fabs(localZ-6.1f)<1.35f) return true;
+    for(int side : {-1,1}) for(int point=0;point<2;++point) {
+        const float tx=point==0?15.0f:69.0f;
+        const float tz=side<0?17.0f:67.0f;
+        const float dx=localX-tx,dz=localZ-tz;
+        if(dx*dx+dz*dz<1.35f*1.35f) return true;
+    }
+
     return false;
 }
 
