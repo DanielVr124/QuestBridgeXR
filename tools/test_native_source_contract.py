@@ -71,7 +71,7 @@ class NativeSourceContractTests(unittest.TestCase):
             "Headboard_structural_backing", "Headboard_alligator_side_band_",
             "Headboard_mirror_bevel_",
             "Headboard_recessed_LED_channel_", "Headboard_crystal_tufted_silver_insert",
-            "Headboard_crystal_tuft_button_", "Headboard_tuft_seam_",
+            "Headboard_quilt_diamond_", "Headboard_crystal_tuft_button_", "Headboard_tuft_seam_",
             "Headboard_mount_", "Sleep_pillow_piping_",
             "Sleep_pillow_corner_fold_", "Slate_accent_cushion_",
             "Slate_accent_piping_", "Lumbar_cushion_seam"
