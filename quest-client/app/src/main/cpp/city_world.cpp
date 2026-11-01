@@ -808,7 +808,7 @@ void CityWorld::render(const float* viewProjection, float cameraX, float cameraY
         const auto key=chunkKey(cx,cz);
         auto existing=chunks_.find(key);
         if(existing!=chunks_.end()) {
-            // Keep the old far LOD visible until its replacement is ready.
+            // Replace a stale LOD only when its scheduled rebuild slot arrives.
             if(existing->second.vao) glDeleteVertexArrays(1,&existing->second.vao);
             if(existing->second.vbo) glDeleteBuffers(1,&existing->second.vbo);
             chunks_.erase(existing);
