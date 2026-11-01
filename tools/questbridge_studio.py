@@ -181,6 +181,7 @@ class QuestBridgeStudio(tk.Tk):
         self.telemetry_process: subprocess.Popen | None = None
         self.adb_path: str | None = find_adb_executable(ROOT)
         self._usb_probe_running = False
+        self.usb_stream_mode = False
         self._build_ui()
         self._load_form(self.config_data)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -1274,6 +1275,7 @@ class QuestBridgeStudio(tk.Tk):
                 raise RuntimeError("The USB tunnel is ready, but QuestBridge XR did not launch: " +
                                    (launch.stderr.strip() or launch.stdout.strip()))
 
+            self.usb_stream_mode = True
             self.status_var.set(
                 f"Wired USB session armed for {serial}: ADB reverse TCP {USB_STREAM_PORT}; video and tracking use the cable."
             )
@@ -1289,6 +1291,23 @@ class QuestBridgeStudio(tk.Tk):
             if self.stream_process and self.stream_process.poll() is None:
                 self.stream_process.terminate()
                 self.stream_process = None
+            # Roll back the pushed USB mode so a failed attempt cannot strand the Quest
+            # in a USB-only configuration after the tunnel has been removed.
+            if adb and serial:
+                try:
+                    rollback_ini = save_quest_ini(self.config_data, GENERATED / "quest-client-udp-config.ini")
+                    subprocess.run(
+                        [adb, "-s", serial, "push", str(rollback_ini),
+                         "/sdcard/Android/data/com.questbridge.xr/files/config.ini"],
+                        capture_output=True, text=True, timeout=30, check=False,
+                    )
+                    subprocess.run(
+                        [adb, "-s", serial, "reverse", "--remove", f"tcp:{USB_STREAM_PORT}"],
+                        capture_output=True, text=True, timeout=15, check=False,
+                    )
+                except (OSError, subprocess.SubprocessError, ValueError):
+                    pass
+            self.usb_stream_mode = False
             messagebox.showerror("Could not start wired streaming", str(exc), parent=self)
 
     def _install_quest_ini(self) -> None:
@@ -1447,6 +1466,45 @@ class QuestBridgeStudio(tk.Tk):
                 except subprocess.TimeoutExpired:
                     process.kill()
                 stopped.append(name)
+
+        if self.usb_stream_mode:
+            adb = self._resolve_adb()
+            try:
+                if adb:
+                    result = subprocess.run(
+                        [adb, "devices", "-l"], capture_output=True, text=True, timeout=15, check=False
+                    )
+                    online = [
+                        device.serial for device in parse_adb_devices(result.stdout)
+                        if device.transport == "usb" and device.state == "device"
+                    ]
+                    if len(online) == 1:
+                        serial = online[0]
+                        rollback_ini = save_quest_ini(self.config_data, GENERATED / "quest-client-udp-config.ini")
+                        subprocess.run(
+                            [adb, "-s", serial, "push", str(rollback_ini),
+                             "/sdcard/Android/data/com.questbridge.xr/files/config.ini"],
+                            capture_output=True, text=True, timeout=30, check=False,
+                        )
+                        subprocess.run(
+                            [adb, "-s", serial, "reverse", "--remove", f"tcp:{USB_STREAM_PORT}"],
+                            capture_output=True, text=True, timeout=15, check=False,
+                        )
+                        subprocess.run(
+                            [adb, "-s", serial, "shell", "am", "force-stop", "com.questbridge.xr"],
+                            capture_output=True, text=True, timeout=15, check=False,
+                        )
+                        subprocess.run(
+                            [adb, "-s", serial, "shell", "monkey", "-p", "com.questbridge.xr", "1"],
+                            capture_output=True, text=True, timeout=20, check=False,
+                        )
+                        stopped.append("USB tunnel removed; Quest returned to UDP mode")
+                    else:
+                        stopped.append("USB tunnel cleanup skipped (Quest not uniquely connected)")
+            except (OSError, subprocess.SubprocessError, ValueError):
+                stopped.append("USB tunnel cleanup failed")
+            self.usb_stream_mode = False
+
         self.status_var.set("Stopped: " + ", ".join(stopped) if stopped else "No active child processes.")
 
     def _open_config_folder(self) -> None:
