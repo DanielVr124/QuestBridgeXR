@@ -1363,8 +1363,8 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
         ledZones_[2].primary={.04f,.30f,1.0f}; ledZones_[2].secondary={.02f,.72f,1.0f};
         ledZones_[3].primary={.48f,.08f,1.0f}; ledZones_[3].secondary={.10f,.34f,1.0f};
         ledZones_[4].primary={.02f,.72f,.82f}; ledZones_[4].secondary={.18f,.22f,1.0f};
-        ledZones_[5].primary={.04f,.34f,1.0f}; ledZones_[5].secondary={.02f,.72f,1.0f};
-        ledZones_[6].primary={.52f,.10f,1.0f}; ledZones_[6].secondary={.12f,.22f,1.0f};
+        ledZones_[5].primary={1.0f,.42f,.19f}; ledZones_[5].secondary={1.0f,.70f,.40f};
+        ledZones_[6].primary={1.0f,.45f,.20f}; ledZones_[6].secondary={1.0f,.72f,.42f};
         ledDefaultsSeeded_=true;
     }
     GLuint vs=compileShader(GL_VERTEX_SHADER,kVertexShader), fs=compileShader(GL_FRAGMENT_SHADER,kFragmentShader);
@@ -1411,7 +1411,7 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     if(vvs)glDeleteShader(vvs);if(vfs)glDeleteShader(vfs);
     createGeometry();
     if (!loadRoomFontAtlas()) LOGE("QuestBridge menu will not render text without a system font");
-    const bool bedLoaded=bedModel_.load(assets,"models/arc_upholstered_bed.glb");
+    const bool bedLoaded=bedModel_.load(assets,"models/gaming_bed.glb");
     const bool deskLoaded=deskModel_.load(assets,"models/arc_gaming_desk.glb");
     const bool monitorLoaded=monitorModel_.load(assets,"models/arc27_curved_monitor.glb");
     const bool tvLoaded=tvModel_.load(assets,"models/tv_on_2_mattress_tall_stand.glb");
@@ -2867,10 +2867,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Neutral, physically plausible finishes keep the room interior grounded;
     // selected scenes remain visible through the window and in practical accent lights.
     // Neon-noir material palette: dark charcoal and midnight-blue surfaces preserve contrast.
-    wall=rgb(.075f,.083f,.135f);
-    floor=rgb(.046f,.055f,.092f);
-    wood=rgb(.075f,.080f,.125f);
-    upholstery=rgb(.105f,.115f,.205f);
+    wall=rgb(.086f,.078f,.090f);
+    floor=rgb(.047f,.044f,.060f);
+    wood=rgb(.125f,.085f,.066f);
+    upholstery=rgb(.112f,.090f,.118f);
     glUseProgram(program_);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDisable(GL_CULL_FACE);
     glUniform1i(locTexture_,0);
     glUniform3f(locCameraPosition_,cameraX,cameraY,cameraZ);
@@ -2894,28 +2894,29 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawPanoramaSkybox(pv.data(),cameraX,cameraY,cameraZ,roomSkyboxTexture);
     }
     const float roomLightScale=roomLightsOn_?1.0f:0.0f;
-    glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?1.0f:0.075f);
+    // Warm indirect fill gives the bedroom a softer, more lived-in balance.
+    glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?0.78f:0.18f);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
-    glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
-    glUniform1f(locCeilingLightIntensity_,1.55f*roomLightScale);
+    glUniform3f(locCeilingLightColor_,1.0f,0.82f,0.70f);
+    glUniform1f(locCeilingLightIntensity_,1.02f*roomLightScale);
     glUniform3f(locPracticalLightPosition_,-halfW+0.30f,floorY+1.92f,-1.45f);
     glUniform3f(locPracticalLightColor_,ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]);
-    glUniform1f(locPracticalLightIntensity_,ledZones_[5].enabled?0.82f*roomLightScale:0.0f);
+    glUniform1f(locPracticalLightIntensity_,ledZones_[5].enabled?0.68f*roomLightScale:0.0f);
     glUniform3f(locPracticalLight2Position_,halfW-0.30f,floorY+1.92f,-1.45f);
     glUniform3f(locPracticalLight2Color_,ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]);
-    glUniform1f(locPracticalLight2Intensity_,ledZones_[6].enabled?0.82f*roomLightScale:0.0f);
+    glUniform1f(locPracticalLight2Intensity_,ledZones_[6].enabled?0.68f*roomLightScale:0.0f);
     glUniform3f(locHeadboardGlowPosition_,halfW-2.0f+.20f,floorY+1.43f,-halfD+2.10f-1.22f);
     glUniform3f(locHeadboardGlowColor_,ledHeadboard[0],ledHeadboard[1],ledHeadboard[2]);
-    glUniform1f(locHeadboardGlowIntensity_,ledZones_[0].enabled?2.60f*roomLightScale:0.0f);
+    glUniform1f(locHeadboardGlowIntensity_,ledZones_[0].enabled?1.72f*roomLightScale:0.0f);
     glUniform3f(locNeonBluePosition_,-halfW+0.20f,floorY+2.75f,-0.45f);
     glUniform3f(locNeonBlueColor_,ledLeftWall[0],ledLeftWall[1],ledLeftWall[2]);
-    glUniform1f(locNeonBlueIntensity_,ledZones_[2].enabled?2.25f*roomLightScale:0.0f);
+    glUniform1f(locNeonBlueIntensity_,ledZones_[2].enabled?1.12f*roomLightScale:0.0f);
     glUniform3f(locNeonVioletPosition_,halfW-0.20f,floorY+2.55f,0.80f);
     glUniform3f(locNeonVioletColor_,ledRightWall[0],ledRightWall[1],ledRightWall[2]);
-    glUniform1f(locNeonVioletIntensity_,ledZones_[3].enabled?2.05f*roomLightScale:0.0f);
+    glUniform1f(locNeonVioletIntensity_,ledZones_[3].enabled?1.08f*roomLightScale:0.0f);
     glUniform3f(locNeonPinkPosition_,0.0f,floorY+2.25f,backZ+0.58f);
     glUniform3f(locNeonPinkColor_,ledRear[0],ledRear[1],ledRear[2]);
-    glUniform1f(locNeonPinkIntensity_,ledZones_[4].enabled?1.55f*roomLightScale:0.0f);
+    glUniform1f(locNeonPinkIntensity_,ledZones_[4].enabled?0.82f*roomLightScale:0.0f);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
     // The right wall is split around the single window aperture. No other wall surface
     // is transparent, and the existing room bounds and wall material are preserved.
@@ -3098,7 +3099,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float bedPlacement[16] = {
         1,0,0,0, 0,1,0,0, 0,0,1,0, bedRenderX,floorY,bedZ,1
     };
-    const std::array<float,4> bedExposure{{.64f,.66f,.76f,1.0f}};
+    const std::array<float,4> bedExposure{{.68f,.64f,.59f,1.0f}};
     bedModel_.draw(pv.data(),bedPlacement,locMvp_,locModel_,locColor_,locTextured_,
                    locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&bedExposure);
     // The recessed headboard emitter is masked from a reclined view by the
