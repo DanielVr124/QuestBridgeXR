@@ -77,6 +77,8 @@ def finish_mesh(obj, mat, bevel=0.0, smooth=True):
         for face in obj.data.polygons:
             face.use_smooth = True
     if bevel > 0.0:
+        if hasattr(obj.data, "use_auto_smooth"):
+            obj.data.use_auto_smooth = True
         mod = obj.modifiers.new("Soft manufactured radii", "BEVEL")
         mod.width = bevel
         mod.segments = 4
@@ -303,8 +305,9 @@ scene.render.image_settings.color_mode = "RGBA"
 scene.render.film_transparent = False
 try:
     scene.view_settings.view_transform = "AgX"
-except TypeError:
-    scene.view_settings.view_transform = "Filmic"
+except (TypeError, ValueError):
+    # Debian/Ubuntu Blender 3.0 builds may expose only Standard.
+    scene.view_settings.view_transform = "Standard"
 if scene.world is None:
     scene.world = bpy.data.worlds.new("TouchPlus Studio World")
 scene.world.color = (0.018, 0.022, 0.030)
