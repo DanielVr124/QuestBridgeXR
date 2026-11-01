@@ -97,8 +97,10 @@ emulator-5554 device product:sdk_gphone64_x86_64 transport_id:9
         self.assertTrue(report["ok"])
         self.assertTrue(report["app_installed"])
         self.assertTrue(report["app_running"])
+        self.assertTrue(report["host_handshake_seen"])
+        self.assertTrue(report["video_config_seen"])
         self.assertIn("Quest 3", report["summary"])
-        self.assertEqual(run.call_count, 5)
+        self.assertEqual(run.call_count, 6)
 
 
 if __name__ == "__main__":
