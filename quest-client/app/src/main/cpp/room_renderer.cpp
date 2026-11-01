@@ -303,6 +303,13 @@ int environmentIndex(const std::string& name) {
     }
     return 0;
 }
+
+// Only completed environments are exposed in the current library page.
+// The full catalog above remains intact for the upcoming environments page.
+constexpr std::array<const char*, 2> kDropdownEnvironmentNames = {
+    "skyline_penthouse",
+    "explorable_city"
+};
 const char* kVertexShader = R"GLSL(#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
@@ -873,7 +880,7 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
     case 27: skyTop={8,35,60}; skyHorizon={139,188,207}; ground={103,130,150}; break;                    // polar station
     default: break;
     }
-    if (sceneIndex >= 28 && sceneIndex < static_cast<int>(kEnvironmentNames.size())) {
+    if (sceneIndex >= 28 && sceneIndex < static_cast<int>(kDropdownEnvironmentNames.size())) {
         const auto palette = extraEnvironmentPalette(sceneIndex - 28);
         skyTop = palette.skyTop;
         skyHorizon = palette.skyHorizon;
@@ -1817,7 +1824,7 @@ void RoomRenderer::cycleScreenDestination() {
 }
 void RoomRenderer::cycleEnvironment() {
     if (!settings_.roomControlsEnabled) return;
-    const int nextIndex = (activeEnvironmentIndex_ + 1) % static_cast<int>(kEnvironmentNames.size());
+    const int nextIndex = (activeEnvironmentIndex_ + 1) % static_cast<int>(kDropdownEnvironmentNames.size());
     applyEnvironment(kEnvironmentNames[nextIndex]);
     LOGI("Room scenery changed to %s", settings_.environment.c_str());
 }
@@ -1885,8 +1892,8 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
     } else if(navigatingVertical&&!previousMenuNavigation_) {
         if(environmentDropdownOpen_) {
             environmentDropdownIndex_=(environmentDropdownIndex_+
-                (vertical>0.0f?static_cast<int>(kEnvironmentNames.size())-1:1))%
-                static_cast<int>(kEnvironmentNames.size());
+                (vertical>0.0f?static_cast<int>(kDropdownEnvironmentNames.size())-1:1))%
+                static_cast<int>(kDropdownEnvironmentNames.size());
         } else {
             const int rowCounts[5]={1,6,3,6,4};
             const int count=rowCounts[menuPage_];
@@ -1898,9 +1905,9 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
         if(menuPage_==1) {
             if(menuSelection_==0) {
                 environmentDropdownIndex_=(environmentDropdownIndex_+
-                    (direction>0?1:static_cast<int>(kEnvironmentNames.size())-1))%
-                    static_cast<int>(kEnvironmentNames.size());
-                applyEnvironment(kEnvironmentNames[environmentDropdownIndex_]);
+                    (direction>0?1:static_cast<int>(kDropdownEnvironmentNames.size())-1))%
+                    static_cast<int>(kDropdownEnvironmentNames.size());
+                applyEnvironment(kDropdownEnvironmentNames[environmentDropdownIndex_]);
             } else if(menuSelection_==1) {
                 const char* sizes[]={"small","medium","large"};
                 const int index=settings_.roomSize=="small"?0:(settings_.roomSize=="large"?2:1);
@@ -1940,8 +1947,8 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
     if(adjusting&&!previousMenuAdjust_) {
         if(environmentDropdownOpen_) {
             environmentDropdownIndex_=(environmentDropdownIndex_+
-                (adjust>0.0f?1:static_cast<int>(kEnvironmentNames.size())-1))%
-                static_cast<int>(kEnvironmentNames.size());
+                (adjust>0.0f?1:static_cast<int>(kDropdownEnvironmentNames.size())-1))%
+                static_cast<int>(kDropdownEnvironmentNames.size());
         } else {
             adjustSelected(adjust>0.0f?1:-1);
         }
@@ -1949,7 +1956,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
 
     if(selectPressed) {
         if(environmentDropdownOpen_) {
-            applyEnvironment(kEnvironmentNames[environmentDropdownIndex_]);
+            applyEnvironment(kDropdownEnvironmentNames[environmentDropdownIndex_]);
             environmentDropdownOpen_=false;
         } else if(menuPage_==0) {
             reconnectRequested_=true;
@@ -1957,7 +1964,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
             switch(menuSelection_) {
             case 0:
                 environmentDropdownOpen_=true;
-                environmentDropdownIndex_=activeEnvironmentIndex_;
+                environmentDropdownIndex_=settings_.environment=="explorable_city"?1:0;
                 break;
             case 1: adjustSelected(1); break;
             case 2: settings_.roomMovementEnabled=!settings_.roomMovementEnabled; break;
@@ -2565,7 +2572,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
                                 const float rowY=menuY-.012f-item*.031f;
                                 if(std::fabs(hitY-rowY)<.017f) {
                                     environmentDropdownIndex_=(environmentDropdownIndex_+item)%
-                                        static_cast<int>(kEnvironmentNames.size());
+                                        static_cast<int>(kDropdownEnvironmentNames.size());
                                     handleMenuInput(0.0f,0.0f,0.0f,true);
                                     break;
                                 }
@@ -3430,6 +3437,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             drawText(pv.data(),value,x,y,menuZ+.0015f,size,tint,monitorX,uiWidth,uiCurve,menuY);
         };
         auto prettyName=[](const std::string& value) {
+            if(value=="skyline_penthouse") return std::string("GAMING ROOM");
+            if(value=="explorable_city") return std::string("EXPLORABLE CITY");
             std::string out=value;
             std::replace(out.begin(),out.end(),'_',' ');
             std::transform(out.begin(),out.end(),out.begin(),
@@ -3500,7 +3509,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 label("CHOOSE ENVIRONMENT",bodyX-.080f,menuY+.020f,.00148f,cyan);
                 for(int item=0;item<4;++item) {
                     const int index=(environmentDropdownIndex_+item)%
-                        static_cast<int>(kEnvironmentNames.size());
+                        static_cast<int>(kDropdownEnvironmentNames.size());
                     const float yy=menuY-.012f-item*.031f;
                     panel(bodyX+.050f,yy,.282f,.027f,item==0?selected:card);
                     const std::string display=prettyName(kEnvironmentNames[index]);
@@ -3508,6 +3517,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 }
                 label("A  APPLY",bodyX+.100f,menuY-.143f,.00125f,blue);
             }
+            label("MORE ENVIRONMENTS",bodyX-.184f,menuY-.158f,.00115f,muted);
+            label("COMING SOON",bodyX+.095f,menuY-.158f,.00115f,cyan);
         } else if(menuPage_==2) {
             label("DISPLAY",bodyX-.184f,contentTop,.00205f,white);
             label("Choose where your PC screen appears",bodyX-.184f,
