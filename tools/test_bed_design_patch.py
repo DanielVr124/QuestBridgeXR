@@ -63,6 +63,26 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertIn("recessed perimeter RGB backlight", self.patched)
         self.assertEqual(self.patched.count("Headboard_crystal_tufted_silver_insert"), 1)
 
+
+    def test_sleep_pillows_are_soft_box_gusset_meshes_not_primitive_ellipsoids(self):
+        for token in (
+            "Sleep_pillow_top_",
+            "Sleep_pillow_box_gusset_",
+            "Sleep_pillow_underside_",
+            "Sleep_pillow_top_welt_",
+            "Sleep_pillow_lower_gusset_seam_",
+            "Sleep_pillow_corner_fold_",
+            "PILLOW_CROWN_HEIGHT = .145",
+            "PILLOW_CORNER_EXPONENT = 3.5",
+            "def pillow_crown_height",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, self.patched)
+        self.assertNotIn("superellipsoid(f'Sleep_pillow_", self.patched)
+        self.assertIn("np.array([side*.49, 1.095, -1.115]", self.patched)
+        self.assertIn("f'Slate_accent_cushion_{side}'", self.patched)
+        self.assertIn("'Lumbar_cushion'", self.patched)
+
     def test_headboard_is_not_the_failed_plain_slab_or_vertical_ribs(self):
         for obsolete in (
             "Headboard_single_soft_panel",

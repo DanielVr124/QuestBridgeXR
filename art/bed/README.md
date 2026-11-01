@@ -11,9 +11,13 @@ The headboard is rebuilt around the visual structure of the Brambley Bed w/ LED 
 - All five Blender review angles render with the blue-violet LED illuminated. This is a preview-only lighting override; the headset keeps its existing LED-zone toggle and straight-on visibility gate.
 - The insert is one connected cushioned surface, not a row of vertical ribs or the previous undersized plain slab.
 
+## Pillow refinement
+
+The two main sleep pillows are built as editable named mesh parts rather than primitive ellipsoids. Their softly squared rounded-rectangle footprint keeps a clear pillow silhouette, while a restrained domed crown, continuous side gusset and closed underside give them real filling depth. A narrow welt and low-amplitude corner creases add fabric detail without excessive quilting or balloon-like puffiness. Their original centres, dimensions, propped angle and layering are preserved.
+
 ## What stays unchanged
 - Original bed platform, rails, legs, foot end, mattress, fitted sheet, duvet and throw.
-- Existing refreshed pillow models and their placement.
+- Existing pillow centres and overall layout; the two main sleep pillows use separate softly crowned top shells, full-depth box gussets, undersides, narrow welt seams and restrained corner creases. The smaller accent and lumbar cushions retain their positions and receive gently eased profiles.
 - Bed position, scale, renderer anchor and collision footprint.
 - Bedside cabinets, lights, TV, desk, monitor, windows and all other room geometry.
 - Camera transforms, head tracking, turning, locomotion, controller bindings and room menus.
