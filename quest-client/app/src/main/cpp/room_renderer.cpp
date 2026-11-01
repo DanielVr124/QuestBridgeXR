@@ -29,7 +29,7 @@ constexpr int kFontCharacterCount = 96;
 GLuint gFontAtlasTexture = 0;
 std::array<stbtt_bakedchar, kFontCharacterCount> gFontCharacters{};
 bool gFontAtlasReady = false;
-constexpr std::array<const char*, 208> kEnvironmentNames = {
+constexpr std::array<const char*, 209> kEnvironmentNames = {
 
 
     "blossom",
@@ -240,6 +240,7 @@ constexpr std::array<const char*, 208> kEnvironmentNames = {
     "ancient_sky_ruins",
     "midnight_blossom_grove",
     "aurora_lagoon",
+    "explorable_city",
 };
 
 
@@ -595,6 +596,16 @@ Mat4 makeProjection(const XrFovf& fov) {
     const float l=std::tan(fov.angleLeft), r=std::tan(fov.angleRight);
     const float d=std::tan(fov.angleDown), u=std::tan(fov.angleUp);
     constexpr float n=0.05f, f=100.0f;
+    Mat4 p{};
+    p[0]=2.0f/(r-l); p[5]=2.0f/(u-d);
+    p[8]=(r+l)/(r-l); p[9]=(u+d)/(u-d);
+    p[10]=-(f+n)/(f-n); p[11]=-1.0f; p[14]=-(2.0f*f*n)/(f-n);
+    return p;
+}
+Mat4 makeCityProjection(const XrFovf& fov) {
+    const float l=std::tan(fov.angleLeft), r=std::tan(fov.angleRight);
+    const float d=std::tan(fov.angleDown), u=std::tan(fov.angleUp);
+    constexpr float n=0.05f, f=330.0f;
     Mat4 p{};
     p[0]=2.0f/(r-l); p[5]=2.0f/(u-d);
     p[8]=(r+l)/(r-l); p[9]=(u+d)/(u-d);
@@ -1378,7 +1389,8 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,shadowSize,shadowSize,0,GL_RGBA,GL_UNSIGNED_BYTE,shadowPixels.data());
     glBindTexture(GL_TEXTURE_2D,0);
-    initialized_=true; chooseEnvironment(); LOGI("cozy room renderer initialized"); return true;
+    if(!cityWorld_.initialize()) LOGE("explorable city renderer failed to initialize");
+    initialized_=true; chooseEnvironment(); LOGI("cozy room / city renderer initialized"); return true;
 }
 
 void RoomRenderer::createGeometry() {
@@ -1624,7 +1636,12 @@ void RoomRenderer::createGeometry() {
     glBindVertexArray(0);
 }
 
-void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; chooseEnvironment(); }
+void RoomRenderer::setSettings(const RoomSettings& settings) {
+    const bool enteringCity = settings.environment=="explorable_city" && settings_.environment!="explorable_city";
+    settings_=settings;
+    if(enteringCity) citySpawnPending_=true;
+    chooseEnvironment();
+}
 
 std::array<float,3> RoomRenderer::ledZoneColor(int zone,float position) const {
     if(zone<0||zone>=static_cast<int>(ledZones_.size())) return {0.0f,0.0f,0.0f};
@@ -1651,7 +1668,8 @@ void RoomRenderer::chooseEnvironment() {
         environmentTextures_[previousIndex] = 0;
     }
     activeEnvironmentIndex_ = selectedIndex;
-    if (activeEnvironmentIndex_ >= 3 && initialized_ && !environmentTextures_[activeEnvironmentIndex_]) {
+    if (activeEnvironmentIndex_ >= 3 && activeEnvironmentIndex_ < static_cast<int>(environmentTextures_.size()) &&
+        initialized_ && !environmentTextures_[activeEnvironmentIndex_]) {
         environmentTextures_[activeEnvironmentIndex_] = createProceduralEnvironment(activeEnvironmentIndex_);
         if (!environmentTextures_[activeEnvironmentIndex_]) {
             LOGW("Could not generate scenery %s; the room window will use its fallback.", settings_.environment.c_str());
@@ -2402,6 +2420,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float cameraX=-(camera[0]*camera[12]+camera[1]*camera[13]+camera[2]*camera[14]);
     const float cameraY=-(camera[4]*camera[12]+camera[5]*camera[13]+camera[6]*camera[14]);
     const float cameraZ=-(camera[8]*camera[12]+camera[9]*camera[13]+camera[10]*camera[14]);
+    if(settings_.environment=="explorable_city") {
+        Mat4 cityProjection=makeCityProjection(view.fov);
+        Mat4 cityPv=mul(cityProjection,camera);
+        cityWorld_.render(cityPv.data(),cameraX,cameraY,cameraZ);
+        return;
+    }
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     const auto ledHeadboard=ledZoneAverageColor(0);
     const auto ledCeiling=ledZoneAverageColor(1);
@@ -3141,6 +3165,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 }
 
 void RoomRenderer::release() {
+    cityWorld_.release();
     bedModel_.release(); deskModel_.release(); monitorModel_.release();
     tvModel_.release(); chairModel_.release(); mouseModel_.release();
     if(gFontAtlasTexture){glDeleteTextures(1,&gFontAtlasTexture);gFontAtlasTexture=0;gFontAtlasReady=false;}
