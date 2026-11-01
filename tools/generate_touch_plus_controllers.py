@@ -13,6 +13,12 @@ from pathlib import Path
 import bpy
 from mathutils import Vector
 
+# Enable Blender's bundled glTF exporter in headless CI when it is not enabled by default.
+try:
+    bpy.ops.preferences.addon_enable(module="io_scene_gltf2")
+except Exception:
+    pass
+
 ROOT = Path(__file__).resolve().parents[1]
 ASSET_DIR = ROOT / "quest-client/app/src/main/assets/models"
 ART_DIR = ROOT / "art/controllers"
@@ -299,6 +305,8 @@ try:
     scene.view_settings.view_transform = "AgX"
 except TypeError:
     scene.view_settings.view_transform = "Filmic"
+if scene.world is None:
+    scene.world = bpy.data.worlds.new("TouchPlus Studio World")
 scene.world.color = (0.018, 0.022, 0.030)
 
 def add_area(name, location, power, color, size):
