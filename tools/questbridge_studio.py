@@ -5,7 +5,7 @@ from __future__ import annotations
 from qbx_paths import project_root
 from openxr_runtime import discover_runtimes, launch_with_runtime, resolve_runtime_manifest
 from network_setup import discover_pc_ipv4, discover_quest_ipv4
-from usb_connection import find_adb_executable, probe_usb_connection
+from usb_connection import find_adb_executable, parse_adb_devices, probe_usb_connection
 
 import copy
 import threading
@@ -868,11 +868,15 @@ class QuestBridgeStudio(tk.Tk):
             )
             return
         try:
-            result = subprocess.run([adb, "devices"], capture_output=True, text=True, timeout=15, check=True)
-            online = [line.split()[0] for line in result.stdout.splitlines()[1:]
-                      if len(line.split()) >= 2 and line.split()[1] == "device"]
+            result = subprocess.run([adb, "devices", "-l"], capture_output=True, text=True, timeout=15, check=True)
+            online = [device.serial for device in parse_adb_devices(result.stdout)
+                      if device.transport == "usb" and device.state == "device"]
             if len(online) != 1:
-                raise RuntimeError(f"Expected exactly one authorized Android/Quest device, found {len(online)}.\n{result.stdout}")
+                raise RuntimeError(
+                    f"Expected exactly one authorized Quest over USB, found {len(online)}. "
+                    "Disconnect other USB Android devices and approve the debugging prompt.\n"
+                    + result.stdout
+                )
             install = subprocess.run([adb, "-s", online[0], "install", "-r", str(apk)],
                                      capture_output=True, text=True, timeout=120)
             if install.returncode != 0:
@@ -1158,10 +1162,17 @@ class QuestBridgeStudio(tk.Tk):
             )
             return
         try:
-            devices = subprocess.run([adb, "devices"], capture_output=True, text=True, timeout=10, check=True).stdout.splitlines()
-            online = [line.split()[0] for line in devices[1:] if line.strip() and len(line.split()) >= 2 and line.split()[1] == "device"]
+            devices_output = subprocess.run(
+                [adb, "devices", "-l"], capture_output=True, text=True, timeout=10, check=True
+            ).stdout
+            online = [device.serial for device in parse_adb_devices(devices_output)
+                      if device.transport == "usb" and device.state == "device"]
             if len(online) != 1:
-                raise RuntimeError(f"Expected exactly one online ADB device; found {len(online)}. Output:\n" + "\n".join(devices))
+                raise RuntimeError(
+                    f"Expected exactly one authorized Quest over USB; found {len(online)}. "
+                    "Disconnect other USB Android devices and approve the debugging prompt.\n"
+                    + devices_output
+                )
             target_dir = "/sdcard/Android/data/com.questbridge.xr/files"
             subprocess.run([adb, "-s", online[0], "shell", "mkdir", "-p", target_dir], capture_output=True, text=True, timeout=10, check=True)
             result = subprocess.run([adb, "-s", online[0], "push", str(local_ini), target_dir + "/config.ini"], capture_output=True, text=True, timeout=30)
