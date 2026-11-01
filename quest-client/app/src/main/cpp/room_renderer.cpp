@@ -2810,6 +2810,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
     (void)eyeIndex; (void)width; (void)height;
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
+    const std::array<float,4> deskExposure{{.78f,.77f,.75f,1.0f}};
+    const std::array<float,4> monitorExposure{{.76f,.77f,.82f,1.0f}};
+    const std::array<float,4> chairExposure{{.75f,.76f,.80f,1.0f}};
+    const std::array<float,4> mouseExposure{{.72f,.74f,.78f,1.0f}};
+    const std::array<float,4> tvExposure{{.72f,.73f,.78f,1.0f}};
+    const std::array<float,4> controllerExposure{{.76f,.77f,.80f,1.0f}};
     Mat4 projection=makeProjection(view.fov);
 
     // Keep the eye camera on its real OpenXR pose. Virtual turning and room
@@ -3162,7 +3168,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float bedPlacement[16] = {
         bedScale,0,0,0, 0,bedScale,0,0, 0,0,bedScale,0, bedRenderX,floorY,bedZ,1
     };
-    const std::array<float,4> bedExposure{{.68f,.64f,.59f,1.0f}};
+    const std::array<float,4> bedExposure{{.60f,.58f,.55f,1.0f}};
     bedModel_.draw(pv.data(),bedPlacement,locMvp_,locModel_,locColor_,locTextured_,
                    locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&bedExposure);
     // The recessed headboard emitter is masked from a reclined view by the
@@ -3310,7 +3316,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         1,0,0,0, 0,1,0,0, 0,0,1,0, deskX,floorY,deskZ,1
     };
     deskModel_.draw(pv.data(),deskPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                    locTexture_,locMaterial_,locRounded_,locUvScale_);
+                    locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&deskExposure);
 
     // Place up to three identical 27-inch screens across the supplied corner desk.
     // The central display remains the primary menu surface when a three-screen row is used.
@@ -3322,7 +3328,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             1,0,0,0, 0,1,0,0, 0,0,1,0, screenX,deskSurface,monitorZ,1
         };
         monitorModel_.draw(pv.data(),monitorPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                           locTexture_,locMaterial_,locRounded_,locUvScale_);
+                           locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&monitorExposure);
         if(streamOn) {
             drawCurvedPanel(pv.data(),screenX,deskSurface+.280f,monitorZ+.001f,
                             .584f,.328f,.029f,
@@ -3332,7 +3338,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
     // User-supplied chair faces the desk; yaw 180 degrees puts the tall
     // upholstered backrest on the room-facing side.
-    const float chairX=deskX, chairZ=deskZ+1.12f;
+    const float chairX=deskX+chairOffsetX_, chairZ=deskZ+1.12f+chairOffsetZ_;
     if(settings_.showChair) {
         drawGroundShadow(pv.data(),chairX,floorY+.006f,chairZ,1.02f,1.18f,.40f);
         if(settings_.showChair&&chairModel_.loaded()) {
@@ -3386,7 +3392,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             1,0,0,0, 0,1,0,0, 0,0,1,0, mouseX,deskSurface+.003f,mouseZ,1
         };
         mouseModel_.draw(pv.data(),mousePlacement,locMvp_,locModel_,locColor_,locTextured_,
-                         locTexture_,locMaterial_,locRounded_,locUvScale_);
+                         locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&mouseExposure);
     }
 
     // User-supplied tall-stand TV replaces the former procedural screen and console.
@@ -3407,7 +3413,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 tvRenderX,floorY,tvZ,1
             };
             tvModel_.draw(pv.data(),tvPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                          locTexture_,locMaterial_,locRounded_,locUvScale_);
+                          locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&tvExposure);
             drawPlane(pv.data(),tvX+.20f,tvScreenCenterY,tvZ-.002f,
                       tvScreenWidth,tvScreenHeight,tvTex,rgb(1,1,1),kPi);
         } else {
@@ -3430,6 +3436,23 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                            .12f*tvModelScale,.49f*tvModelScale,.13f*tvModelScale,stand,0.0f,4);
             drawRoundedBox(pv.data(),tvRenderX,floorY+.075f*tvModelScale,tvZ+.16f,
                            .78f*tvModelScale,.07f*tvModelScale,.35f*tvModelScale,stand,0.0f,4);
+        }
+    }
+
+    // Show ring-free Touch Plus controller models at their tracked grip poses.
+    for(int hand=0;hand<2;++hand) {
+        if(!controllerPoseValid_[hand]) continue;
+        const XrPosef virtualController=mapTrackedPoseToRoom(
+            controllerPoses_[hand],headCenterPose,moveX_,moveZ_,effectiveWorldYaw,.42f*seatedBlend_);
+        const Mat4 controllerTransform=mul(
+            translation(virtualController.position.x,virtualController.position.y,
+                        virtualController.position.z),
+            quatMatrix(virtualController.orientation));
+        const GlbModel& controllerModel=hand==0?leftControllerModel_:rightControllerModel_;
+        if(controllerModel.loaded()) {
+            controllerModel.draw(pv.data(),controllerTransform.data(),locMvp_,locModel_,locColor_,
+                                 locTextured_,locTexture_,locMaterial_,locRounded_,locUvScale_,
+                                 nullptr,nullptr,&controllerExposure);
         }
     }
 
