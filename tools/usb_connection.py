@@ -116,7 +116,7 @@ def probe_usb_connection(
     if not executable or not pathlib.Path(executable).is_file():
         report["adb_path"] = None
         checks.append(_check("FAIL", "ADB tools", "adb.exe was not found. Install Android Platform-Tools or use Locate ADB in Studio."))
-        report["summary"] = "ADB is missing — USB detection cannot start."
+        report["summary"] = "ADB is missing — install Android Platform-Tools or locate adb.exe."
         return report
 
     checks.append(_check("PASS", "ADB tools", f"Using {executable}"))
