@@ -26,6 +26,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("applyEnvironment(\"skyline_penthouse\")", renderer)
         self.assertIn("cityWorld_.collides(targetX,playerZ)", renderer)
         self.assertIn("std::abs(dx)>2 || std::abs(dz)>2", city_source)
+        self.assertIn("buildCount=std::min<size_t>(2u,pendingChunks.size())", city_source)
         self.assertIn("glDrawArrays(GL_TRIANGLES,0,chunk.vertexCount)", city_source)
         self.assertIn("addBuilding(vertices", city_source)
         self.assertIn('key == "environment" && !value.empty()', main_source)
