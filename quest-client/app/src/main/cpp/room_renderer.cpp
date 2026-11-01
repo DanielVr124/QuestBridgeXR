@@ -2043,6 +2043,8 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
             } else if(menuSelection_==5) {
                 sittingActive_=false;
                 sitAnchorPending_=false;
+                virtualYaw_+=chairYaw_;
+                chairYaw_=0.0f;
                 chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f;
             } else {
                 adjustSelected(1);
@@ -3348,6 +3350,17 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             chairModel_.draw(pv.data(),chairPlacementMatrix.data(),locMvp_,locModel_,locColor_,locTextured_,
                              locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,
                              &chairExposure);
+            // Separate small caster overlays spin as the chair rolls, while the
+            // imported upholstered shell remains a single high-quality GLB.
+            for(int wheel=0;wheel<5;++wheel) {
+                const float angle=chairYaw_+2.0f*kPi*static_cast<float>(wheel)/5.0f;
+                const float wx=chairX+std::cos(angle)*.37f;
+                const float wz=chairZ+std::sin(angle)*.37f;
+                drawRoundedBox(pv.data(),wx,floorY+.105f,wz,.105f,.072f,.052f,
+                               rgb(.075f,.083f,.098f),angle+chairWheelRoll_,5);
+                drawSphere(pv.data(),wx,floorY+.105f,wz,.020f,.020f,.020f,
+                           rgb(.28f,.31f,.35f),4);
+            }
         } else {
             // Deliberately complete fallback: a white high-back gaming chair with
             // padded seat/back, arm rests, gas lift and a five-spoke wheel base.
