@@ -155,9 +155,9 @@ for row in range(3):
             if abs(x-nx) <= .206:
                 curve_tube(
                     f'Headboard_tuft_seam_{row}_{col}_{next_col}',
-                    [(x,tuft_y[row],-1.292),
-                     ((x+nx)*.5,(tuft_y[row]+tuft_y[row+1])*.5,-1.302),
-                     (nx,tuft_y[row+1],-1.292)],
+                    [(x,tuft_y[row],-1.270),
+                     ((x+nx)*.5,(tuft_y[row]+tuft_y[row+1])*.5,-1.278),
+                     (nx,tuft_y[row+1],-1.270)],
                     .0034,'charcoal2',sides=8
                 )
 
