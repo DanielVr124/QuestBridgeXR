@@ -104,7 +104,7 @@ def patch_blender_review_cameras(source: str) -> str:
 
     # Brighten the headboard LED only in this offline Blender preview scene.
     # The runtime GLB keeps its low-level diffuser material and native angle gate.
-    import_marker = "bpy.ops.import_scene.gltf(filepath=str(args.source))\\n"
+    import_marker = "bpy.ops.import_scene.gltf(filepath=str(args.source))\n"
     import_count = patched.count(import_marker)
     if import_count > 1:
         raise RuntimeError("Blender preview LED patch found multiple glTF import points.")

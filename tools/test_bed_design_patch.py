@@ -58,7 +58,7 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertIn("Headboard_crystal_tuft_button_", self.patched)
         self.assertIn("headboard_led_diffuser", self.patched)
         self.assertIn("perimeter_points.append(perimeter_points[0])", self.patched)
-        self.assertIn("curve_tube(\\n    'Headboard_connected_outer_LED_strip'", self.patched)
+        self.assertIn("curve_tube(\n    'Headboard_connected_outer_LED_strip'", self.patched)
         self.assertIn("led_corner_radius = .070", self.patched)
         self.assertIn("recessed perimeter RGB backlight", self.patched)
         self.assertEqual(self.patched.count("Headboard_crystal_tufted_silver_insert"), 1)
