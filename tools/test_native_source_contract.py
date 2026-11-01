@@ -338,6 +338,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn('chairYaw_+=chairAngularVelocity_*dt', renderer)
         self.assertIn('chairWheelRoll_+=speedNow*dt/.055f', renderer)
         self.assertIn('scene.render.resolution_x = 1400', generator)
+        self.assertIn('scene.view_settings.view_transform = "Standard"', generator)
+        self.assertIn('obj.data.use_auto_smooth = True', generator)
         self.assertIn("not Meta's proprietary FBX source mesh", generator)
         self.assertIn("sudo apt-get install --yes blender python3-numpy", workflow)
         self.assertIn("PYTHONPATH=/usr/lib/python3/dist-packages blender --background", workflow)
