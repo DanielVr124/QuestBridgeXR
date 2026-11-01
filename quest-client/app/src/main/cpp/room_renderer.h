@@ -213,6 +213,10 @@ private:
     bool previousMenuNavigation_ = false;
     bool previousMenuHorizontal_ = false;
     bool previousMenuAdjust_ = false;
+    bool previousMenuPointerTrigger_ = false;
+    bool menuPointerValid_ = false;
+    std::array<float,3> menuPointerOrigin_{{0.0f,0.0f,0.0f}};
+    std::array<float,3> menuPointerHit_{{0.0f,0.0f,0.0f}};
     bool reconnectRequested_ = false;
     bool roomLightsOn_ = true;
     bool previousRoomTrigger_ = false;
