@@ -44,6 +44,36 @@ foreach ($item in $include) {
         Copy-Item $source -Destination $stage -Recurse -Force
     }
 }
+
+# Include the small ADB runtime files when Android Platform-Tools are installed
+# on the build machine. Studio also supports locating adb.exe manually.
+$adbCandidates = @()
+foreach ($sdkVariable in @('ANDROID_SDK_ROOT', 'ANDROID_HOME')) {
+    $sdkRoot = [Environment]::GetEnvironmentVariable($sdkVariable)
+    if ($sdkRoot) {
+        $adbCandidates += Join-Path $sdkRoot 'platform-tools\adb.exe'
+    }
+}
+if ($env:LOCALAPPDATA) {
+    $adbCandidates += Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
+}
+$adbCommand = Get-Command 'adb.exe' -ErrorAction SilentlyContinue
+if ($adbCommand) { $adbCandidates += $adbCommand.Source }
+$adbSource = $adbCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if ($adbSource) {
+    $platformToolsStage = Join-Path $stage 'platform-tools'
+    New-Item -ItemType Directory -Path $platformToolsStage -Force | Out-Null
+    $adbSourceDir = Split-Path -Parent $adbSource
+    foreach ($file in @('adb.exe', 'AdbWinApi.dll', 'AdbWinUsbApi.dll')) {
+        $sourceFile = Join-Path $adbSourceDir $file
+        if (Test-Path $sourceFile) {
+            Copy-Item $sourceFile (Join-Path $platformToolsStage $file) -Force
+        }
+    }
+    Write-Host "Bundled Android Debug Bridge from $adbSourceDir" -ForegroundColor Green
+} else {
+    Write-Warning 'Android Platform-Tools were not found on this build machine. Studio will offer Locate adb.exe on the Connect tab.'
+}
 New-Item -ItemType Directory -Path (Join-Path $stage 'host') -Force | Out-Null
 Copy-Item $hostExe (Join-Path $stage 'host\QuestBridgeHost.exe') -Force
 $stageRuntime = Join-Path $stage 'runtime'
