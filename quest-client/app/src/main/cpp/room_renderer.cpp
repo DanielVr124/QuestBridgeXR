@@ -880,7 +880,7 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
     case 27: skyTop={8,35,60}; skyHorizon={139,188,207}; ground={103,130,150}; break;                    // polar station
     default: break;
     }
-    if (sceneIndex >= 28 && sceneIndex < static_cast<int>(kDropdownEnvironmentNames.size())) {
+    if (sceneIndex >= 28 && sceneIndex < static_cast<int>(kEnvironmentNames.size())) {
         const auto palette = extraEnvironmentPalette(sceneIndex - 28);
         skyTop = palette.skyTop;
         skyHorizon = palette.skyHorizon;
@@ -1824,7 +1824,7 @@ void RoomRenderer::cycleScreenDestination() {
 }
 void RoomRenderer::cycleEnvironment() {
     if (!settings_.roomControlsEnabled) return;
-    const int nextIndex = (activeEnvironmentIndex_ + 1) % static_cast<int>(kDropdownEnvironmentNames.size());
+    const int nextIndex = (activeEnvironmentIndex_ + 1) % static_cast<int>(kEnvironmentNames.size());
     applyEnvironment(kEnvironmentNames[nextIndex]);
     LOGI("Room scenery changed to %s", settings_.environment.c_str());
 }
@@ -3512,7 +3512,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                         static_cast<int>(kDropdownEnvironmentNames.size());
                     const float yy=menuY-.012f-item*.031f;
                     panel(bodyX+.050f,yy,.282f,.027f,item==0?selected:card);
-                    const std::string display=prettyName(kEnvironmentNames[index]);
+                    const std::string display=prettyName(kDropdownEnvironmentNames[index]);
                     label(display.c_str(),bodyX-.080f,yy-.004f,.00130f,item==0?white:muted);
                 }
                 label("A  APPLY",bodyX+.100f,menuY-.143f,.00125f,blue);
