@@ -286,7 +286,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("rightZ=-std::sin(yaw)", renderer)
         self.assertIn("virtualYaw_-=std::clamp(rightStickX", renderer)
         self.assertIn("headPose.position.x+moveX_", renderer)
-        self.assertIn("const float bedX=halfW-2.0f", renderer)
+        self.assertIn("const float bedX=halfW-bedWidth*.5f", renderer)
         self.assertIn("screenX,deskSurface,monitorZ", renderer)
         self.assertIn(".584f,.328f,.029f", renderer)
         self.assertNotIn("Retain procedural furniture as a fallback", renderer)
