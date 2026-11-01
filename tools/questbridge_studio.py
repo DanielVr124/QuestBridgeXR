@@ -352,13 +352,14 @@ class QuestBridgeStudio(tk.Tk):
         ttk.Button(usb_actions, text="Send Settings to Quest",
                    command=self._install_quest_ini).grid(row=0, column=3, padx=(7, 0))
 
-        ttk.Label(
+        self.usb_transport_note = ttk.Label(
             f,
             text=("Important: this is a real USB/ADB setup test, not a wired video-stream test. "
                   "QuestBridge currently sends video and tracking over UDP on your local Wi-Fi/LAN. "
                   "USB is used here for device detection, installation, diagnostics, and settings transfer."),
             wraplength=840, justify="left",
-        ).grid(row=3, column=0, sticky="w", pady=(0, 16))
+        )
+        self.usb_transport_note.grid(row=3, column=0, sticky="w", pady=(0, 16))
 
         network = ttk.Frame(f, padding=18, style="Card.TFrame")
         network.grid(row=4, column=0, sticky="ew", pady=(0, 14))
