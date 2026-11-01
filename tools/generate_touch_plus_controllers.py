@@ -192,8 +192,8 @@ def build_controller(side):
     def box(name, loc, dims, mat, bevel=0.003, rot=None):
         return register(rounded_box(name, loc, dims, mat, bevel, rot))
 
-    def sph(name, loc, dims, mat):
-        return register(sphere(name, loc, dims, mat))
+    def sph(name, loc, dims, mat, segments=24, rings=16):
+        return register(sphere(name, loc, dims, mat, segments, rings))
 
     def cyl(name, loc, radius, depth, mat, vertices=32, rot=None):
         return register(cylinder(name, loc, radius, depth, mat, vertices, rot))
