@@ -4,7 +4,7 @@ The headboard is rebuilt around the visual structure of the Brambley Bed w/ LED 
 
 ## Headboard design
 - Full-width silver-grey faux-leather upholstered insert with a softly crowned, furniture-like profile.
-- Four rows of clear polished crystal-style tuft buttons set into bright metal mounts, with diagonal seams forming the diamond-tufted pattern.
+- Four staggered rows of clear polished crystal-style tuft buttons set into bright metal mounts, with diagonal seams forming a continuous diamond-tufted pattern.
 - Polished mirror-chrome bevel rails and a fine dark reveal around the upholstery.
 - Direction-mapped alligator embossing on the silver outer bands, applied as continuous material texture rather than protruding tiles.
 - LED channel recessed behind the frame and aligned to the existing headboard light perimeter; the compositor's existing reclined-view visibility behavior is preserved.
