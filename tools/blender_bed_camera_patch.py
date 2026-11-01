@@ -88,7 +88,7 @@ def patch_blender_review_cameras(source: str) -> str:
         raise RuntimeError("Blender camera patch expected at most one Cycles sample setting.")
     if sample_matches:
         sample = sample_matches[0]
-        replacement = "scene.cycles.samples=24\nscene.cycles.use_denoising=True"
+        replacement = "scene.cycles.samples=16\nscene.cycles.use_denoising=True"
         patched = patched[:sample.start()] + replacement + patched[sample.end():]
 
     resolution_matches = list(_RENDER_RESOLUTION.finditer(patched))
@@ -97,7 +97,7 @@ def patch_blender_review_cameras(source: str) -> str:
     if resolution_matches:
         resolution = resolution_matches[0]
         replacement = (
-            "scene.render.resolution_x=1440; scene.render.resolution_y=1080; "
+            "scene.render.resolution_x=1200; scene.render.resolution_y=900; "
             "scene.render.resolution_percentage=100"
         )
         patched = patched[:resolution.start()] + replacement + patched[resolution.end():]
