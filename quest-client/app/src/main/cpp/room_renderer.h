@@ -7,6 +7,7 @@
 #include <android/asset_manager.h>
 #include <openxr/openxr.h>
 #include "glb_model.h"
+#include "qbx/protocol.hpp"
 
 struct RoomSettings {
     std::string environment = "skyline_penthouse";       // 208 scenes; see Studio Virtual Room settings
@@ -15,7 +16,7 @@ struct RoomSettings {
     int monitorCount = 1;                       // 1..3, replicated stream
     bool showTv = true;
     bool showCouch = false; // Legacy config field; the bedroom renderer no longer draws a couch.
-    bool showChair = false; // Legacy config setting; no chair is rendered or collided with.
+    bool showChair = true; // User-supplied white gaming chair beside the desk.
     bool roomControlsEnabled = true;
     bool roomMovementEnabled = true;
     bool sittingToggleEnabled = false; // Legacy setting retained for config compatibility.
@@ -36,6 +37,7 @@ public:
     void updateLocomotion(float leftX, float leftY, float rightX, float dt,
                           const XrPosef& headPose);
     void handleRoomInteraction(const XrPosef& controllerPose, bool triggerPressed);
+    bool consumeMousePayload(qbx::MousePayload& payload);
     void cycleScreenDestination();
     void cycleEnvironment();
     void toggleMenu();
@@ -104,6 +106,9 @@ private:
     GlbModel bedModel_;
     GlbModel deskModel_;
     GlbModel monitorModel_;
+    GlbModel tvModel_;
+    GlbModel chairModel_;
+    GlbModel mouseModel_;
     GLuint program_ = 0;
     GLuint vignetteProgram_ = 0;
     GLuint vao_ = 0;
@@ -198,6 +203,20 @@ private:
     bool reconnectRequested_ = false;
     bool roomLightsOn_ = true;
     bool previousRoomTrigger_ = false;
+    bool mouseDragging_ = false;
+    bool mousePayloadPending_ = false;
+    bool sittingActive_ = false;
+    bool sitAnchorPending_ = false;
+    float seatedBlend_ = 0.0f;
+    float mouseOffsetX_ = 0.39f;
+    float mouseOffsetZ_ = 0.28f;
+    float mouseGrabOffsetX_ = 0.0f;
+    float mouseGrabOffsetZ_ = 0.0f;
+    std::uint16_t mousePointerX_ = 32768;
+    std::uint16_t mousePointerY_ = 32768;
+    std::uint16_t mousePointerButtons_ = 0;
+    std::uint16_t lastQueuedMouseX_ = 0;
+    std::uint16_t lastQueuedMouseY_ = 0;
     bool pcConnected_ = false;
     bool pcStreaming_ = false;
     std::string pcHostIp_ = "Not configured";
