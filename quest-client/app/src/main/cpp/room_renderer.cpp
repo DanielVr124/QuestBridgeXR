@@ -1308,8 +1308,12 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     const bool bedLoaded=bedModel_.load(assets,"models/arc_upholstered_bed.glb");
     const bool deskLoaded=deskModel_.load(assets,"models/arc_gaming_desk.glb");
     const bool monitorLoaded=monitorModel_.load(assets,"models/arc27_curved_monitor.glb");
-    LOGI("custom furniture GLB status: bed=%d desk=%d monitor=%d",
-         bedLoaded?1:0,deskLoaded?1:0,monitorLoaded?1:0);
+    const bool tvLoaded=tvModel_.load(assets,"models/user_tv.glb.gz");
+    const bool chairLoaded=chairModel_.load(assets,"models/user_gaming_chair.glb.gz");
+    const bool mouseLoaded=mouseModel_.load(assets,"models/user_mouse.glb.gz");
+    LOGI("custom furniture GLB status: bed=%d desk=%d monitor=%d tv=%d chair=%d mouse=%d",
+         bedLoaded?1:0,deskLoaded?1:0,monitorLoaded?1:0,
+         tvLoaded?1:0,chairLoaded?1:0,mouseLoaded?1:0);
     environmentTextures_[0]=loadRgbAsset(assets,"environments/blossom.rgb");
     environmentTextures_[1]=loadRgbAsset(assets,"environments/night_city.rgb");
     environmentTextures_[2]=loadRgbAsset(assets,"environments/golden_city.rgb");
@@ -2146,15 +2150,29 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     const float yaw=headYaw(headPose)+virtualYaw_;
     const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
 
-    // Match makeView(): OpenXR local forward (-Z) rotates toward -X for +yaw.
-    const float forwardX=-std::sin(yaw), forwardZ=-std::cos(yaw);
-    const float rightX=std::cos(yaw), rightZ=-std::sin(yaw);
-    const float stepX=settings_.roomMovementEnabled?(rightX*leftX+forwardX*leftY)*speed*dt:0.0f;
-    const float stepZ=settings_.roomMovementEnabled?(rightZ*leftX+forwardZ*leftY)*speed*dt:0.0f;
-
     float halfW=3.0f,halfD=3.8f;
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}
     else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
+
+    const float deskX=-halfW+1.32f, deskZ=-halfD+.43f;
+    const float chairX=deskX, chairZ=deskZ+1.12f;
+    if(sitAnchorPending_) {
+        moveX_=chairX-headPose.position.x;
+        moveZ_=(chairZ+.18f)-headPose.position.z;
+        sitAnchorPending_=false;
+    }
+    const float seatedTarget=sittingActive_?1.0f:0.0f;
+    const float seatBlendStep=std::clamp(dt*3.8f,0.0f,1.0f);
+    seatedBlend_+=(seatedTarget-seatedBlend_)*seatBlendStep;
+    if(std::fabs(seatedTarget-seatedBlend_)<.001f)seatedBlend_=seatedTarget;
+
+    // Match makeView(): OpenXR local forward (-Z) rotates toward -X for +yaw.
+    const float forwardX=-std::sin(yaw), forwardZ=-std::cos(yaw);
+    const float rightX=std::cos(yaw), rightZ=-std::sin(yaw);
+    const float stepX=settings_.roomMovementEnabled&&!sittingActive_?
+        (rightX*leftX+forwardX*leftY)*speed*dt:0.0f;
+    const float stepZ=settings_.roomMovementEnabled&&!sittingActive_?
+        (rightZ*leftX+forwardZ*leftY)*speed*dt:0.0f;
 
     // Collision checks run in room coordinates, not locomotion-offset-only coordinates.
     const float playerX=headPose.position.x+moveX_;
@@ -2162,13 +2180,13 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     float targetX=std::clamp(playerX+stepX,-halfW+0.34f,halfW-0.34f);
     float targetZ=std::clamp(playerZ+stepZ,-halfD+0.34f,halfD-0.34f);
 
-    const float deskX=-halfW+1.32f, deskZ=-halfD+0.43f;
     const float bedX=halfW-2.0f, bedZ=-halfD+2.10f;
     auto overlaps=[](float x,float z,float cx,float cz,float rx,float rz) {
         return std::fabs(x-cx)<rx && std::fabs(z-cz)<rz;
     };
     auto collides=[&](float x,float z) {
         return overlaps(x,z,deskX,deskZ,1.36f,.52f) ||
+               (!sittingActive_&&settings_.showChair&&overlaps(x,z,chairX,chairZ,.43f,.60f)) ||
                overlaps(x,z,bedX,bedZ,1.30f,1.72f) ||
                overlaps(x,z,bedX-1.53f,bedZ-.94f,.52f,.54f) ||
                overlaps(x,z,bedX+1.53f,bedZ-.94f,.52f,.54f);
@@ -2198,20 +2216,58 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     }
 }
 
+void RoomRenderer::updateMousePayload(std::uint16_t buttons) {
+    const float normalizedX=std::clamp((mouseOffsetX_+1.20f)/2.40f,0.0f,1.0f);
+    const float normalizedY=std::clamp((mouseOffsetZ_+.43f)/.86f,0.0f,1.0f);
+    const std::uint16_t nextX=static_cast<std::uint16_t>(std::lround(normalizedX*65535.0f));
+    const std::uint16_t nextY=static_cast<std::uint16_t>(std::lround(normalizedY*65535.0f));
+    const bool changed=nextX!=lastQueuedMouseX_||nextY!=lastQueuedMouseY_||
+                       buttons!=mousePointerButtons_;
+    mousePointerX_=nextX;
+    mousePointerY_=nextY;
+    mousePointerButtons_=buttons;
+    if(changed||(buttons&1u)!=0u) {
+        lastQueuedMouseX_=nextX;
+        lastQueuedMouseY_=nextY;
+        mousePayloadPending_=true;
+    }
+}
+
+bool RoomRenderer::consumeMousePayload(qbx::MousePayload& payload) {
+    if(!mousePayloadPending_) return false;
+    payload={};
+    payload.x=mousePointerX_;
+    payload.y=mousePointerY_;
+    payload.buttons=mousePointerButtons_;
+    mousePayloadPending_=false;
+    return true;
+}
+
 void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool triggerPressed) {
-    const bool triggerEdge = triggerPressed && !previousRoomTrigger_;
-    previousRoomTrigger_ = triggerPressed;
-    if (!triggerEdge || menuVisible_ || !settings_.roomControlsEnabled) return;
+    const bool triggerEdge=triggerPressed&&!previousRoomTrigger_;
+    previousRoomTrigger_=triggerPressed;
 
     float halfW=3.0f,halfD=3.8f;
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}
     else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
-    (void)halfW;
 
     const float floorY=settings_.floorOffsetY;
     const float frontZ=halfD;
-    const float bedX=halfW-2.0f;
-    const float bedZ=-halfD+2.10f;
+    const float deskX=-halfW+1.32f;
+    const float deskZ=-halfD+.43f;
+    const float deskSurface=floorY+.75f;
+    const float chairX=deskX;
+    const float chairZ=deskZ+1.12f;
+
+    // Never leave a host-side mouse button held when a menu or settings change
+    // interrupts a drag operation.
+    if(menuVisible_||!settings_.roomControlsEnabled) {
+        if(mouseDragging_) {
+            mouseDragging_=false;
+            updateMousePayload(0);
+        }
+        return;
+    }
 
     const XrQuaternionf roomYaw{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
     const XrQuaternionf roomOrientation=quatMul(roomYaw,controllerPose.orientation);
@@ -2230,33 +2286,93 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
                                              controllerPose.position.z+moveZ_});
     auto direction=rotateVector(roomOrientation,{0.0f,0.0f,-1.0f});
     const float directionLength=std::sqrt(direction[0]*direction[0]+direction[1]*direction[1]+direction[2]*direction[2]);
-    if(directionLength<0.0001f)return;
+    if(directionLength<0.0001f) {
+        if(mouseDragging_&&!triggerPressed) {
+            mouseDragging_=false;
+            updateMousePayload(0);
+        }
+        return;
+    }
     for(float& component:direction)component/=directionLength;
 
-    enum class Target { None, LightSwitch };
-    Target target=Target::None;
-    float nearest=4.5f;
+    // Desk-top ray intersection. The draggable footprint is clamped to the
+    // tabletop so neither the model nor the remote pointer can slide off it.
+    auto deskIntersection=[&](float& hitX,float& hitZ) {
+        if(direction[1]>=-.10f)return false;
+        const float t=(deskSurface-origin[1])/direction[1];
+        if(t<=0.0f||t>4.5f)return false;
+        hitX=origin[0]+direction[0]*t;
+        hitZ=origin[2]+direction[2]*t;
+        return hitX>=deskX-1.20f&&hitX<=deskX+1.20f&&
+               hitZ>=deskZ-.41f&&hitZ<=deskZ+.41f;
+    };
 
-    // Wall switch: a forward-facing hit on the rocker beside the entry opening.
-    constexpr float lightSwitchX=1.12f;
-    const float lightSwitchY=floorY+1.42f;
-    const float lightSwitchFaceZ=frontZ-.132f;
-    if(direction[2]>0.10f) {
-        const float t=(lightSwitchFaceZ-origin[2])/direction[2];
-        if(t>0.0f&&t<nearest) {
+    float hitDeskX=0.0f,hitDeskZ=0.0f;
+    const bool overDesk=deskIntersection(hitDeskX,hitDeskZ);
+    if(mouseDragging_) {
+        if(!triggerPressed) {
+            mouseDragging_=false;
+            updateMousePayload(0);
+        } else {
+            if(overDesk) {
+                mouseOffsetX_=std::clamp(hitDeskX-deskX-mouseGrabOffsetX_,-1.20f,1.20f);
+                mouseOffsetZ_=std::clamp(hitDeskZ-deskZ-mouseGrabOffsetZ_,-.41f,.41f);
+            }
+            updateMousePayload(1);
+        }
+        return;
+    }
+    if(!triggerEdge)return;
+
+    // Trigger-down on the mouse grabs it. Continue holding to drag; trigger-up
+    // releases the physical left mouse button on Windows.
+    if(overDesk && std::fabs((hitDeskX-deskX)-mouseOffsetX_)<=.065f &&
+       std::fabs((hitDeskZ-deskZ)-mouseOffsetZ_)<=.090f) {
+        mouseGrabOffsetX_=(hitDeskX-deskX)-mouseOffsetX_;
+        mouseGrabOffsetZ_=(hitDeskZ-deskZ)-mouseOffsetZ_;
+        mouseDragging_=true;
+        updateMousePayload(1);
+        return;
+    }
+
+    // A click while seated stands the user up. The virtual eye-height offset
+    // eases out over time; raw OpenXR head tracking itself remains unchanged.
+    if(sittingActive_) {
+        sittingActive_=false;
+        sitAnchorPending_=false;
+        return;
+    }
+
+    // A trigger tap on the rear upholstered backrest enters seated mode.
+    if(settings_.showChair && direction[2]<-.10f) {
+        const float chairBackZ=chairZ+.455f;
+        const float t=(chairBackZ-origin[2])/direction[2];
+        if(t>0.0f&&t<2.8f) {
             const float hitX=origin[0]+direction[0]*t;
             const float hitY=origin[1]+direction[1]*t;
-            if(std::fabs(hitX-lightSwitchX)<=.145f&&std::fabs(hitY-lightSwitchY)<=.17f) {
-                nearest=t;
-                target=Target::LightSwitch;
+            if(std::fabs(hitX-chairX)<=.265f&&
+               hitY>=floorY+.60f&&hitY<=floorY+1.34f) {
+                sittingActive_=true;
+                sitAnchorPending_=true;
+                return;
             }
         }
     }
 
-
-    if(target==Target::LightSwitch) {
-        roomLightsOn_=!roomLightsOn_;
-        LOGI("Room lighting %s",roomLightsOn_?"on":"off");
+    // Existing wall switch interaction remains available.
+    constexpr float lightSwitchX=1.12f;
+    const float lightSwitchY=floorY+1.42f;
+    const float lightSwitchFaceZ=frontZ-.132f;
+    if(direction[2]>.10f) {
+        const float t=(lightSwitchFaceZ-origin[2])/direction[2];
+        if(t>0.0f&&t<4.5f) {
+            const float hitX=origin[0]+direction[0]*t;
+            const float hitY=origin[1]+direction[1]*t;
+            if(std::fabs(hitX-lightSwitchX)<=.145f&&std::fabs(hitY-lightSwitchY)<=.17f) {
+                roomLightsOn_=!roomLightsOn_;
+                LOGI("Room lighting %s",roomLightsOn_?"on":"off");
+            }
+        }
     }
 }
 
@@ -2265,6 +2381,7 @@ XrPosef RoomRenderer::projectionPose(const XrPosef& viewPose) const {
     const XrQuaternionf virtualTurn{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
     adjusted.orientation=quatMul(virtualTurn,viewPose.orientation);
     adjusted.position.x+=moveX_;
+    adjusted.position.y-=.42f*seatedBlend_;
     adjusted.position.z+=moveZ_;
     return adjusted;
 }
@@ -2276,7 +2393,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     (void)eyeIndex; (void)width; (void)height;
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
     Mat4 projection=makeProjection(view.fov);
-    Mat4 camera=makeView(view.pose,moveX_,moveZ_,virtualYaw_);
+    XrPosef renderedPose=view.pose;
+    renderedPose.position.y-=.42f*seatedBlend_;
+    Mat4 camera=makeView(renderedPose,moveX_,moveZ_,virtualYaw_);
     Mat4 pv=mul(projection,camera);
     // Recover the camera position from the exact view matrix already used for this eye.
     // This only feeds material view-dependent highlights; it does not alter the view transform.
@@ -2757,35 +2876,41 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         }
     }
 
-    // Bedroom TV centered beyond the foot of the bed and facing back toward it.
-    // A compact floor-standing media console replaces the old living-area furniture.
-    if(settings_.showTv) {
+    // User-supplied chair faces the desk; yaw 180 degrees puts the tall
+    // upholstered backrest on the room-facing side.
+    const float chairX=deskX, chairZ=deskZ+1.12f;
+    if(settings_.showChair&&chairModel_.loaded()) {
+        drawGroundShadow(pv.data(),chairX,floorY+.006f,chairZ,.92f,1.12f,.36f);
+        const float chairPlacement[16]={
+            -1,0,0,0, 0,1,0,0, 0,0,-1,0, chairX,floorY,chairZ,1
+        };
+        chairModel_.draw(pv.data(),chairPlacement,locMvp_,locModel_,locColor_,locTextured_,
+                         locTexture_,locMaterial_,locRounded_,locUvScale_);
+    }
+
+    // White wireless mouse rests on the desk and moves only over the tabletop.
+    const float mouseX=deskX+mouseOffsetX_,mouseZ=deskZ+mouseOffsetZ_;
+    if(mouseModel_.loaded()) {
+        const float mousePlacement[16]={
+            1,0,0,0, 0,1,0,0, 0,0,1,0, mouseX,deskSurface+.003f,mouseZ,1
+        };
+        mouseModel_.draw(pv.data(),mousePlacement,locMvp_,locModel_,locColor_,locTextured_,
+                         locTexture_,locMaterial_,locRounded_,locUvScale_);
+    }
+
+    // User-supplied tall-stand TV replaces the former procedural screen and console.
+    // The imported display faces back toward the bed and retains PC stream routing.
+    if(settings_.showTv&&tvModel_.loaded()) {
         const float tvX=bedX, tvZ=bedZ+3.18f;
-        const float tvY=floorY+1.95f, tvW=std::min(2.35f,halfW*.82f), tvH=tvW*9.0f/16.0f;
+        const float tvPlacement[16]={
+            -1,0,0,0, 0,1,0,0, 0,0,-1,0, tvX,floorY,tvZ,1
+        };
+        tvModel_.draw(pv.data(),tvPlacement,locMvp_,locModel_,locColor_,locTextured_,
+                      locTexture_,locMaterial_,locRounded_,locUvScale_);
         const bool tvStream=settings_.screenDestination=="tv"||settings_.screenDestination=="both";
         const GLuint tvTex=(tvStream&&hasVideo)?videoTexture:env;
-        drawRoundedBox(pv.data(),tvX,tvY,tvZ,tvW+.14f,tvH+.14f,.085f,trimDark,0.0f,5);
-        drawPlane(pv.data(),tvX,tvY,tvZ-.046f,tvW,tvH,tvTex,rgb(1,1,1),kPi);
-        drawBox(pv.data(),tvX,tvY-tvH*.5f-.055f,tvZ-.047f,tvW*.54f,.010f,.006f,accentBlue,0.0f,7);
-        const float cabinetY=floorY+.30f, cabinetZ=tvZ+.27f, cabinetW=tvW*.88f;
-        drawGroundShadow(pv.data(),tvX,floorY+.004f,cabinetZ,.78f,2.15f,.28f);
-        drawRoundedBox(pv.data(),tvX,cabinetY,cabinetZ,cabinetW,.50f,.50f,trimDark,0.0f,5);
-        drawRoundedBox(pv.data(),tvX,cabinetY+.045f,cabinetZ-.238f,cabinetW-.08f,.39f,.018f,
-                       rgb(.045f,.060f,.095f),0.0f,5);
-        for(int bay=0;bay<3;++bay) {
-            const float panelX=tvX+(bay-1)*cabinetW*.29f;
-            drawRoundedBox(pv.data(),panelX,cabinetY+.045f,cabinetZ-.250f,
-                           cabinetW*.255f,.35f,.008f,rgb(.055f,.070f,.115f),0.0f,5);
-            drawBox(pv.data(),panelX,cabinetY+.045f,cabinetZ-.256f,
-                    .12f,.006f,.004f,bay==1?accentViolet:accentBlue,0.0f,7);
-        }
-        drawRoundedBox(pv.data(),tvX,cabinetY-.265f,cabinetZ,.10f,.035f,.40f,silver,0.0f,4);
-        for(int side : {-1,1}) {
-            const float supportX=tvX+side*tvW*.22f;
-            drawBox(pv.data(),supportX,floorY+.91f,tvZ+.085f,.035f,.78f,.045f,silver);
-            drawBox(pv.data(),supportX,floorY+.55f,tvZ+.085f,.14f,.035f,.34f,trimDark);
-        }
-        drawBox(pv.data(),tvX,cabinetY+.262f,cabinetZ,.72f,.012f,.38f,accentBlue,0.0f,7);
+        drawPlane(pv.data(),tvX,floorY+.984f,tvZ-.002f,1.218f,.685f,tvTex,rgb(1,1,1),kPi);
+        drawGroundShadow(pv.data(),tvX,floorY+.004f,tvZ+.02f,1.58f,.75f,.30f);
     }
 
     const float lampX=-halfW+.30f,lampZ=-1.45f;
@@ -3017,6 +3142,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
 void RoomRenderer::release() {
     bedModel_.release(); deskModel_.release(); monitorModel_.release();
+    tvModel_.release(); chairModel_.release(); mouseModel_.release();
     if(gFontAtlasTexture){glDeleteTextures(1,&gFontAtlasTexture);gFontAtlasTexture=0;gFontAtlasReady=false;}
     if(!initialized_&&!program_&&!vao_)return;
     if(program_)glDeleteProgram(program_);if(vignetteProgram_)glDeleteProgram(vignetteProgram_);if(vao_)glDeleteVertexArrays(1,&vao_);if(vbo_)glDeleteBuffers(1,&vbo_);
