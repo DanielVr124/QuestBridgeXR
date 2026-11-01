@@ -1389,8 +1389,10 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,shadowSize,shadowSize,0,GL_RGBA,GL_UNSIGNED_BYTE,shadowPixels.data());
     glBindTexture(GL_TEXTURE_2D,0);
-    if(!cityWorld_.initialize()) LOGE("explorable city renderer failed to initialize");
-    if(!cityWorld_.initialize()) LOGE("explorable city renderer failed to initialize");
+    if(!cityWorld_.initialize()) {
+        LOGE("explorable city renderer failed to initialize");
+        if(settings_.environment=="explorable_city") settings_.environment="skyline_penthouse";
+    }
     initialized_=true; chooseEnvironment(); LOGI("cozy room / city renderer initialized"); return true;
 }
 
