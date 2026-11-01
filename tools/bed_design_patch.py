@@ -472,12 +472,35 @@ materials['headboard_crystal']=PBRMaterial(
     emissiveFactor=[.035,.045,.065],doubleSided=True
 )
 
-# Warm ivory cotton pillow casing and matching side panels. The gusset is
-# slightly shaded so its thickness reads from side angles without turning blue.
+# A restrained tangent-space weave gives the cotton casing a real textile
+# response to grazing light. The amplitude is intentionally low so it reads
+# as percale rather than corduroy or a visible procedural pattern.
+def _make_pillow_cotton_normal_map(size=512):
+    y, x = np.mgrid[0:size, 0:size].astype(np.float32)
+    warp = np.sin(2.0 * math.pi * x / 18.0)
+    weft = np.sin(2.0 * math.pi * y / 18.0)
+    cross = .20 * np.sin(2.0 * math.pi * (x + y) / 9.0)
+    height = .010 * (warp + weft) + .002 * cross
+    grad_x = np.gradient(height, axis=1) * 22.0
+    grad_y = np.gradient(height, axis=0) * 22.0
+    nx = -grad_x
+    ny = -grad_y
+    nz = np.ones_like(height)
+    length = np.sqrt(nx * nx + ny * ny + nz * nz)
+    normal = np.stack((nx / length, ny / length, nz / length), axis=-1)
+    pixels = np.clip((normal * .5 + .5) * 255.0, 0, 255).astype(np.uint8)
+    return Image.fromarray(pixels, mode='RGB')
+
+_pillow_cotton_normal = _make_pillow_cotton_normal_map()
+
+# Warm ivory cotton pillow casing. Top, gusset and underside share this one
+# material so the pillow pair stays inside the runtime draw-call budget.
 materials['pillow_cotton']=PBRMaterial(
-    name='Warm ivory cotton pillow casing',
-    baseColorFactor=[244,241,234,255],metallicFactor=0.0,roughnessFactor=.96,
-    baseColorTexture=textures['sheet'],doubleSided=True
+    name='Warm ivory woven cotton pillow casing',
+    baseColorFactor=[244,241,234,255],metallicFactor=0.0,roughnessFactor=.97,
+    baseColorTexture=textures['sheet'],
+    normalTexture=_pillow_cotton_normal,
+    doubleSided=True
 )
 """
 
