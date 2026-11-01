@@ -107,6 +107,12 @@ void main() {
         albedo *= 0.88 + surfaceNoise * 0.08;
         metallic = 0.28;
         roughness = 0.24;
+    } else if (vMaterial == 9) {          // fibrous tree bark
+        albedo *= 0.58 + noise2(vWorld.xy * vec2(3.0,11.0)) * 0.52;
+        roughness = 0.97;
+    } else if (vMaterial == 10) {         // tire rubber
+        albedo *= 0.84 + noise2(vWorld.xy * 18.0) * 0.12;
+        roughness = 0.99;
     }
 
     float ndl = max(dot(n, sunDir), 0.0);
@@ -356,12 +362,36 @@ void CityWorld::addOctahedron(std::vector<Vertex>& out, float x, float y, float 
     triangle(bottom,west,south); triangle(bottom,south,east);
 }
 
+void CityWorld::addCylinderZ(std::vector<Vertex>& out, float x, float y, float z,
+                             float radius, float depth, const float* color, float material, int sides) {
+    sides=std::clamp(sides,6,16);
+    const float z0=z-depth*.5f, z1=z+depth*.5f;
+    const float centerFront[3]={x,y,z1};
+    const float centerBack[3]={x,y,z0};
+    for(int side=0;side<sides;++side) {
+        const float a0=(static_cast<float>(side)/sides)*2.0f*kPi;
+        const float a1=(static_cast<float>(side+1)/sides)*2.0f*kPi;
+        const float p0[3]={x+std::cos(a0)*radius,y+std::sin(a0)*radius,z0};
+        const float p1[3]={x+std::cos(a1)*radius,y+std::sin(a1)*radius,z0};
+        const float p2[3]={x+std::cos(a1)*radius,y+std::sin(a1)*radius,z1};
+        const float p3[3]={x+std::cos(a0)*radius,y+std::sin(a0)*radius,z1};
+        addQuad(out,p0,p1,p2,p3,color,material);
+        const float frontA[3]={x+std::cos(a0)*radius,y+std::sin(a0)*radius,z1};
+        const float frontB[3]={x+std::cos(a1)*radius,y+std::sin(a1)*radius,z1};
+        const float backA[3]={x+std::cos(a0)*radius,y+std::sin(a0)*radius,z0};
+        const float backB[3]={x+std::cos(a1)*radius,y+std::sin(a1)*radius,z0};
+        addQuad(out,centerFront,frontB,frontA,frontA,color,material);
+        addQuad(out,centerBack,backA,backB,backB,color,material);
+        (void)centerFront; (void)centerBack;
+    }
+}
+
 void CityWorld::addTree(std::vector<Vertex>& out, float x, float z, float scale, std::uint32_t seed) {
     const float trunk[3]={0.28f,0.20f,0.13f};
     const float leafA[3]={0.16f,0.29f,0.19f};
     const float leafB[3]={0.21f,0.34f,0.22f};
     const float leafC[3]={0.28f,0.38f,0.25f};
-    addBox(out,x,1.02f*scale,z,.25f*scale,2.04f*scale,.25f*scale,trunk,3);
+    addBox(out,x,1.02f*scale,z,.25f*scale,2.04f*scale,.25f*scale,trunk,9);
     const float jitterX=(random01(seed+1u)-0.5f)*.18f*scale;
     const float jitterZ=(random01(seed+2u)-0.5f)*.18f*scale;
     addOctahedron(out,x+jitterX,2.30f*scale,z+jitterZ,.70f*scale,.87f*scale,.66f*scale,leafA);
@@ -566,6 +596,7 @@ void CityWorld::buildChunk(int chunkX, int chunkZ, int lod) {
     const bool greenBlock=!plaza && (hash(seed+0xB71u)%11u==0u);
     if (greenBlock) {
         // Occasional small park blocks give long walks a visual pause without breaking the street grid.
+        ground(14.0f,14.0f,70.0f,70.0f,grass,5,.008f);
         for (int i=0;i<9;++i) {
             const float x=ox+18.0f+random01(seed+i*13u)*48.0f;
             const float z=oz+18.0f+random01(seed+i*37u)*48.0f;
