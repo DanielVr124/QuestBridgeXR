@@ -129,7 +129,7 @@ jobs:
           ):
               path = Path(asset)
               assert path.is_file() and path.stat().st_size > 20_000, f"Missing or empty controller asset: {asset}"
-          assert "not Meta's proprietary source FBX" in manifest["provenance"]
+          assert "not Meta's proprietary FBX source mesh" in manifest["provenance"]
           assert len(manifest["renders"]) >= 3
           print("Touch Plus reference replicas generated and verified.")
           PY
