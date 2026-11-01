@@ -10,6 +10,24 @@ sys.path.insert(0, str(ROOT / "tools"))
 from qbx_config import ROOM_ENVIRONMENTS
 
 class NativeSourceContractTests(unittest.TestCase):
+    def test_explorable_city_is_a_separate_streamed_native_world(self):
+        renderer = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
+        header = (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8")
+        city_header = (ROOT / "quest-client/app/src/main/cpp/city_world.h").read_text(encoding="utf-8")
+        city_source = (ROOT / "quest-client/app/src/main/cpp/city_world.cpp").read_text(encoding="utf-8")
+        cmake = (ROOT / "quest-client/app/src/main/cpp/CMakeLists.txt").read_text(encoding="utf-8")
+        main_source = (ROOT / "quest-client/app/src/main/cpp/main.cpp").read_text(encoding="utf-8")
+        self.assertIn('"explorable_city"', renderer)
+        self.assertIn("CityWorld cityWorld_", header)
+        self.assertIn("city_world.cpp", cmake)
+        self.assertIn("cityWorld_.render(cityPv.data()", renderer)
+        self.assertIn("cityWorld_.collides(targetX,playerZ)", renderer)
+        self.assertIn("std::abs(dx)>2 || std::abs(dz)>2", city_source)
+        self.assertIn("glDrawArrays(GL_TRIANGLES,0,chunk.vertexCount)", city_source)
+        self.assertIn("addBuilding(vertices", city_source)
+        self.assertIn('value == "explorable_city"', main_source)
+        self.assertIn('"explorable_city"', city_header)
+
     def test_room_renderer_contains_requested_environment_and_seating_paths(self):
         header = (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8")
         source = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
@@ -21,7 +39,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("aurora", source)
         self.assertIn("cyberpunk", source)
         self.assertIn("createProceduralEnvironment(activeEnvironmentIndex_)", source)
-        self.assertIn("std::array<const char*, 208> kEnvironmentNames", source)
+        self.assertIn("std::array<const char*, 209> kEnvironmentNames", source)
         self.assertIn("environmentTextures_[activeEnvironmentIndex_]", source)
         catalog_start = source.index("kEnvironmentNames")
         catalog_end = source.index("};", catalog_start)
