@@ -25,7 +25,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("std::abs(dx)>2 || std::abs(dz)>2", city_source)
         self.assertIn("glDrawArrays(GL_TRIANGLES,0,chunk.vertexCount)", city_source)
         self.assertIn("addBuilding(vertices", city_source)
-        self.assertIn('value == "explorable_city"', main_source)
+        self.assertIn('key == "environment" && !value.empty()', main_source)
         self.assertIn("class CityWorld", city_header)
 
     def test_room_renderer_contains_requested_environment_and_seating_paths(self):
@@ -60,7 +60,7 @@ class NativeSourceContractTests(unittest.TestCase):
         main_source = (ROOT / "quest-client/app/src/main/cpp/main.cpp").read_text(encoding="utf-8")
         self.assertIn('environment = "skyline_penthouse"', header)
         self.assertIn('environment=skyline_penthouse', main_source)
-        self.assertIn('value == "skyline_penthouse"', main_source)
+        self.assertIn('key == "environment" && !value.empty()', main_source)
         self.assertIn("if (sceneIndex == 29)", source)
         self.assertIn("city lights into softened, vertically stretched reflections", source)
         self.assertIn("const float bedX=halfW-2.0f, bedZ=-halfD+2.10f", source)
