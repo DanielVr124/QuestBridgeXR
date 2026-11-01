@@ -79,7 +79,7 @@ class BedDesignPatchTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
         self.assertNotIn("superellipsoid(f'Sleep_pillow_", self.patched)
-        self.assertIn("np.array([side*.50, 1.105, -.86]", self.patched)
+        self.assertIn("np.array([side*.50, 1.105, -1.35]", self.patched)
         self.assertEqual(self.patched.count("f'Sleep_pillow_top_{side}'"), 1)
         self.assertNotIn("Slate_accent", self.patched)
         self.assertNotIn("Lumbar_cushion", self.patched)
@@ -87,7 +87,7 @@ class BedDesignPatchTests(unittest.TestCase):
     def test_exactly_two_sleep_pillows_are_propped_against_the_headboard(self):
         self.assertIn("PILLOW_HALF_WIDTH = .475", self.patched)
         self.assertIn("PILLOW_HALF_DEPTH = .33", self.patched)
-        self.assertIn("PILLOW_REAR_TILT = math.radians(12.0)", self.patched)
+        self.assertIn("PILLOW_REAR_TILT = math.radians(50.0)", self.patched)
         self.assertIn("PILLOW_REST_PIVOT", self.patched)
         self.assertIn("pillow_rotation[:3, :3] @ (local - PILLOW_REST_PIVOT)", self.patched)
         self.assertIn("for side in (-1, 1):", self.patched)
