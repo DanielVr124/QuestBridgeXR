@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <vector>
+#include <zlib.h>
 
 #define GLB_LOG(...) __android_log_print(ANDROID_LOG_INFO,"QuestBridgeGLB",__VA_ARGS__)
 
@@ -51,6 +52,40 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
     std::vector<uint8_t> bytes(static_cast<size_t>(length));
     const int read=AAsset_read(asset,bytes.data(),bytes.size()); AAsset_close(asset);
     if(read!=length) { GLB_LOG("short read for %s",assetPath); return false; }
+
+    // User-supplied furniture is stored gzip-compressed in the APK to reduce
+    // install size. Existing uncompressed GLBs continue through unchanged.
+    if(bytes.size()>=2 && bytes[0]==0x1f && bytes[1]==0x8b) {
+        z_stream stream{};
+        stream.next_in=bytes.data();
+        stream.avail_in=static_cast<uInt>(bytes.size());
+        if(inflateInit2(&stream,MAX_WBITS+16)!=Z_OK) {
+            GLB_LOG("gzip init failed for %s",assetPath);
+            return false;
+        }
+        std::vector<uint8_t> decoded;
+        std::array<uint8_t,65536> chunk{};
+        int inflateResult=Z_OK;
+        while(inflateResult==Z_OK) {
+            stream.next_out=chunk.data();
+            stream.avail_out=static_cast<uInt>(chunk.size());
+            inflateResult=inflate(&stream,Z_NO_FLUSH);
+            const size_t produced=chunk.size()-stream.avail_out;
+            decoded.insert(decoded.end(),chunk.begin(),chunk.begin()+produced);
+            if(decoded.size()>32u*1024u*1024u) {
+                inflateEnd(&stream);
+                GLB_LOG("gzip model exceeds 32 MiB limit: %s",assetPath);
+                return false;
+            }
+        }
+        inflateEnd(&stream);
+        if(inflateResult!=Z_STREAM_END || decoded.size()<12 ||
+           std::memcmp(decoded.data(),"glTF",4)!=0) {
+            GLB_LOG("gzip decompression failed for %s (zlib=%d)",assetPath,inflateResult);
+            return false;
+        }
+        bytes.swap(decoded);
+    }
 
     cgltf_options options{}; cgltf_data* data=nullptr;
     cgltf_result result=cgltf_parse(&options,bytes.data(),bytes.size(),&data);
