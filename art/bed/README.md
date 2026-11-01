@@ -7,7 +7,8 @@ The headboard is rebuilt around the visual structure of the Brambley Bed w/ LED 
 - Four staggered rows of clear polished crystal-style tuft buttons set into bright metal mounts, with diagonal seams forming a continuous diamond-tufted pattern.
 - Polished mirror-chrome bevel rails and a soft grey recessed seam reveal around the upholstery.
 - Direction-mapped alligator embossing on the silver outer bands, applied as continuous material texture rather than protruding tiles.
-- LED channel recessed behind the frame and aligned to the existing headboard light perimeter; the compositor's existing reclined-view visibility behavior is preserved.
+- One rounded, closed-loop LED raceway follows the complete outer edge; the strip is continuous around all four sides and corners.
+- All five Blender review angles render with the blue-violet LED illuminated. This is a preview-only lighting override; the headset keeps its existing LED-zone toggle and straight-on visibility gate.
 - The insert is one connected cushioned surface, not a row of vertical ribs or the previous undersized plain slab.
 
 ## What stays unchanged

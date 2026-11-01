@@ -25,7 +25,8 @@ class BedDesignPatchTests(unittest.TestCase):
             "Headboard_alligator_side_band_",
             "Headboard_mirror_bevel_",
             "Headboard_inner_shadow_reveal",
-            "Headboard_recessed_LED_channel_",
+            "Headboard_connected_outer_LED_channel",
+            "Headboard_connected_outer_LED_strip",
             "Headboard_crystal_tufted_silver_insert",
             "Headboard_crystal_button_setting_",
             "Headboard_crystal_tuft_button_",
@@ -37,10 +38,10 @@ class BedDesignPatchTests(unittest.TestCase):
 
         self.assertIn("(1.075,.685,.135),'headboard_leather'", self.patched)
         self.assertIn("materials['headboard_chrome']", self.patched)
-        self.assertIn("materials['headboard_crystal']",
-        "materials['headboard_seam']",
-        "materials['headboard_led_diffuser']",
-         self.patched)
+        self.assertIn("materials['headboard_crystal']", self.patched)
+        self.assertIn("materials['headboard_seam']", self.patched)
+        self.assertIn("materials['headboard_led_channel']", self.patched)
+        self.assertIn("materials['headboard_led_diffuser']", self.patched)
         self.assertIn("materials['headboard_emboss_horizontal']", self.patched)
         self.assertIn("materials['headboard_emboss_vertical']", self.patched)
         self.assertIn("headboard_alligator_horizontal", self.patched)
@@ -56,6 +57,9 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertIn(".0018,'headboard_seam',sides=8", self.patched)
         self.assertIn("Headboard_crystal_tuft_button_", self.patched)
         self.assertIn("headboard_led_diffuser", self.patched)
+        self.assertIn("perimeter_points.append(perimeter_points[0])", self.patched)
+        self.assertIn("curve_tube(\\n    'Headboard_connected_outer_LED_strip'", self.patched)
+        self.assertIn("led_corner_radius = .070", self.patched)
         self.assertIn("recessed perimeter RGB backlight", self.patched)
         self.assertEqual(self.patched.count("Headboard_crystal_tufted_silver_insert"), 1)
 
@@ -94,7 +98,7 @@ class BedDesignPatchTests(unittest.TestCase):
         # The patch replaces one exact bed geometry block plus two normal-cache lines
         # and one design metadata string. No tracking, locomotion, or controller code.
         self.assertEqual(self.source.count(OLD_GEOMETRY), 1)
-        self.assertIn("Headboard_recessed_LED_channel", NEW_GEOMETRY)
+        self.assertIn("Headboard_connected_outer_LED_strip", NEW_GEOMETRY)
         for token in ("head tracking", "locomotion", "controller", "camera"):
             self.assertNotIn(token, NEW_GEOMETRY.lower())
 

@@ -103,18 +103,35 @@ curve_tube(
     .008,'charcoal2',sides=8
 )
 
-# LED channel is recessed behind the mirror frame at the existing compositor
-# perimeter coordinates. The diffuser itself remains hidden from a reclined view.
-for name,y in (('top',1.955),('bottom',.405)):
-    boxsoft(
-        f'Headboard_recessed_LED_channel_{name}',
-        (0,y,-1.485),(2.47,.025,.032),'headboard_led_diffuser',.22
-    )
-for side in (-1,1):
-    boxsoft(
-        f'Headboard_recessed_LED_channel_side_{side}',
-        (side*1.235,1.185,-1.485),(.025,1.55,.032),'headboard_led_diffuser',.22
-    )
+# One rounded, closed perimeter raceway follows the complete outer headboard edge.
+# Repeating the first point closes the tube into one continuous mesh with no corner gaps.
+perimeter_points = []
+led_corner_radius = .070
+led_corners = (
+    (1.165,1.885,0,90),
+    (-1.165,1.885,90,180),
+    (-1.165,.475,180,270),
+    (1.165,.475,270,360),
+)
+for cx,cy,start_angle,end_angle in led_corners:
+    for step in range(13):
+        angle=math.radians(start_angle+(end_angle-start_angle)*step/12)
+        perimeter_points.append((
+            cx+led_corner_radius*math.cos(angle),
+            cy+led_corner_radius*math.sin(angle)
+        ))
+perimeter_points.append(perimeter_points[0])
+
+channel_points=[(x,y,-1.355) for x,y in perimeter_points]
+strip_points=[(x,y,-1.345) for x,y in perimeter_points]
+curve_tube(
+    'Headboard_connected_outer_LED_channel',
+    channel_points,.018,'headboard_led_channel',sides=12
+)
+curve_tube(
+    'Headboard_connected_outer_LED_strip',
+    strip_points,.009,'headboard_led_diffuser',sides=12
+)
 
 # Single silver bi-cast-vinyl foundation under individually puffed diamond cells.
 superellipsoid(
@@ -219,17 +236,84 @@ for side in (-1,1):
 
 IMAGE_IMPORT_OLD = "from PIL import Image, ImageFilter\n"
 IMAGE_IMPORT_NEW = "from PIL import Image, ImageFilter, ImageDraw\n"
-HEADBOARD_MATERIALS = "\n# ----------------------- BRAMBLEY HEADBOARD PBR MATERIALS -----------------------\n# Pearl-silver bi-cast vinyl, directional alligator embossing, polished mirror\n# bevels, and clear polished crystal hardware are dedicated PBR materials.\ndef _make_headboard_alligator_texture(name, cell_width, cell_height):\n    size=512\n    image=Image.new('RGB',(size,size),(165,172,184))\n    draw=ImageDraw.Draw(image)\n    rows=int(math.ceil(size/cell_height))+2\n    cols=int(math.ceil(size/cell_width))+2\n    for row in range(-1,rows):\n        row_offset=cell_width//2 if row%2 else 0\n        for col in range(-1,cols):\n            cx=col*cell_width+cell_width//2+row_offset\n            cy=row*cell_height+cell_height//2\n            left=int(cx-cell_width*.43)\n            top=int(cy-cell_height*.43)\n            right=int(cx+cell_width*.43)\n            bottom=int(cy+cell_height*.43)\n            radius=max(2,int(min(cell_width,cell_height)*.28))\n            draw.rounded_rectangle(\n                (left,top,right,bottom),radius=radius,\n                fill=(177,184,197),outline=(139,148,163),width=1\n            )\n            box=(left+1,top+1,right-1,bottom-1)\n            draw.arc(box,190,350,fill=(211,218,229),width=1)\n            draw.arc(box,10,170,fill=(145,154,169),width=1)\n    image=image.filter(ImageFilter.GaussianBlur(.38))\n    image.save(TEXTURES/f'{name}.png',optimize=True)\n    return image\n\n_headboard_alligator_h=_make_headboard_alligator_texture(\n    'headboard_alligator_horizontal',14,82\n)\n_headboard_alligator_v=_make_headboard_alligator_texture(\n    'headboard_alligator_vertical',82,27\n)\nmaterials['headboard_leather']=PBRMaterial(\n    name='Pearl silver bi-cast vinyl',\n    baseColorFactor=[255,255,255,255],metallicFactor=.06,roughnessFactor=.54,\n    baseColorTexture=textures['linen'],doubleSided=True\n)\nmaterials['headboard_emboss_horizontal']=PBRMaterial(\n    name='Silver embossed faux-alligator horizontal panels',\n    baseColorFactor=[255,255,255,255],metallicFactor=.18,roughnessFactor=.43,\n    baseColorTexture=_headboard_alligator_h,doubleSided=True\n)\nmaterials['headboard_emboss_vertical']=PBRMaterial(\n    name='Silver embossed faux-alligator vertical panels',\n    baseColorFactor=[255,255,255,255],metallicFactor=.18,roughnessFactor=.43,\n    baseColorTexture=_headboard_alligator_v,doubleSided=True\n)\nmaterials['headboard_chrome']=PBRMaterial(\n    name='Polished beveled mirror chrome',\n    baseColorFactor=[210,219,232,255],metallicFactor=.90,roughnessFactor=.16,\n    doubleSided=True\n)\nmaterials['headboard_seam']=PBRMaterial(
+HEADBOARD_MATERIALS = r"""
+# ----------------------- BRAMBLEY HEADBOARD PBR MATERIALS -----------------------
+# Pearl-silver bi-cast vinyl, directional alligator embossing, polished mirror
+# bevels, crystal hardware, and the recessed perimeter LED raceway.
+def _make_headboard_alligator_texture(name, cell_width, cell_height):
+    size=512
+    image=Image.new('RGB',(size,size),(165,172,184))
+    draw=ImageDraw.Draw(image)
+    rows=int(math.ceil(size/cell_height))+2
+    cols=int(math.ceil(size/cell_width))+2
+    for row in range(-1,rows):
+        row_offset=cell_width//2 if row%2 else 0
+        for col in range(-1,cols):
+            cx=col*cell_width+cell_width//2+row_offset
+            cy=row*cell_height+cell_height//2
+            left=int(cx-cell_width*.43)
+            top=int(cy-cell_height*.43)
+            right=int(cx+cell_width*.43)
+            bottom=int(cy+cell_height*.43)
+            radius=max(2,int(min(cell_width,cell_height)*.28))
+            draw.rounded_rectangle(
+                (left,top,right,bottom),radius=radius,
+                fill=(177,184,197),outline=(139,148,163),width=1
+            )
+            box=(left+1,top+1,right-1,bottom-1)
+            draw.arc(box,190,350,fill=(211,218,229),width=1)
+            draw.arc(box,10,170,fill=(145,154,169),width=1)
+    image=image.filter(ImageFilter.GaussianBlur(.38))
+    image.save(TEXTURES/f'{name}.png',optimize=True)
+    return image
+
+_headboard_alligator_h=_make_headboard_alligator_texture(
+    'headboard_alligator_horizontal',14,82
+)
+_headboard_alligator_v=_make_headboard_alligator_texture(
+    'headboard_alligator_vertical',82,27
+)
+materials['headboard_leather']=PBRMaterial(
+    name='Pearl silver bi-cast vinyl',
+    baseColorFactor=[255,255,255,255],metallicFactor=.06,roughnessFactor=.54,
+    baseColorTexture=textures['linen'],doubleSided=True
+)
+materials['headboard_emboss_horizontal']=PBRMaterial(
+    name='Silver embossed faux-alligator horizontal panels',
+    baseColorFactor=[255,255,255,255],metallicFactor=.18,roughnessFactor=.43,
+    baseColorTexture=_headboard_alligator_h,doubleSided=True
+)
+materials['headboard_emboss_vertical']=PBRMaterial(
+    name='Silver embossed faux-alligator vertical panels',
+    baseColorFactor=[255,255,255,255],metallicFactor=.18,roughnessFactor=.43,
+    baseColorTexture=_headboard_alligator_v,doubleSided=True
+)
+materials['headboard_chrome']=PBRMaterial(
+    name='Polished beveled mirror chrome',
+    baseColorFactor=[210,219,232,255],metallicFactor=.90,roughnessFactor=.16,
+    doubleSided=True
+)
+materials['headboard_seam']=PBRMaterial(
     name='Soft recessed silver-vinyl tuft seam',
     baseColorFactor=[92,99,112,255],metallicFactor=.02,roughnessFactor=.82,
     doubleSided=True
 )
+materials['headboard_led_channel']=PBRMaterial(
+    name='Dark recessed outer LED raceway',
+    baseColorFactor=[18,24,42,255],metallicFactor=.16,roughnessFactor=.48,
+    doubleSided=True
+)
 materials['headboard_led_diffuser']=PBRMaterial(
-    name='Recessed satin LED diffuser',
-    baseColorFactor=[126,136,154,255],metallicFactor=.12,roughnessFactor=.38,
+    name='Headboard blue-violet LED diffuser',
+    baseColorFactor=[58,102,236,255],metallicFactor=.03,roughnessFactor=.24,
     emissiveFactor=[.035,.042,.060],doubleSided=True
 )
-materials['headboard_crystal']=PBRMaterial(\n    name='Clear polished crystal tuft hardware',\n    baseColorFactor=[242,248,255,255],metallicFactor=.04,roughnessFactor=.07,\n    emissiveFactor=[.035,.045,.065],doubleSided=True\n)\n"
+materials['headboard_crystal']=PBRMaterial(
+    name='Clear polished crystal tuft hardware',
+    baseColorFactor=[242,248,255,255],metallicFactor=.04,roughnessFactor=.07,
+    emissiveFactor=[.035,.045,.065],doubleSided=True
+)
+"""
 
 def patch_bed_geometry(source: str) -> str:
     if source.count(OLD_GEOMETRY) != 1:

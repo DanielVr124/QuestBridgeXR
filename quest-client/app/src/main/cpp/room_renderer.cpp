@@ -2575,11 +2575,11 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float viewForwardX=-camera[8],viewForwardY=-camera[9],viewForwardZ=-camera[10];
     const float straightOn=(viewForwardX*toLedX+viewForwardY*toLedY+viewForwardZ*toLedZ)/toLedLength;
     if(ledZones_[0].enabled&&straightOn>0.985f) {
-        drawGradientBar(0,bedX,floorY+.405f,emitterZ,2.30f,.014f,.012f,40);
-        drawGradientBar(0,bedX,floorY+1.955f,emitterZ,2.30f,.014f,.012f,40);
+        drawGradientBar(0,bedX,floorY+.405f,emitterZ,2.49f,.014f,.012f,40);
+        drawGradientBar(0,bedX,floorY+1.955f,emitterZ,2.49f,.014f,.012f,40);
         for(int edge=0;edge<2;++edge) {
             const float x=bedX+(edge==0?-1.235f:1.235f);
-            drawGradientBarY(0,x,floorY+1.180f,emitterZ,.014f,1.52f,.012f,32);
+            drawGradientBarY(0,x,floorY+1.180f,emitterZ,.014f,1.57f,.012f,32);
         }
     }
     // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.

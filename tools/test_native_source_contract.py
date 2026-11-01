@@ -58,6 +58,8 @@ class NativeSourceContractTests(unittest.TestCase):
         bed_section = source[bed_start:bed_end]
         self.assertIn("bedModel_.draw(pv.data(),bedPlacement", bed_section)
         self.assertIn("drawGradientBar(0,bedX", bed_section)
+        self.assertIn("emitterZ,2.49f,.014f,.012f,40", bed_section)
+        self.assertIn("emitterZ,.014f,1.57f,.012f,32", bed_section)
         self.assertIn("const float emitterZ=bedZ-1.270f", bed_section)
         self.assertIn("if(ledZones_[0].enabled&&straightOn>0.985f)", bed_section)
         self.assertIn("const float straightOn=", bed_section)

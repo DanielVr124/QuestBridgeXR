@@ -28,6 +28,26 @@ _RENDER_RESOLUTION = re.compile(
 # its upholstered face looks toward the mattress/foot side (-Y). These are
 # offline Blender review cameras only; runtime VR camera/tracking is untouched.
 # Keep camera names stable: the source-packaging job expects exact render filenames.
+# This emission override exists only in the offline Blender review scene; the
+# headset continues to reveal the LED through its normal view-angle / zone logic.
+_PREVIEW_LED_SETUP = """# Enable the connected headboard strip in all offline Blender review angles.
+for _qbx_led_mat in bpy.data.materials:
+    _qbx_name = _qbx_led_mat.name.lower()
+    if 'led diffuser' not in _qbx_name and 'headboard_led_diffuser' not in _qbx_name:
+        continue
+    _qbx_led_mat.diffuse_color = (0.055, 0.14, 1.0, 1.0)
+    _qbx_led_mat.use_nodes = True
+    _qbx_bsdf = next((n for n in _qbx_led_mat.node_tree.nodes
+                      if n.type == 'BSDF_PRINCIPLED'), None)
+    if _qbx_bsdf is not None:
+        _qbx_emission = _qbx_bsdf.inputs.get('Emission Color')
+        if _qbx_emission is not None:
+            _qbx_emission.default_value = (0.055, 0.14, 1.0, 1.0)
+        _qbx_strength = _qbx_bsdf.inputs.get('Emission Strength')
+        if _qbx_strength is not None:
+            _qbx_strength.default_value = 4.5
+"""
+
 NEW_VIEWS = """review_views = [
     # Wide three-quarter framing of the full platform, mattress and headboard.
     ('bed_three_quarter', (5.5,-4.3,4.0), (0,0,1.0), 42),
@@ -81,5 +101,14 @@ def patch_blender_review_cameras(source: str) -> str:
             "scene.render.resolution_percentage=100"
         )
         patched = patched[:resolution.start()] + replacement + patched[resolution.end():]
+
+    # Brighten the headboard LED only in this offline Blender preview scene.
+    # The runtime GLB keeps its low-level diffuser material and native angle gate.
+    import_marker = "bpy.ops.import_scene.gltf(filepath=str(args.source))\\n"
+    import_count = patched.count(import_marker)
+    if import_count > 1:
+        raise RuntimeError("Blender preview LED patch found multiple glTF import points.")
+    if import_count == 1:
+        patched = patched.replace(import_marker, import_marker + _PREVIEW_LED_SETUP, 1)
 
     return patched
