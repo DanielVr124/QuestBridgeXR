@@ -108,58 +108,109 @@ curve_tube(
 for name,y in (('top',1.955),('bottom',.405)):
     boxsoft(
         f'Headboard_recessed_LED_channel_{name}',
-        (0,y,-1.485),(2.47,.025,.032),'charcoal2',.22
+        (0,y,-1.485),(2.47,.025,.032),'headboard_led_diffuser',.22
     )
 for side in (-1,1):
     boxsoft(
         f'Headboard_recessed_LED_channel_side_{side}',
-        (side*1.235,1.185,-1.485),(.025,1.55,.032),'charcoal2',.22
+        (side*1.235,1.185,-1.485),(.025,1.55,.032),'headboard_led_diffuser',.22
     )
 
-# One full-width silver faux-leather insert with a gently rectangular
-# padded silhouette; this avoids the previous overly-oval cushion shape.
+# Single silver bi-cast-vinyl foundation under individually puffed diamond cells.
 superellipsoid(
     'Headboard_crystal_tufted_silver_insert',
     (0,1.185,-1.415),
-    (1.075,.685,.135),'headboard_leather',.28,160,96,taper=.015
+    (1.075,.685,.135),'headboard_leather',.22,160,96,taper=.015
 )
 
-# Staggered crystal-button rows create a proper diamond-tuft grid instead of
-# the visually flat straight-row layout. Shadowed chrome settings sit below
-# each clear crystal stud.
+# Five alternating crystal-button rows form a continuous 5-4-5-4-5 tuft grid.
 tuft_rows = (
     (-.82,-.41,0,.41,.82),
     (-.615,-.205,.205,.615),
     (-.82,-.41,0,.41,.82),
     (-.615,-.205,.205,.615),
+    (-.82,-.41,0,.41,.82),
 )
-tuft_y = (1.705,1.355,1.015,.665)
-for row,(xs,y) in enumerate(zip(tuft_rows,tuft_y)):
-    for col,x in enumerate(xs):
-        superellipsoid(
-            f'Headboard_crystal_button_setting_{row}_{col}',
-            (x,y,-1.286),(.036,.036,.012),'headboard_chrome',.72,32,20
-        )
-        superellipsoid(
-            f'Headboard_crystal_tuft_button_{row}_{col}',
-            (x,y,-1.266),(.026,.026,.016),'headboard_crystal',.84,40,28
+tuft_y = (1.70,1.43,1.16,.89,.62)
+
+# Build each diamond as a smooth, raised mesh patch with a soft crown and
+# an eased edge that sinks into the recessed seam around the cell.
+def _add_brambley_quilt_diamond(name,cx,cy,rx,ry,z_edge=-1.285,puff=.085,rings=18,segments=72):
+    verts = [(cx,cy,z_edge+puff)]
+    uv = [(.5,.5)]
+    for ring in range(1,rings+1):
+        radius = ring/rings
+        z = z_edge + puff*((1.0-radius*radius)**2.0)
+        for k in range(segments):
+            t = 4.0*k/segments
+            edge = int(t)
+            f = t-edge
+            if edge == 0:
+                ux,vy = f,1.0-f
+            elif edge == 1:
+                ux,vy = 1.0-f,-f
+            elif edge == 2:
+                ux,vy = -f,-(1.0-f)
+            else:
+                ux,vy = -(1.0-f),f
+            verts.append((cx+rx*radius*ux,cy+ry*radius*vy,z))
+            uv.append(((ux+1.0)*.5,(vy+1.0)*.5))
+
+    faces = []
+    first = 1
+    for k in range(segments):
+        faces.append((0,first+k,first+(k+1)%segments))
+    for ring in range(1,rings):
+        inner = 1+(ring-1)*segments
+        outer = 1+ring*segments
+        for k in range(segments):
+            kn = (k+1)%segments
+            a0 = inner+k
+            b0 = inner+kn
+            c0 = outer+kn
+            d0 = outer+k
+            faces.extend(((a0,b0,c0),(a0,c0,d0)))
+    add_mesh(name,verts,faces,uv,'headboard_leather')
+
+# Ten raised diamond upholstery cells. Their narrow gaps meet at the crystal
+# buttons, so the tufting is built into the surface rather than drawn on top.
+for band in (0,2):
+    top_y = tuft_y[band]
+    bottom_y = tuft_y[band+2]
+    center_y = (top_y+bottom_y)*.5
+    radius_y = (top_y-bottom_y)*.5-.012
+    for col,cx in enumerate(tuft_rows[band]):
+        _add_brambley_quilt_diamond(
+            f'Headboard_quilt_diamond_{band}_{col}',
+            cx,center_y,.198,radius_y
         )
 
-# Each button connects diagonally to its two nearest neighbours in the next
-# row, producing a continuous diamond seam pattern across the upholstered face.
-for row in range(3):
-    upper=tuft_rows[row]
-    lower=tuft_rows[row+1]
+# Fine inset seams follow the diagonals between adjacent tuft points.
+for row in range(4):
+    upper = tuft_rows[row]
+    lower = tuft_rows[row+1]
     for col,x in enumerate(upper):
         for next_col,nx in enumerate(lower):
             if abs(x-nx) <= .206:
                 curve_tube(
                     f'Headboard_tuft_seam_{row}_{col}_{next_col}',
-                    [(x,tuft_y[row],-1.270),
-                     ((x+nx)*.5,(tuft_y[row]+tuft_y[row+1])*.5,-1.278),
-                     (nx,tuft_y[row+1],-1.270)],
-                    .0034,'charcoal2',sides=8
+                    [(x,tuft_y[row],-1.289),
+                     ((x+nx)*.5,(tuft_y[row]+tuft_y[row+1])*.5,-1.292),
+                     (nx,tuft_y[row+1],-1.289)],
+                    .0018,'headboard_seam',sides=8
                 )
+
+# Bright chrome sockets and small polished crystal cabochons at all 23 junctions.
+for row,(xs,y) in enumerate(zip(tuft_rows,tuft_y)):
+    for col,x in enumerate(xs):
+        superellipsoid(
+            f'Headboard_crystal_button_setting_{row}_{col}',
+            (x,y,-1.190),(.026,.026,.013),'headboard_chrome',1.08,36,24
+        )
+        superellipsoid(
+            f'Headboard_crystal_tuft_button_{row}_{col}',
+            (x,y,-1.166),(.020,.020,.017),'headboard_crystal',1.18,48,32
+        )
 
 # Original mounting brackets are retained exactly.
 for side in (-1,1):
@@ -168,7 +219,17 @@ for side in (-1,1):
 
 IMAGE_IMPORT_OLD = "from PIL import Image, ImageFilter\n"
 IMAGE_IMPORT_NEW = "from PIL import Image, ImageFilter, ImageDraw\n"
-HEADBOARD_MATERIALS = "\n# ----------------------- BRAMBLEY HEADBOARD PBR MATERIALS -----------------------\n# Pearl-silver bi-cast vinyl, directional alligator embossing, polished mirror\n# bevels, and clear polished crystal hardware are dedicated PBR materials.\ndef _make_headboard_alligator_texture(name, cell_width, cell_height):\n    size=512\n    image=Image.new('RGB',(size,size),(165,172,184))\n    draw=ImageDraw.Draw(image)\n    rows=int(math.ceil(size/cell_height))+2\n    cols=int(math.ceil(size/cell_width))+2\n    for row in range(-1,rows):\n        row_offset=cell_width//2 if row%2 else 0\n        for col in range(-1,cols):\n            cx=col*cell_width+cell_width//2+row_offset\n            cy=row*cell_height+cell_height//2\n            left=int(cx-cell_width*.43)\n            top=int(cy-cell_height*.43)\n            right=int(cx+cell_width*.43)\n            bottom=int(cy+cell_height*.43)\n            radius=max(2,int(min(cell_width,cell_height)*.28))\n            draw.rounded_rectangle(\n                (left,top,right,bottom),radius=radius,\n                fill=(177,184,197),outline=(139,148,163),width=1\n            )\n            box=(left+1,top+1,right-1,bottom-1)\n            draw.arc(box,190,350,fill=(211,218,229),width=1)\n            draw.arc(box,10,170,fill=(145,154,169),width=1)\n    image=image.filter(ImageFilter.GaussianBlur(.38))\n    image.save(TEXTURES/f'{name}.png',optimize=True)\n    return image\n\n_headboard_alligator_h=_make_headboard_alligator_texture(\n    'headboard_alligator_horizontal',14,82\n)\n_headboard_alligator_v=_make_headboard_alligator_texture(\n    'headboard_alligator_vertical',82,27\n)\nmaterials['headboard_leather']=PBRMaterial(\n    name='Pearl silver bi-cast vinyl',\n    baseColorFactor=[255,255,255,255],metallicFactor=.06,roughnessFactor=.54,\n    baseColorTexture=textures['linen'],doubleSided=True\n)\nmaterials['headboard_emboss_horizontal']=PBRMaterial(\n    name='Silver embossed faux-alligator horizontal panels',\n    baseColorFactor=[255,255,255,255],metallicFactor=.18,roughnessFactor=.43,\n    baseColorTexture=_headboard_alligator_h,doubleSided=True\n)\nmaterials['headboard_emboss_vertical']=PBRMaterial(\n    name='Silver embossed faux-alligator vertical panels',\n    baseColorFactor=[255,255,255,255],metallicFactor=.18,roughnessFactor=.43,\n    baseColorTexture=_headboard_alligator_v,doubleSided=True\n)\nmaterials['headboard_chrome']=PBRMaterial(\n    name='Polished beveled mirror chrome',\n    baseColorFactor=[210,219,232,255],metallicFactor=.90,roughnessFactor=.16,\n    doubleSided=True\n)\nmaterials['headboard_crystal']=PBRMaterial(\n    name='Clear polished crystal tuft hardware',\n    baseColorFactor=[242,248,255,255],metallicFactor=.04,roughnessFactor=.07,\n    emissiveFactor=[.035,.045,.065],doubleSided=True\n)\n"
+HEADBOARD_MATERIALS = "\n# ----------------------- BRAMBLEY HEADBOARD PBR MATERIALS -----------------------\n# Pearl-silver bi-cast vinyl, directional alligator embossing, polished mirror\n# bevels, and clear polished crystal hardware are dedicated PBR materials.\ndef _make_headboard_alligator_texture(name, cell_width, cell_height):\n    size=512\n    image=Image.new('RGB',(size,size),(165,172,184))\n    draw=ImageDraw.Draw(image)\n    rows=int(math.ceil(size/cell_height))+2\n    cols=int(math.ceil(size/cell_width))+2\n    for row in range(-1,rows):\n        row_offset=cell_width//2 if row%2 else 0\n        for col in range(-1,cols):\n            cx=col*cell_width+cell_width//2+row_offset\n            cy=row*cell_height+cell_height//2\n            left=int(cx-cell_width*.43)\n            top=int(cy-cell_height*.43)\n            right=int(cx+cell_width*.43)\n            bottom=int(cy+cell_height*.43)\n            radius=max(2,int(min(cell_width,cell_height)*.28))\n            draw.rounded_rectangle(\n                (left,top,right,bottom),radius=radius,\n                fill=(177,184,197),outline=(139,148,163),width=1\n            )\n            box=(left+1,top+1,right-1,bottom-1)\n            draw.arc(box,190,350,fill=(211,218,229),width=1)\n            draw.arc(box,10,170,fill=(145,154,169),width=1)\n    image=image.filter(ImageFilter.GaussianBlur(.38))\n    image.save(TEXTURES/f'{name}.png',optimize=True)\n    return image\n\n_headboard_alligator_h=_make_headboard_alligator_texture(\n    'headboard_alligator_horizontal',14,82\n)\n_headboard_alligator_v=_make_headboard_alligator_texture(\n    'headboard_alligator_vertical',82,27\n)\nmaterials['headboard_leather']=PBRMaterial(\n    name='Pearl silver bi-cast vinyl',\n    baseColorFactor=[255,255,255,255],metallicFactor=.06,roughnessFactor=.54,\n    baseColorTexture=textures['linen'],doubleSided=True\n)\nmaterials['headboard_emboss_horizontal']=PBRMaterial(\n    name='Silver embossed faux-alligator horizontal panels',\n    baseColorFactor=[255,255,255,255],metallicFactor=.18,roughnessFactor=.43,\n    baseColorTexture=_headboard_alligator_h,doubleSided=True\n)\nmaterials['headboard_emboss_vertical']=PBRMaterial(\n    name='Silver embossed faux-alligator vertical panels',\n    baseColorFactor=[255,255,255,255],metallicFactor=.18,roughnessFactor=.43,\n    baseColorTexture=_headboard_alligator_v,doubleSided=True\n)\nmaterials['headboard_chrome']=PBRMaterial(\n    name='Polished beveled mirror chrome',\n    baseColorFactor=[210,219,232,255],metallicFactor=.90,roughnessFactor=.16,\n    doubleSided=True\n)\nmaterials['headboard_seam']=PBRMaterial(
+    name='Soft recessed silver-vinyl tuft seam',
+    baseColorFactor=[92,99,112,255],metallicFactor=.02,roughnessFactor=.82,
+    doubleSided=True
+)
+materials['headboard_led_diffuser']=PBRMaterial(
+    name='Recessed satin LED diffuser',
+    baseColorFactor=[126,136,154,255],metallicFactor=.12,roughnessFactor=.38,
+    emissiveFactor=[.035,.042,.060],doubleSided=True
+)
+materials['headboard_crystal']=PBRMaterial(\n    name='Clear polished crystal tuft hardware',\n    baseColorFactor=[242,248,255,255],metallicFactor=.04,roughnessFactor=.07,\n    emissiveFactor=[.035,.045,.065],doubleSided=True\n)\n"
 
 def patch_bed_geometry(source: str) -> str:
     if source.count(OLD_GEOMETRY) != 1:
@@ -208,7 +269,7 @@ def patch_bed_geometry(source: str) -> str:
     )
 
     old_design = "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',"
-    new_design = "'design':'Original bed platform and bedding retained; Brambley-style pearl-silver faux-leather diamond-tufted insert with staggered crystal buttons, polished mirror chrome bevels, embossed silver alligator panels and recessed perimeter RGB backlight',"
+    new_design = "'design':'Original bed platform and bedding retained; Brambley-style pearl-silver faux-leather with ten raised diamond-quilt cells, 23 crystal tuft points, mirror-chrome bevels, embossed silver alligator bands and recessed perimeter RGB backlight',"
     if source.count(old_design) != 1:
         raise RuntimeError("Bed metadata design marker changed; update the design patch.")
     source = source.replace(old_design, new_design, 1)
