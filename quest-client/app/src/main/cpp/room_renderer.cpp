@@ -1693,6 +1693,16 @@ void RoomRenderer::cycleEnvironment() {
 }
 
 void RoomRenderer::toggleMenu() {
+    if(settings_.environment=="explorable_city") {
+        // The city has no bedroom monitor to host the desktop menu; the menu button
+        // is therefore a deliberate, immediate return-to-room control.
+        settings_.environment="skyline_penthouse";
+        citySpawnPending_=true;
+        menuVisible_=false;
+        chooseEnvironment();
+        LOGI("returned from explorable city to the room");
+        return;
+    }
     menuVisible_ = !menuVisible_;
     previousMenuNavigation_ = false;
     previousMenuHorizontal_ = false;
@@ -2458,6 +2468,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         Mat4 cityProjection=makeCityProjection(view.fov);
         Mat4 cityPv=mul(cityProjection,camera);
         cityWorld_.render(cityPv.data(),cameraX,cameraY,cameraZ);
+        if(settings_.comfortVignette && vignetteProgram_) {
+            glDisable(GL_DEPTH_TEST);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+            glUseProgram(vignetteProgram_);
+            glBindVertexArray(planeTexture_);
+            glDrawArrays(GL_TRIANGLES,0,6);
+            glBindVertexArray(0);
+            glUseProgram(0);
+            glDisable(GL_BLEND);
+            glEnable(GL_DEPTH_TEST);
+        }
         return;
     }
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
