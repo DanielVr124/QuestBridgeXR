@@ -323,14 +323,19 @@ class QuestBridgeStudio(tk.Tk):
             value=self.adb_path or "ADB not found — locate adb.exe or install Android Platform-Tools"
         )
         ttk.Label(usb, textvariable=self.adb_path_var, style="Muted.TLabel",
-                  wraplength=820).grid(row=2, column=0, sticky="w", pady=(0, 10))
+                  wraplength=820).grid(row=2, column=0, sticky="w", pady=(0, 4))
+        self.stream_probe_var = tk.StringVar(
+            value="Quest-to-PC and video setup checks appear here when the Quest app is installed."
+        )
+        ttk.Label(usb, textvariable=self.stream_probe_var, style="Muted.TLabel",
+                  wraplength=820).grid(row=3, column=0, sticky="w", pady=(0, 10))
 
         self.usb_details = ScrolledText(
             usb, height=7, wrap="word", font=("Segoe UI", 9),
             background=self.palette["surface2"], foreground=self.palette["text"],
             insertbackground=self.palette["text"], relief="flat", borderwidth=0,
         )
-        self.usb_details.grid(row=3, column=0, sticky="ew", pady=(0, 10))
+        self.usb_details.grid(row=4, column=0, sticky="ew", pady=(0, 10))
         self.usb_details.insert(
             "1.0",
             "Connect the Quest with a data-capable USB cable, unlock the headset, and accept the USB debugging prompt.\n"
@@ -339,7 +344,7 @@ class QuestBridgeStudio(tk.Tk):
         self.usb_details.configure(state="disabled")
 
         usb_actions = ttk.Frame(usb)
-        usb_actions.grid(row=4, column=0, sticky="ew")
+        usb_actions.grid(row=5, column=0, sticky="ew")
         self.usb_refresh_button = ttk.Button(
             usb_actions, text="Test USB Connection", style="Accent.TButton",
             command=self._refresh_usb_status
@@ -471,6 +476,15 @@ class QuestBridgeStudio(tk.Tk):
             self.usb_refresh_button.configure(state="normal")
         self.usb_status_var.set(str(report.get("summary", "USB check finished.")))
         self.adb_path_var.set(report.get("adb_path") or "ADB not found — use Locate adb.exe…")
+        host_seen = report.get("host_handshake_seen")
+        video_seen = report.get("video_config_seen")
+        if host_seen is None and video_seen is None:
+            stream_summary = "Quest-to-PC UDP / video: not checked (install and launch QuestBridge XR first)."
+        else:
+            host_text = "handshake seen in Quest logs" if host_seen else "handshake not seen in latest Quest logs"
+            video_text = "video setup seen in Quest logs" if video_seen else "video setup not seen in latest Quest logs"
+            stream_summary = f"Quest → PC: {host_text}   •   Video setup: {video_text}"
+        self.stream_probe_var.set(stream_summary)
         lines = []
         for check in report.get("checks", []):
             lines.append(f"[{check.get('level', 'INFO')}] {check.get('label', 'Check')}: {check.get('detail', '')}")
