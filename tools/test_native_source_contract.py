@@ -257,7 +257,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("CHOOSE A SCENE", renderer)
         self.assertIn("UP / DOWN  BROWSE", renderer)
         self.assertIn("constexpr float tvModelScale=.90f", renderer)
-        self.assertIn("roomLightsOn_?0.78f:0.18f", renderer)
+        self.assertIn("roomLightsOn_?0.78f:0.075f", renderer)
         self.assertIn("Mat4 physicalView=makeView(view.pose,0.0f,0.0f,0.0f)", renderer)
         self.assertIn("const float pivotX=headCenterPose.position.x", renderer)
         self.assertIn("const Mat4 inverseVirtualWorld=mul(inverseVirtualRotation,inverseVirtualTranslation)", renderer)
