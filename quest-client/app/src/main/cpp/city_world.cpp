@@ -15,6 +15,7 @@ constexpr float kPi = 3.14159265358979323846f;
 
 const char* kCityVertexShader = R"GLSL(#version 300 es
 precision highp float;
+precision highp int;
 layout(location=0) in vec3 aPosition;
 layout(location=1) in vec3 aNormal;
 layout(location=2) in vec2 aUv;
@@ -38,6 +39,7 @@ void main() {
 
 const char* kCityFragmentShader = R"GLSL(#version 300 es
 precision highp float;
+precision highp int;
 in vec3 vWorld;
 in vec3 vNormal;
 in vec2 vUv;
@@ -201,7 +203,9 @@ float clampf(float value, float lo, float hi) {
 } // namespace
 
 std::int64_t CityWorld::chunkKey(int x, int z) {
-    return (static_cast<std::int64_t>(x) << 32) ^ static_cast<std::uint32_t>(z);
+    const std::uint64_t packed=(static_cast<std::uint64_t>(static_cast<std::uint32_t>(x))<<32) |
+                              static_cast<std::uint32_t>(z);
+    return static_cast<std::int64_t>(packed);
 }
 
 std::uint32_t CityWorld::hash(std::uint32_t value) {
@@ -386,8 +390,8 @@ void CityWorld::addBuilding(std::vector<Vertex>& out, float x, float z, float wi
     const float sill[3]={0.33f,0.36f,0.37f};
     const float warmWindow[3]={0.95f,0.67f,0.38f};
     const float coolGlass[3]={0.075f,0.17f,0.24f};
-    const int floors=std::clamp(static_cast<int>((height-1.0f)/3.25f),3,15);
-    const int columns=std::clamp(static_cast<int>((width-1.2f)/2.7f),2,5);
+    const int floors=std::clamp(static_cast<int>((height-1.0f)/3.25f),3,12);
+    const int columns=std::clamp(static_cast<int>((width-1.2f)/2.7f),2,4);
     const float floorHeight=(height-0.65f)/floors;
     if (detailed) {
         for (int side : {-1,1}) {
@@ -410,7 +414,7 @@ void CityWorld::addBuilding(std::vector<Vertex>& out, float x, float z, float wi
         }
         for (int side : {-1,1}) {
             const float xFace=x+side*(width*.5f+.027f);
-            const int sideColumns=std::max(2,static_cast<int>((depth-1.0f)/3.1f));
+            const int sideColumns=std::clamp(static_cast<int>((depth-1.0f)/3.1f),2,4);
             for (int floor=0;floor<floors;++floor) {
                 const float y=baseY+0.75f+floor*floorHeight;
                 for (int col=0;col<sideColumns;++col) {
@@ -701,8 +705,15 @@ void CityWorld::render(const float* viewProjection, float cameraX, float cameraY
     for (int dz=-2;dz<=2;++dz) for (int dx=-2;dx<=2;++dx) {
         const int cx=centerChunkX_+dx, cz=centerChunkZ_+dz;
         const auto key=chunkKey(cx,cz);
-        if (chunks_.find(key)==chunks_.end())
-            buildChunk(cx,cz,(std::abs(dx)<=1 && std::abs(dz)<=1)?0:1);
+        const int desiredLod=(std::abs(dx)<=1 && std::abs(dz)<=1)?0:1;
+        auto existing=chunks_.find(key);
+        if(existing!=chunks_.end() && existing->second.lod!=desiredLod) {
+            if(existing->second.vao) glDeleteVertexArrays(1,&existing->second.vao);
+            if(existing->second.vbo) glDeleteBuffers(1,&existing->second.vbo);
+            chunks_.erase(existing);
+            existing=chunks_.end();
+        }
+        if(existing==chunks_.end()) buildChunk(cx,cz,desiredLod);
     }
 
     glEnable(GL_DEPTH_TEST);
