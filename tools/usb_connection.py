@@ -107,6 +107,8 @@ def probe_usb_connection(
         "android_version": None,
         "app_installed": None,
         "app_running": None,
+        "host_handshake_seen": None,
+        "video_config_seen": None,
         "checks": [],
     }
     checks: list[dict[str, str]] = report["checks"]
@@ -240,6 +242,42 @@ def probe_usb_connection(
             ))
         except (OSError, subprocess.SubprocessError) as exc:
             checks.append(_check("WARN", "QuestBridge process", f"Could not check whether the app is running: {exc}"))
+
+        # These logs distinguish "ADB can see the headset" from the Quest app
+        # actually completing its UDP handshake and receiving stream metadata.
+        try:
+            log_result = subprocess.run(
+                [executable, "-s", device.serial, "logcat", "-d", "-t", "1200", "-s", "QuestBridgeXR:I"],
+                capture_output=True, text=True, timeout=max(timeout_seconds, 10.0), check=False,
+            )
+            if log_result.returncode == 0:
+                quest_log = log_result.stdout.casefold()
+                host_seen = "windows host accepted connection" in quest_log
+                video_seen = (
+                    "received video config" in quest_log
+                    or "video decoder configured:" in quest_log
+                )
+                report["host_handshake_seen"] = host_seen
+                report["video_config_seen"] = video_seen
+                checks.append(_check(
+                    "PASS" if host_seen else "WARN",
+                    "Quest → PC UDP handshake",
+                    "The Quest log contains a Windows-host HELLO_ACK acceptance. This proves the Quest reached the configured PC at least once in the retained log; refresh after launching the app to check the current session."
+                    if host_seen else
+                    "No Windows-host acceptance was found in the latest retained QuestBridge logs. Start the Windows Host, launch QuestBridge on the headset, and check the PC IP, UDP port, and Windows Firewall."
+                ))
+                checks.append(_check(
+                    "PASS" if video_seen else "INFO",
+                    "Video stream setup",
+                    "The Quest log shows video configuration/decoder setup was received. This confirms stream setup reached the headset, not that every frame is rendering smoothly."
+                    if video_seen else
+                    "No video configuration was found in the latest retained logs. Start the video sender after the Quest-to-PC handshake."
+                ))
+            else:
+                detail = log_result.stderr.strip() or "Android logcat returned a failure code."
+                checks.append(_check("WARN", "Quest connection logs", detail))
+        except (OSError, subprocess.SubprocessError) as exc:
+            checks.append(_check("WARN", "Quest connection logs", f"Could not read Quest logcat: {exc}"))
 
     report["ok"] = True
     report["summary"] = f"USB ready — {model} is responding to ADB."
