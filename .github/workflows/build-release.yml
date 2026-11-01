@@ -170,6 +170,9 @@ jobs:
             art/controllers/meta_touch_plus_controllers.blend
             art/controllers/controller_manifest.json
             art/controllers/renders/*.png
+            tools/generate_touch_plus_controllers.py
+            quest-client/app/src/main/assets/models/meta_touch_plus_left.glb
+            quest-client/app/src/main/assets/models/meta_touch_plus_right.glb
           if-no-files-found: error
           retention-days: 30
 
@@ -200,6 +203,17 @@ jobs:
         with:
           name: quest-apk
           path: bundle/QuestClient
+
+      - name: Download Touch Plus Blender source and renders
+        uses: actions/download-artifact@v4
+        with:
+          name: touch-plus-controller-source
+          path: controller-source
+
+      - name: Package Touch Plus controller source archive
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'controller-source\*' -DestinationPath 'QuestBridgeXR-TouchPlus-Controller-Source.zip' -CompressionLevel Optimal -Force
 
       - name: Create release-ready package and checksum
         shell: pwsh
@@ -248,6 +262,7 @@ jobs:
             QuestBridgeXR-*-Portable.zip
             QuestBridgeXR-*-Portable.zip.sha256
             QuestBridgeXR-*-Setup.exe
+            QuestBridgeXR-TouchPlus-Controller-Source.zip
           if-no-files-found: error
           retention-days: 30
 
