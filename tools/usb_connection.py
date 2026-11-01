@@ -194,6 +194,13 @@ def probe_usb_connection(
     report["model"] = model
     report["android_version"] = android_version or None
     version_text = f", Android {android_version}" if android_version else ""
+    if not any(token in model.casefold() for token in ("quest", "oculus", "meta")):
+        checks.append(_check(
+            "WARN", "Headset identification",
+            f"USB device answered ADB, but its model is '{model}', not a recognized Meta Quest model. Check that the Quest is the device connected."
+        ))
+        report["summary"] = f"USB device responds, but it is not identified as a Meta Quest ({model})."
+        return report
     checks.append(_check("PASS", "Quest response", f"{model}{version_text} answered an ADB shell request."))
 
     try:
