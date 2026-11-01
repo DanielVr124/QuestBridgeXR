@@ -2391,7 +2391,7 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float cente
 
 void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
     if(dt<0.0f||dt>0.1f)dt=0.0f;
-    const float yaw=headYaw(headPose)+virtualYaw_;
+    const float yaw=headYaw(headPose)+virtualYaw_+(sittingActive_?chairYaw_:0.0f);
     const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
 
     if(settings_.environment=="explorable_city") {
@@ -2466,17 +2466,56 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     float targetX=std::clamp(playerX+stepX,-halfW+0.34f,halfW-0.34f);
     float targetZ=std::clamp(playerZ+stepZ,-halfD+0.34f,halfD-0.34f);
 
-    const float bedX=halfW-2.0f+.20f, bedZ=-halfD+2.10f;
+    constexpr float bedScale=1.16f;
+    const float bedWidth=3.20f*bedScale,bedDepth=4.05f*bedScale;
+    const float bedX=halfW-bedWidth*.5f,bedZ=-halfD+bedDepth*.5f;
     auto overlaps=[](float x,float z,float cx,float cz,float rx,float rz) {
         return std::fabs(x-cx)<rx && std::fabs(z-cz)<rz;
     };
     auto collides=[&](float x,float z) {
         return overlaps(x,z,deskX,deskZ,1.36f,.52f) ||
                (!sittingActive_&&settings_.showChair&&overlaps(x,z,chairX,chairZ,.43f,.60f)) ||
-               overlaps(x,z,bedX,bedZ,1.30f,1.72f) ||
-               overlaps(x,z,bedX-1.53f,bedZ-.94f,.52f,.54f) ||
-               overlaps(x,z,bedX+1.53f,bedZ-.94f,.52f,.54f);
+               overlaps(x,z,bedX,bedZ,bedWidth*.5f,bedDepth*.5f);
     };
+
+    if(sittingActive_&&settings_.showChair) {
+        // The seated body and chair behave as one damped rolling assembly.
+        // Left stick applies drive force; right stick steers the chair's caster swivel.
+        const float driveX=rightX*leftX+forwardX*leftY;
+        const float driveZ=rightZ*leftX+forwardZ*leftY;
+        const float acceleration=3.0f*std::clamp(settings_.chairRollSpeed,.30f,2.60f);
+        chairVelocityX_+=driveX*acceleration*dt;
+        chairVelocityZ_+=driveZ*acceleration*dt;
+        const float damping=std::exp(-std::clamp(settings_.chairFriction,.50f,6.0f)*dt);
+        chairVelocityX_*=damping;
+        chairVelocityZ_*=damping;
+        const float speedNow=std::sqrt(chairVelocityX_*chairVelocityX_+chairVelocityZ_*chairVelocityZ_);
+        if(speedNow>1.35f) {
+            chairVelocityX_*=1.35f/speedNow;
+            chairVelocityZ_*=1.35f/speedNow;
+        }
+        const float nextChairX=std::clamp(chairX+chairVelocityX_*dt,-halfW+.52f,halfW-.52f);
+        const float nextChairZ=std::clamp(chairZ+chairVelocityZ_*dt,-halfD+.58f,halfD-.58f);
+        if(collides(nextChairX,nextChairZ)) {
+            chairVelocityX_=0.0f;
+            chairVelocityZ_=0.0f;
+        } else {
+            chairOffsetX_=nextChairX-deskX;
+            chairOffsetZ_=nextChairZ-(deskZ+1.12f);
+        }
+        const float spinTarget=std::clamp(rightStickX,-1.0f,1.0f)*
+                               std::clamp(settings_.chairSpinSpeed,.30f,3.50f);
+        chairAngularVelocity_+=(spinTarget-chairAngularVelocity_)*
+                               std::clamp(dt*8.0f,0.0f,1.0f);
+        chairAngularVelocity_*=std::exp(-std::clamp(settings_.chairFriction,.50f,6.0f)*.35f*dt);
+        chairYaw_+=chairAngularVelocity_*dt;
+        chairWheelRoll_+=speedNow*dt/.055f;
+        const float seatedChairX=deskX+chairOffsetX_;
+        const float seatedChairZ=deskZ+1.12f+chairOffsetZ_;
+        moveX_=seatedChairX-headPose.position.x;
+        moveZ_=(seatedChairZ+.18f)-headPose.position.z;
+        return;
+    }
 
     // Axis-separated resolution permits sliding alongside furniture.
     if(collides(targetX,playerZ) && !collides(playerX,playerZ)) targetX=playerX;
@@ -2710,6 +2749,9 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
     if(sittingActive_) {
         sittingActive_=false;
         sitAnchorPending_=false;
+        virtualYaw_+=chairYaw_;
+        chairYaw_=0.0f;
+        chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f;
         return;
     }
 
