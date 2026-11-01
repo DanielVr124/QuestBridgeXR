@@ -61,8 +61,8 @@ class BedDesignPatchTests(unittest.TestCase):
             "    merged.vertex_normals  # include normals in optimized runtime batches\\n", "", 1
         )
         restored = restored.replace(
-            "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',",
             "'design':'Original bed platform and bedding retained; Brambley-style silver faux-leather crystal-button diamond-tufted headboard insert, beveled mirror frame, subtly embossed silver outer bands and recessed perimeter RGB backlight',",
+            "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',",
             1
         )
         self.assertEqual(restored, self.source)
