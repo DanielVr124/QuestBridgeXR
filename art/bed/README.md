@@ -1,23 +1,24 @@
-# QuestBridge XR — original bed with a corrected padded headboard
+# QuestBridge XR — Brambley-reference headboard rebuild
 
-This update keeps the original bed body and the existing pillow arrangement, and corrects the headboard into one continuous upholstered cushion.
+The headboard is rebuilt around the visual structure of the Brambley Bed w/ LED Lights reference: a broad silver faux-leather insert with crystal-button diamond tufting, a layered beveled mirror frame, textured silver outer bands and a recessed perimeter LED channel.
 
-## Headboard
-- One wide charcoal padded panel, not five separate vertical cushions.
-- Broad rectangular silhouette with gently eased corners; the padding stays full without becoming an oversized oval.
-- A slim, low-profile upholstered perimeter lip protects the recessed RGB channel.
-- The LED emitter is rendered by the room compositor and appears only when looking almost straight at the headboard; it stays hidden from a reclined view.
-- No vertical ribs, tall cushion channels, bulky double rails, exposed LED tape, diamond buttons or decorative crystal parts.
+## Headboard design
+- Full-width silver-grey faux-leather upholstered insert with a softly crowned, furniture-like profile.
+- Four rows of crystal-style tuft buttons set into small shadowed mounts, with diagonal seams forming the diamond-tufted pattern.
+- Separate silver beveled frame rails and a fine dark reveal around the upholstery.
+- Subtle raised alligator-style embossing across the outer silver bands.
+- LED channel recessed behind the frame and aligned to the existing headboard light perimeter; the compositor's existing reclined-view visibility behavior is preserved.
+- The insert is one connected cushioned surface, not a row of vertical ribs or the previous undersized plain slab.
 
-## What stays exactly as it was
+## What stays unchanged
 - Original bed platform, rails, legs, foot end, mattress, fitted sheet, duvet and throw.
-- Existing refreshed pillows and their arrangement.
+- Existing refreshed pillow models and their placement.
 - Bed position, scale, renderer anchor and collision footprint.
-- Bedside cabinets, lights, TV, desk, monitor, window and all other room geometry.
-- Head tracking, turning, locomotion, controller bindings and room menus.
-- Existing per-zone LED colour settings.
+- Bedside cabinets, lights, TV, desk, monitor, windows and all other room geometry.
+- Camera transforms, head tracking, turning, locomotion, controller bindings and room menus.
+- Existing LED color controls and the runtime's LED visibility logic.
 
-## Regenerate
+## Regenerate the model
 From the repository root:
 
 ```bash
@@ -34,3 +35,5 @@ blender --background --python tools/blender_import_bed.py -- \
   --output art/bed/arc_upholstered_bed.blend \
   --render-dir art/bed/renders
 ```
+
+The Blender workflow generates the editable scene, runtime model, bed review renders and the room showcase package.
