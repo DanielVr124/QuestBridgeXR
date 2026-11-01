@@ -58,6 +58,12 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertNotIn("showCouch", source)
         self.assertIn("settings_.showChair&&chairModel_.loaded()", source)
         self.assertIn("settings_.showChair&&overlaps(x,z,chairX,chairZ", source)
+        chair_placement_start = source.index("const float chairPlacement[16]")
+        chair_placement = source[chair_placement_start:source.index("};", chair_placement_start) + 2]
+        self.assertIn("1,0,0,0, 0,1,0,0, 0,0,1,0", chair_placement)
+        self.assertNotIn("-1,0,0,0", chair_placement)
+        self.assertNotIn("0,0,-1,0", chair_placement)
+        self.assertIn("The supplied GLB already faces the desk along local -Z", source)
         self.assertIn("tvZ=bedZ+3.18f", source)
         self.assertIn("rgb(1,1,1),kPi", source)
         self.assertIn("const float deskX=-halfW+1.32f", source)

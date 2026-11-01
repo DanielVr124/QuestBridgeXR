@@ -3020,8 +3020,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float chairX=deskX, chairZ=deskZ+1.12f;
     if(settings_.showChair&&chairModel_.loaded()) {
         drawGroundShadow(pv.data(),chairX,floorY+.006f,chairZ,.92f,1.12f,.36f);
+        // The supplied GLB already faces the desk along local -Z.
+        // Keep its native orientation; a 180-degree flip put the backrest toward the desk.
         const float chairPlacement[16]={
-            -1,0,0,0, 0,1,0,0, 0,0,-1,0, chairX,floorY,chairZ,1
+            1,0,0,0, 0,1,0,0, 0,0,1,0, chairX,floorY,chairZ,1
         };
         chairModel_.draw(pv.data(),chairPlacement,locMvp_,locModel_,locColor_,locTextured_,
                          locTexture_,locMaterial_,locRounded_,locUvScale_);
