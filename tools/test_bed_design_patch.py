@@ -71,9 +71,9 @@ class BedDesignPatchTests(unittest.TestCase):
             "Sleep_pillow_underside_",
             "Sleep_pillow_top_welt_",
             "Sleep_pillow_lower_gusset_seam_",
-            "Sleep_pillow_corner_fold_",
-            "PILLOW_CROWN_HEIGHT = .175",
-            "PILLOW_CORNER_EXPONENT = 3.1",
+            "pillow_corner_tucks",
+            "PILLOW_CROWN_HEIGHT = .205",
+            "PILLOW_CORNER_EXPONENT = 3.8",
             "def pillow_crown_height",
         ):
             with self.subTest(token=token):
@@ -81,6 +81,11 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertNotIn("superellipsoid(f'Sleep_pillow_", self.patched)
         self.assertIn("np.array([side*.50, 1.105, -1.35]", self.patched)
         self.assertEqual(self.patched.count("f'Sleep_pillow_top_{side}'"), 1)
+        self.assertIn("PILLOW_RING_ROWS = 32", self.patched)
+        self.assertIn("PILLOW_RING_SEGMENTS = 128", self.patched)
+        self.assertIn("corner_tucks", self.patched)
+        self.assertIn("fill_lobes", self.patched)
+        self.assertNotIn("Sleep_pillow_corner_fold_", self.patched)
         self.assertNotIn("Slate_accent", self.patched)
         self.assertNotIn("Lumbar_cushion", self.patched)
 
@@ -93,6 +98,9 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertIn("for side in (-1, 1):", self.patched)
         self.assertNotIn("Slate_accent", self.patched)
         self.assertNotIn("Lumbar_cushion", self.patched)
+        for token in ("pillow_cotton", "pillow_gusset", "pillow_thread"):
+            with self.subTest(material=token):
+                self.assertIn("materials['" + token + "']", self.patched)
 
     def test_headboard_is_not_the_failed_plain_slab_or_vertical_ribs(self):
         for obsolete in (
