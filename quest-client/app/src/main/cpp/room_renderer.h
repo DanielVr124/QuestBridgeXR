@@ -58,6 +58,7 @@ private:
     GLuint createProceduralEnvironment(int sceneIndex);
     void createGeometry();
     void chooseEnvironment();
+    void updateMousePayload(std::uint16_t buttons);
     std::array<float,3> ledZoneColor(int zone, float position) const;
     std::array<float,3> ledZoneAverageColor(int zone) const;
     void drawBox(const float* projectionView, float x, float y, float z,
