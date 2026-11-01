@@ -59,6 +59,7 @@ private:
     GLuint createProceduralEnvironment(int sceneIndex);
     void createGeometry();
     void chooseEnvironment();
+    void applyEnvironment(const std::string& environment);
     void updateMousePayload(std::uint16_t buttons);
     std::array<float,3> ledZoneColor(int zone, float position) const;
     std::array<float,3> ledZoneAverageColor(int zone) const;
@@ -113,6 +114,10 @@ private:
     GlbModel mouseModel_;
     CityWorld cityWorld_;
     bool citySpawnPending_ = true;
+    bool cityReturnValid_ = false;
+    float roomReturnMoveX_ = 0.0f;
+    float roomReturnMoveZ_ = 0.0f;
+    float roomReturnYaw_ = 0.0f;
     GLuint program_ = 0;
     GLuint vignetteProgram_ = 0;
     GLuint vao_ = 0;
