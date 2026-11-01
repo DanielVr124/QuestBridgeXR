@@ -43,7 +43,8 @@ camera_count = len(review_views)
         self.assertIn("scene.render.resolution_x=1200; scene.render.resolution_y=900;", patched)
         self.assertIn("Emission Strength", patched)
         self.assertIn("default_value = 4.5", patched)
-        self.assertIn("Headboard blue-violet LED diffuser", patched)
+        self.assertIn("headboard_led_diffuser", patched)
+        self.assertIn("(0.055, 0.14, 1.0, 1.0)", patched)
         self.assertEqual(patched.count("review_views = ["), 1)
 
     def test_refuses_a_scene_without_the_expected_camera_list(self):
