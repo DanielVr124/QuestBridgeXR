@@ -2432,7 +2432,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
 
     const float deskX=-halfW+1.32f+.04f, deskZ=-halfD+.56f;
-    const float chairX=deskX, chairZ=deskZ+1.12f;
+    const float chairX=deskX+chairOffsetX_, chairZ=deskZ+1.12f+chairOffsetZ_;
     if(sitAnchorPending_) {
         // Ease the virtual room anchor toward the chair instead of teleporting
         // the player to it. Raw OpenXR head tracking and orientation stay intact.
@@ -3109,17 +3109,16 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // separate pillows, tailored headboard, bedside storage and practical lamps.
     // Geometry stays inside the existing room bounds and is fully walkable around.
     // -------------------------------------------------------------------------
-    // Legacy room-space anchor: the bed is backZ+2.10f; its visible assembly is shifted 20 cm right.
-    const float bedX=halfW-2.0f, bedZ=-halfD+2.10f;
-    const float bedRenderX=bedX+.20f;
-    const auto bedBase=rgb(.018f,.024f,.043f);
-    const auto bedMetal=rgb(.16f,.20f,.30f);
-
-    // The complete bed is a custom, textured multi-part GLB built for this exact
-    // bedroom anchor. The bedside cabinets and their controls remain native room props.
-    drawGroundShadow(pv.data(),bedRenderX,floorY+.004f,bedZ,3.20f,4.05f,.42f);
+    // Place the enlarged upholstered bed flush into the far-right/back corner.
+    constexpr float bedScale=1.16f;
+    const float bedWidth=3.20f*bedScale;
+    const float bedDepth=4.05f*bedScale;
+    const float bedRenderX=halfW-bedWidth*.5f;
+    const float bedX=bedRenderX-.20f;
+    const float bedZ=backZ+bedDepth*.5f;
+    drawGroundShadow(pv.data(),bedRenderX,floorY+.004f,bedZ,bedWidth,bedDepth,.42f);
     const float bedPlacement[16] = {
-        1,0,0,0, 0,1,0,0, 0,0,1,0, bedRenderX,floorY,bedZ,1
+        bedScale,0,0,0, 0,bedScale,0,0, 0,0,bedScale,0, bedRenderX,floorY,bedZ,1
     };
     const std::array<float,4> bedExposure{{.68f,.64f,.59f,1.0f}};
     bedModel_.draw(pv.data(),bedPlacement,locMvp_,locModel_,locColor_,locTextured_,
@@ -3127,7 +3126,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // The recessed headboard emitter is masked from a reclined view by the
     // padded frame lips. Keep its colour bounce active, but reveal the narrow
     // LED channel only when the headset is aimed almost straight at the headboard.
-    const float emitterZ=bedZ-1.270f;
+    const float emitterZ=bedZ-1.270f*bedScale;
     const float toLedX=bedRenderX-cameraX;
     const float toLedY=floorY+1.180f-cameraY;
     const float toLedZ=emitterZ-cameraZ;
@@ -3135,45 +3134,17 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float viewForwardX=-camera[8],viewForwardY=-camera[9],viewForwardZ=-camera[10];
     const float straightOn=(viewForwardX*toLedX+viewForwardY*toLedY+viewForwardZ*toLedZ)/toLedLength;
     if(ledZones_[0].enabled&&straightOn>0.985f) {
-        drawGradientBar(0,bedX+.20f,floorY+.405f,emitterZ,2.49f,.014f,.012f,40);
-        drawGradientBar(0,bedX+.20f,floorY+1.955f,emitterZ,2.49f,.014f,.012f,40);
+        drawGradientBar(0,bedRenderX,floorY+.405f*bedScale,emitterZ,
+                        2.49f*bedScale,.014f,.012f,40);
+        drawGradientBar(0,bedRenderX,floorY+1.955f*bedScale,emitterZ,
+                        2.49f*bedScale,.014f,.012f,40);
         for(int edge=0;edge<2;++edge) {
-            const float x=bedRenderX+(edge==0?-1.235f:1.235f);
-            drawGradientBarY(0,x,floorY+1.180f,emitterZ,.014f,1.57f,.012f,32);
+            const float x=bedRenderX+(edge==0?-1.235f:1.235f)*bedScale;
+            drawGradientBarY(0,x,floorY+1.180f*bedScale,emitterZ,
+                             .014f,1.57f*bedScale,.012f,32);
         }
     }
-    // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.
-    for(int side : {-1,1}) {
-        const float nx=bedRenderX+side*1.53f, nz=bedZ-.94f;
-        drawRoundedBox(pv.data(),nx,floorY+.405f,nz,.52f,.60f,.56f,bedBase,0.0f,5);
-        drawRoundedBox(pv.data(),nx,floorY+.68f,nz,.56f,.055f,.60f,bedMetal,0.0f,4);
-        for(int drawer=0;drawer<2;++drawer) {
-            const float dy=floorY+.34f+drawer*.22f;
-            drawRoundedBox(pv.data(),nx,dy,nz+.289f,.445f,.185f,.025f,
-                           rgb(.055f,.068f,.11f),0.0f,5);
-            drawRoundedBox(pv.data(),nx,dy+.035f,nz+.308f,.10f,.012f,.012f,
-                           bedMetal,0.0f,4);
-        }
-        drawCylinder(pv.data(),nx,floorY+.79f,nz,.055f,.20f,bedMetal,4);
-        drawCylinder(pv.data(),nx,floorY+.925f,nz,.25f,.20f,
-                     side<0?rgb(ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]):rgb(ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]),3);
-        drawCylinder(pv.data(),nx,floorY+1.035f,nz,.17f,.025f,
-                     side<0?rgb(ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]):rgb(ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]),0,0.0f);
-        drawSphere(pv.data(),nx,floorY+.91f,nz,.07f,.075f,.07f,
-                   side<0?rgb(ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]):rgb(ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]),7);
-        // A compact segmented halo lets each bedside zone show its own gradient.
-        const int bedsideZone=side<0?5:6;
-        if(ledZones_[static_cast<size_t>(bedsideZone)].enabled) {
-            for(int segment=0;segment<16;++segment) {
-                const float t=(static_cast<float>(segment)+.5f)/16.0f;
-                const float angle=t*2.0f*kPi;
-                const auto halo=ledZoneColor(bedsideZone,t);
-                drawSphere(pv.data(),nx+std::cos(angle)*.090f,floorY+1.045f,
-                           nz+std::sin(angle)*.090f,.013f,.010f,.013f,
-                           rgb(halo[0],halo[1],halo[2]),7);
-            }
-        }
-    }
+    // Bedside tables and their lamp props are intentionally removed.
 
     // Place the supplied desk almost flush to both walls in the back-left corner.
     const float deskZ=backZ+0.56f;
@@ -3324,11 +3295,11 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawGroundShadow(pv.data(),chairX,floorY+.006f,chairZ,1.02f,1.18f,.40f);
         if(settings_.showChair&&chairModel_.loaded()) {
             // The supplied GLB already faces the desk along local -Z.
-            const float chairPlacement[16]={
-                1,0,0,0, 0,1,0,0, 0,0,1,0, chairX,floorY,chairZ,1
-            };
-            chairModel_.draw(pv.data(),chairPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                             locTexture_,locMaterial_,locRounded_,locUvScale_);
+            const Mat4 chairPlacementMatrix=mul(
+                translation(chairX,floorY,chairZ),rotateY(chairYaw_));
+            chairModel_.draw(pv.data(),chairPlacementMatrix.data(),locMvp_,locModel_,locColor_,locTextured_,
+                             locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,
+                             &chairExposure);
         } else {
             // Deliberately complete fallback: a white high-back gaming chair with
             // padded seat/back, arm rests, gas lift and a five-spoke wheel base.
@@ -3382,7 +3353,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float tvX=bedX, tvZ=bedZ+3.18f;
         const float tvRenderX=tvX+.20f;
         // Scale the full stand and display together to better balance it beside the bed.
-        constexpr float tvModelScale=.90f;
+        constexpr float tvModelScale=1.14f;
         const float tvScreenWidth=1.218f*tvModelScale;
         const float tvScreenHeight=.685f*tvModelScale;
         const float tvScreenCenterY=floorY+.984f*tvModelScale;
