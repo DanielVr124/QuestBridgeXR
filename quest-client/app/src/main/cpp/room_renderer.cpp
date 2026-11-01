@@ -2172,7 +2172,8 @@ void RoomRenderer::drawPanoramaSkybox(const float* pv,float cameraX,float camera
     const Mat4 mvp=mul(projectionView,model);
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
     glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
-    glUniform4f(locColor_,1.0f,1.0f,1.0f,1.0f);
+    // Keep the photographic city panorama at its intended night exposure.
+    glUniform4f(locColor_,0.60f,0.63f,0.70f,1.0f);
     glUniform1i(locTextured_,1);
     glUniform1i(locMaterial_,-1);
     glUniform1i(locRounded_,0);
@@ -2388,7 +2389,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}
     else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
 
-    const float deskX=-halfW+1.32f, deskZ=-halfD+.43f;
+    const float deskX=-halfW+1.36f, deskZ=-halfD+.56f;
     const float chairX=deskX, chairZ=deskZ+1.12f;
     if(sitAnchorPending_) {
         // Ease the virtual room anchor toward the chair instead of teleporting
@@ -2423,7 +2424,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     float targetX=std::clamp(playerX+stepX,-halfW+0.34f,halfW-0.34f);
     float targetZ=std::clamp(playerZ+stepZ,-halfD+0.34f,halfD-0.34f);
 
-    const float bedX=halfW-2.0f, bedZ=-halfD+2.10f;
+    const float bedX=halfW-1.72f, bedZ=-halfD+2.10f;
     auto overlaps=[](float x,float z,float cx,float cz,float rx,float rz) {
         return std::fabs(x-cx)<rx && std::fabs(z-cz)<rz;
     };
@@ -2497,19 +2498,106 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
 
     const float floorY=settings_.floorOffsetY;
     const float frontZ=halfD;
-    const float deskX=-halfW+1.32f;
-    const float deskZ=-halfD+.43f;
+    const float deskX=-halfW+1.36f;
+    const float deskZ=-halfD+.56f;
     const float deskSurface=floorY+.75f;
     const float chairX=deskX;
     const float chairZ=deskZ+1.12f;
 
     // Never leave a host-side mouse button held when a menu or settings change
     // interrupts a drag operation.
-    if(menuVisible_||!settings_.roomControlsEnabled) {
-        if(mouseDragging_) {
-            mouseDragging_=false;
-            updateMousePayload(0);
+    if(menuVisible_) {
+        menuPointerValid_=false;
+        const XrQuaternionf roomYaw{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
+        const XrQuaternionf roomOrientation=quatMul(roomYaw,controllerPose.orientation);
+        auto rotatePointerVector=[](const XrQuaternionf& q,const std::array<float,3>& v) {
+            const float tx=2.0f*(q.y*v[2]-q.z*v[1]);
+            const float ty=2.0f*(q.z*v[0]-q.x*v[2]);
+            const float tz=2.0f*(q.x*v[1]-q.y*v[0]);
+            return std::array<float,3>{
+                v[0]+q.w*tx+(q.y*tz-q.z*ty),
+                v[1]+q.w*ty+(q.z*tx-q.x*tz),
+                v[2]+q.w*tz+(q.x*ty-q.y*tx)
+            };
+        };
+        const auto pointerOrigin=rotatePointerVector(roomYaw,
+            {controllerPose.position.x+moveX_,controllerPose.position.y,
+             controllerPose.position.z+moveZ_});
+        auto pointerDirection=rotatePointerVector(roomOrientation,{0.0f,0.0f,-1.0f});
+        const float pointerLength=std::sqrt(pointerDirection[0]*pointerDirection[0]+
+            pointerDirection[1]*pointerDirection[1]+pointerDirection[2]*pointerDirection[2]);
+        if(pointerLength>.0001f) {
+            for(float& c:pointerDirection)c/=pointerLength;
+            const float halfW=settings_.roomSize=="large"?6.0f:(settings_.roomSize=="medium"?4.2f:3.0f);
+            const float halfD=settings_.roomSize=="large"?7.5f:(settings_.roomSize=="medium"?5.4f:3.8f);
+            const float deskX=-halfW+1.36f,deskZ=-halfD+.56f;
+            const float monitorX=deskX;
+            const float monitorZ=deskZ-.31f;
+            const float menuY=settings_.floorOffsetY+1.03f;
+            if(pointerDirection[2]<-.08f) {
+                const float t=(monitorZ+.001f-pointerOrigin[2])/pointerDirection[2];
+                if(t>.02f&&t<8.0f) {
+                    const float hitX=pointerOrigin[0]+pointerDirection[0]*t;
+                    const float hitY=pointerOrigin[1]+pointerDirection[1]*t;
+                    menuPointerOrigin_=pointerOrigin;
+                    menuPointerHit_={hitX,hitY,monitorZ+.003f};
+                    menuPointerValid_=hitX>=monitorX-.300f&&hitX<=monitorX+.300f&&
+                                      hitY>=menuY-.175f&&hitY<=menuY+.175f;
+                    if(menuPointerValid_&&triggerPressed&&!previousMenuPointerTrigger_) {
+                        const float navX=monitorX-.216f;
+                        const float bodyX=monitorX+.063f;
+                        if(std::fabs(hitX-navX)<.067f) {
+                            const float tabY[5]={menuY+.061f,menuY+.015f,menuY-.031f,
+                                                menuY-.077f,menuY-.123f};
+                            for(int i=0;i<5;++i) if(std::fabs(hitY-tabY[i])<.020f) {
+                                menuPage_=i;menuSelection_=0;
+                                environmentDropdownOpen_=false;
+                                lightingColorPickerOpen_=false;
+                                break;
+                            }
+                        } else if(environmentDropdownOpen_&&hitX>bodyX-.115f&&hitX<bodyX+.205f) {
+                            for(int item=0;item<4;++item) {
+                                const float rowY=menuY-.012f-item*.031f;
+                                if(std::fabs(hitY-rowY)<.017f) {
+                                    environmentDropdownIndex_=(environmentDropdownIndex_+item)%
+                                        static_cast<int>(kEnvironmentNames.size());
+                                    handleMenuInput(0.0f,0.0f,0.0f,true);
+                                    break;
+                                }
+                            }
+                        } else {
+                            int selection=-1;
+                            const float* rows=nullptr;
+                            static const float envRows[6]={.038f,.005f,-.028f,-.061f,-.094f,-.127f};
+                            static const float displayRows[3]={.034f,-.018f,-.070f};
+                            static const float ledRows[6]={.046f,.009f,-.028f,-.065f,-.102f,-.139f};
+                            static const float comfortRows[4]={.034f,-.010f,-.054f,-.098f};
+                            int count=0;
+                            if(menuPage_==1){rows=envRows;count=6;}
+                            else if(menuPage_==2){rows=displayRows;count=3;}
+                            else if(menuPage_==3&&!lightingColorPickerOpen_){rows=ledRows;count=6;}
+                            else if(menuPage_==4){rows=comfortRows;count=4;}
+                            else if(menuPage_==0) {
+                                if(std::fabs(hitY-(menuY-.075f))<.025f) selection=0;
+                            }
+                            if(rows) for(int i=0;i<count;++i)
+                                if(std::fabs(hitY-(menuY+rows[i]))<.019f){selection=i;break;}
+                            if(selection>=0&&hitX>=bodyX-.205f&&hitX<=bodyX+.215f) {
+                                menuSelection_=selection;
+                                handleMenuInput(0.0f,0.0f,0.0f,true);
+                            }
+                        }
+                    }
+                }
+            }
         }
+        previousMenuPointerTrigger_=triggerPressed;
+        if(mouseDragging_) {mouseDragging_=false;updateMousePayload(0);}
+        return;
+    }
+    previousMenuPointerTrigger_=false;
+    if(!settings_.roomControlsEnabled) {
+        if(mouseDragging_) {mouseDragging_=false;updateMousePayload(0);}
         return;
     }
 
@@ -2590,7 +2678,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
     // A trigger tap on either the upholstered backrest or the seat cushion
     // enters seated mode. The seat ray makes sitting feel like touching the chair.
     bool chairHit=false;
-    if(settings_.showChair&&chairModel_.loaded()) {
+    if(settings_.showChair) {
         if(direction[2]<-.10f) {
             const float chairBackZ=chairZ+.455f;
             const float t=(chairBackZ-origin[2])/direction[2];
@@ -2792,7 +2880,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform3f(locPracticalLight2Position_,halfW-0.30f,floorY+1.92f,-1.45f);
     glUniform3f(locPracticalLight2Color_,ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]);
     glUniform1f(locPracticalLight2Intensity_,ledZones_[6].enabled?0.82f*roomLightScale:0.0f);
-    glUniform3f(locHeadboardGlowPosition_,halfW-2.0f,floorY+1.43f,-halfD+2.10f-1.22f);
+    glUniform3f(locHeadboardGlowPosition_,halfW-1.72f,floorY+1.43f,-halfD+2.10f-1.22f);
     glUniform3f(locHeadboardGlowColor_,ledHeadboard[0],ledHeadboard[1],ledHeadboard[2]);
     glUniform1f(locHeadboardGlowIntensity_,ledZones_[0].enabled?2.60f*roomLightScale:0.0f);
     glUniform3f(locNeonBluePosition_,-halfW+0.20f,floorY+2.75f,-0.45f);
@@ -2974,7 +3062,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // separate pillows, tailored headboard, bedside storage and practical lamps.
     // Geometry stays inside the existing room bounds and is fully walkable around.
     // -------------------------------------------------------------------------
-    const float bedX=halfW-2.0f;
+    const float bedX=halfW-1.72f;
     const float bedZ=backZ+2.10f;
     const auto bedBase=rgb(.018f,.024f,.043f);
     const auto bedMetal=rgb(.16f,.20f,.30f);
@@ -2985,8 +3073,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float bedPlacement[16] = {
         1,0,0,0, 0,1,0,0, 0,0,1,0, bedX,floorY,bedZ,1
     };
+    const std::array<float,4> bedExposure{{.64f,.66f,.76f,1.0f}};
     bedModel_.draw(pv.data(),bedPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                   locTexture_,locMaterial_,locRounded_,locUvScale_);
+                   locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&bedExposure);
     // The recessed headboard emitter is masked from a reclined view by the
     // padded frame lips. Keep its colour bounce active, but reveal the narrow
     // LED channel only when the headset is aimed almost straight at the headboard.
@@ -3040,7 +3129,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
     // Place the supplied desk almost flush to both walls in the back-left corner.
     const float deskZ=backZ+0.43f;
-    const float deskX=-halfW+1.32f;
+    const float deskX=-halfW+1.36f;
     const int monitorCount=std::clamp(settings_.monitorCount,1,3);
     const float monitorBaseX=deskX-(monitorCount-1)*.335f;
     const float monitorX=monitorCount==3?deskX:monitorBaseX;
@@ -3183,15 +3272,50 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // User-supplied chair faces the desk; yaw 180 degrees puts the tall
     // upholstered backrest on the room-facing side.
     const float chairX=deskX, chairZ=deskZ+1.12f;
-    if(settings_.showChair&&chairModel_.loaded()) {
-        drawGroundShadow(pv.data(),chairX,floorY+.006f,chairZ,.92f,1.12f,.36f);
-        // The supplied GLB already faces the desk along local -Z.
-        // Keep its native orientation; a 180-degree flip put the backrest toward the desk.
-        const float chairPlacement[16]={
-            1,0,0,0, 0,1,0,0, 0,0,1,0, chairX,floorY,chairZ,1
-        };
-        chairModel_.draw(pv.data(),chairPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                         locTexture_,locMaterial_,locRounded_,locUvScale_);
+    if(settings_.showChair) {
+        drawGroundShadow(pv.data(),chairX,floorY+.006f,chairZ,1.02f,1.18f,.40f);
+        if(chairModel_.loaded()) {
+            // The supplied GLB faces the desk along local -Z.
+            const float chairPlacement[16]={
+                1,0,0,0, 0,1,0,0, 0,0,1,0, chairX,floorY,chairZ,1
+            };
+            chairModel_.draw(pv.data(),chairPlacement,locMvp_,locModel_,locColor_,locTextured_,
+                             locTexture_,locMaterial_,locRounded_,locUvScale_);
+        } else {
+            // Deliberately complete fallback: a white high-back gaming chair with
+            // padded seat/back, arm rests, gas lift and a five-spoke wheel base.
+            const auto shell=rgb(.73f,.79f,.88f);
+            const auto cushion=rgb(.91f,.93f,.97f);
+            const auto piping=rgb(.25f,.32f,.45f);
+            drawRoundedBox(pv.data(),chairX,floorY+.53f,chairZ,.82f,.20f,.82f,
+                           shell,0.0f,3);
+            drawRoundedBox(pv.data(),chairX,floorY+.625f,chairZ-.035f,.70f,.10f,.68f,
+                           cushion,0.0f,3);
+            drawRoundedBox(pv.data(),chairX,floorY+1.08f,chairZ+.34f,.84f,1.02f,.23f,
+                           shell,0.0f,3);
+            drawRoundedBox(pv.data(),chairX,floorY+1.08f,chairZ+.205f,.70f,.86f,.075f,
+                           cushion,0.0f,3);
+            drawRoundedBox(pv.data(),chairX,floorY+1.08f,chairZ+.155f,.045f,.78f,.022f,
+                           piping,0.0f,5);
+            for(int side : {-1,1}) {
+                const float armX=chairX+side*.47f;
+                drawRoundedBox(pv.data(),armX,floorY+.71f,chairZ-.055f,.095f,.43f,.11f,
+                               shell,0.0f,4);
+                drawRoundedBox(pv.data(),armX,floorY+.91f,chairZ-.015f,.17f,.075f,.62f,
+                               cushion,0.0f,3);
+                drawRoundedBox(pv.data(),armX,floorY+1.08f,chairZ+.34f,.075f,.94f,.18f,
+                               shell,0.0f,4);
+            }
+            drawCylinder(pv.data(),chairX,floorY+.30f,chairZ,.16f,.43f,piping,4);
+            for(int spoke=0;spoke<5;++spoke) {
+                const float angle=2.0f*kPi*static_cast<float>(spoke)/5.0f;
+                const float sx=std::cos(angle)*.37f, sz=std::sin(angle)*.37f;
+                drawRoundedBox(pv.data(),chairX+sx*.48f,floorY+.105f,chairZ+sz*.48f,
+                               .48f,.075f,.105f,shell,angle,4);
+                drawSphere(pv.data(),chairX+sx,floorY+.075f,chairZ+sz,
+                           .075f,.075f,.075f,piping,5);
+            }
+        }
     }
 
     // White wireless mouse rests on the desk and moves only over the tabletop.
@@ -3206,17 +3330,36 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
     // User-supplied tall-stand TV replaces the former procedural screen and console.
     // The imported display faces back toward the bed and retains PC stream routing.
-    if(settings_.showTv&&tvModel_.loaded()) {
+    if(settings_.showTv) {
         const float tvX=bedX, tvZ=bedZ+3.18f;
-        const float tvPlacement[16]={
-            -1,0,0,0, 0,1,0,0, 0,0,-1,0, tvX,floorY,tvZ,1
-        };
-        tvModel_.draw(pv.data(),tvPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                      locTexture_,locMaterial_,locRounded_,locUvScale_);
         const bool tvStream=settings_.screenDestination=="tv"||settings_.screenDestination=="both";
         const GLuint tvTex=(tvStream&&hasVideo)?videoTexture:env;
-        drawPlane(pv.data(),tvX,floorY+.984f,tvZ-.002f,1.218f,.685f,tvTex,rgb(1,1,1),kPi);
-        drawGroundShadow(pv.data(),tvX,floorY+.004f,tvZ+.02f,1.58f,.75f,.30f);
+        if(tvModel_.loaded()) {
+            const float tvPlacement[16]={
+                -1,0,0,0, 0,1,0,0, 0,0,-1,0, tvX,floorY,tvZ,1
+            };
+            tvModel_.draw(pv.data(),tvPlacement,locMvp_,locModel_,locColor_,locTextured_,
+                          locTexture_,locMaterial_,locRounded_,locUvScale_);
+            drawPlane(pv.data(),tvX,floorY+.984f,tvZ-.002f,1.218f,.685f,tvTex,rgb(1,1,1),kPi);
+        } else {
+            // Reliable 55-inch-style TV fallback: slim dark bezel, lit screen,
+            // central metal pedestal and a wide weighted foot, facing the bed.
+            const auto bezel=rgb(.012f,.016f,.027f);
+            const auto stand=rgb(.17f,.20f,.27f);
+            drawGroundShadow(pv.data(),tvX,floorY+.004f,tvZ+.05f,1.72f,.92f,.34f);
+            drawRoundedBox(pv.data(),tvX,floorY+1.10f,tvZ+.045f,1.52f,.91f,.105f,
+                           bezel,0.0f,5);
+            drawRoundedBox(pv.data(),tvX,floorY+1.10f,tvZ-.013f,1.43f,.82f,.018f,
+                           rgb(.035f,.045f,.075f),0.0f,5);
+            drawPlane(pv.data(),tvX,floorY+1.10f,tvZ-.026f,1.405f,.795f,
+                      tvTex,rgb(1,1,1),kPi);
+            drawSphere(pv.data(),tvX,floorY+.60f,tvZ+.07f,.035f,.035f,.035f,
+                       rgb(.16f,.65f,1.0f),7);
+            drawRoundedBox(pv.data(),tvX,floorY+.31f,tvZ+.12f,.12f,.49f,.13f,
+                           stand,0.0f,4);
+            drawRoundedBox(pv.data(),tvX,floorY+.075f,tvZ+.16f,.78f,.07f,.35f,
+                           stand,0.0f,4);
+        }
     }
 
     const float lampX=-halfW+.30f,lampZ=-1.45f;
@@ -3442,6 +3585,21 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         }
         glDisable(GL_BLEND);
         glDepthMask(GL_TRUE);
+        if(menuPointerValid_) {
+            // A fine blue-white ray with a distinct cursor dot, in the style of
+            // a desktop VR laser pointer. The beam is drawn as short capsules.
+            glDisable(GL_DEPTH_TEST);
+            const auto start=menuPointerOrigin_;
+            const auto finish=menuPointerHit_;
+            const float dx=finish[0]-start[0],dy=finish[1]-start[1],dz=finish[2]-start[2];
+            for(int segment=1;segment<=18;++segment) {
+                const float t=static_cast<float>(segment)/19.0f;
+                drawSphere(pv.data(),start[0]+dx*t,start[1]+dy*t,start[2]+dz*t,
+                           .0045f,.0045f,.0045f,rgb(.30f,.78f,1.0f),7);
+            }
+            drawSphere(pv.data(),finish[0],finish[1],finish[2],
+                       .018f,.018f,.018f,rgb(.88f,.97f,1.0f),7);
+        }
     }
     glBindTexture(GL_TEXTURE_2D,0);glBindVertexArray(0);glUseProgram(0);glDisable(GL_DEPTH_TEST);
 }
