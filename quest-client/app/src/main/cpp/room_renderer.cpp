@@ -1390,6 +1390,7 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,shadowSize,shadowSize,0,GL_RGBA,GL_UNSIGNED_BYTE,shadowPixels.data());
     glBindTexture(GL_TEXTURE_2D,0);
     if(!cityWorld_.initialize()) LOGE("explorable city renderer failed to initialize");
+    if(!cityWorld_.initialize()) LOGE("explorable city renderer failed to initialize");
     initialized_=true; chooseEnvironment(); LOGI("cozy room / city renderer initialized"); return true;
 }
 
@@ -2167,6 +2168,39 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     if(dt<0.0f||dt>0.1f)dt=0.0f;
     const float yaw=headYaw(headPose)+virtualYaw_;
     const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
+
+    if(settings_.environment=="explorable_city") {
+        if(citySpawnPending_) {
+            moveX_=42.0f-headPose.position.x;
+            moveZ_=42.0f-headPose.position.z;
+            citySpawnPending_=false;
+        }
+        const float forwardX=-std::sin(yaw), forwardZ=-std::cos(yaw);
+        const float rightX=std::cos(yaw), rightZ=-std::sin(yaw);
+        const float stepX=settings_.roomMovementEnabled?(rightX*leftX+forwardX*leftY)*speed*dt:0.0f;
+        const float stepZ=settings_.roomMovementEnabled?(rightZ*leftX+forwardZ*leftY)*speed*dt:0.0f;
+        const float playerX=headPose.position.x+moveX_;
+        const float playerZ=headPose.position.z+moveZ_;
+        float targetX=playerX+stepX;
+        float targetZ=playerZ+stepZ;
+        if(cityWorld_.collides(targetX,playerZ) && !cityWorld_.collides(playerX,playerZ)) targetX=playerX;
+        if(cityWorld_.collides(targetX,targetZ) && !cityWorld_.collides(targetX,playerZ)) targetZ=playerZ;
+        moveX_=targetX-headPose.position.x;
+        moveZ_=targetZ-headPose.position.z;
+        snapCooldown_=std::max(0.0f,snapCooldown_-dt);
+        if(settings_.smoothTurn) {
+            virtualYaw_-=std::clamp(rightStickX,-1.0f,1.0f)*std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;
+        } else {
+            const bool right=rightStickX>0.7f,left=rightStickX < -0.7f;
+            if(snapCooldown_<=0.0f && right && !previousTurnRight_) {
+                virtualYaw_-=settings_.snapTurnDegrees*kPi/180.0f; snapCooldown_=0.24f;
+            } else if(snapCooldown_<=0.0f && left && !previousTurnLeft_) {
+                virtualYaw_+=settings_.snapTurnDegrees*kPi/180.0f; snapCooldown_=0.24f;
+            }
+            previousTurnRight_=right; previousTurnLeft_=left;
+        }
+        return;
+    }
 
     float halfW=3.0f,halfD=3.8f;
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}
