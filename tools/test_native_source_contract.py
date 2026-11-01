@@ -75,7 +75,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("if (sceneIndex == 29)", source)
         self.assertIn("city lights into softened, vertically stretched reflections", source)
         self.assertIn("const float bedX=halfW-2.0f, bedZ=-halfD+2.10f", source)
-        self.assertIn('bedModel_.load(assets,"models/arc_upholstered_bed.glb")', source)
+        self.assertIn('bedModel_.load(assets,"models/gaming_bed.glb")', source)
         self.assertIn("bedModel_.draw(pv.data(),bedPlacement", source)
         self.assertIn("bedModel_.release()", source)
         self.assertIn("backZ+2.10f", source)
