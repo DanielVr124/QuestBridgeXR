@@ -8,7 +8,8 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from bed_design_patch import OLD_GEOMETRY, NEW_GEOMETRY, patch_bed_geometry
+from bed_design_patch import (OLD_GEOMETRY, NEW_GEOMETRY, IMAGE_IMPORT_OLD,
+                              IMAGE_IMPORT_NEW, HEADBOARD_MATERIALS, patch_bed_geometry)
 
 
 class BedDesignPatchTests(unittest.TestCase):
@@ -22,7 +23,6 @@ class BedDesignPatchTests(unittest.TestCase):
         for token in (
             "Headboard_structural_backing",
             "Headboard_alligator_side_band_",
-            "Headboard_alligator_scale_",
             "Headboard_mirror_bevel_",
             "Headboard_inner_shadow_reveal",
             "Headboard_recessed_LED_channel_",
@@ -35,7 +35,12 @@ class BedDesignPatchTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
 
-        self.assertIn("(1.055,.685,.128),'sheet'", self.patched)
+        self.assertIn("(1.055,.685,.128),'headboard_leather'", self.patched)
+        self.assertIn("materials['headboard_chrome']", self.patched)
+        self.assertIn("materials['headboard_crystal']", self.patched)
+        self.assertIn("materials['headboard_emboss_horizontal']", self.patched)
+        self.assertIn("materials['headboard_emboss_vertical']", self.patched)
+        self.assertIn("headboard_alligator_horizontal", self.patched)
         self.assertIn("tuft_x = (-.82,-.41,0,.41,.82)", self.patched)
         self.assertIn("tuft_y = (1.705,1.355,1.015,.665)", self.patched)
         self.assertIn("recessed perimeter RGB backlight", self.patched)
@@ -61,10 +66,12 @@ class BedDesignPatchTests(unittest.TestCase):
             "    merged.vertex_normals  # include normals in optimized runtime batches\n", "", 1
         )
         restored = restored.replace(
-            "'design':'Original bed platform and bedding retained; Brambley-style silver faux-leather crystal-button diamond-tufted headboard insert, beveled mirror frame, subtly embossed silver outer bands and recessed perimeter RGB backlight',",
+            "'design':'Original bed platform and bedding retained; Brambley-style pearl-silver bi-cast vinyl diamond-tufted headboard insert, polished mirror chrome bevels, direction-mapped faux-alligator silver panels, clear crystal buttons and recessed perimeter RGB backlight',",
             "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',",
             1
         )
+        restored = restored.replace(HEADBOARD_MATERIALS, "", 1)
+        restored = restored.replace(IMAGE_IMPORT_NEW, IMAGE_IMPORT_OLD, 1)
         self.assertEqual(restored, self.source)
         for token in ("mattress", "duvet", "throw", "footboard", "platform"):
             with self.subTest(token=token):
