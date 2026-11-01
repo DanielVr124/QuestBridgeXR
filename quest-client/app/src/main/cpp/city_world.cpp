@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <iterator>
 #include <vector>
 
 namespace {
@@ -458,14 +459,20 @@ void CityWorld::addChunkGround(std::vector<Vertex>& out, int chunkX, int chunkZ,
     const float sidewalk[3]={0.56f,0.56f,0.52f};
     const float curb[3]={0.67f,0.66f,0.61f};
     const float paint[3]={0.84f,0.84f,0.77f};
-    auto ground=[&](float x0,float z0,float x1,float z1,const float* color,float material) {
-        const float a[3]={ox+x0,0.0f,oz+z0};
-        const float b[3]={ox+x0,0.0f,oz+z1};
-        const float c[3]={ox+x1,0.0f,oz+z1};
-        const float d[3]={ox+x1,0.0f,oz+z0};
+    auto ground=[&](float x0,float z0,float x1,float z1,const float* color,float material,float elevation=0.0f) {
+        const float a[3]={ox+x0,elevation,oz+z0};
+        const float b[3]={ox+x0,elevation,oz+z1};
+        const float c[3]={ox+x1,elevation,oz+z1};
+        const float d[3]={ox+x1,elevation,oz+z0};
         addQuad(out,a,b,c,d,color,material,std::max(1.0f,(x1-x0)*.24f),std::max(1.0f,(z1-z0)*.24f));
     };
-    ground(0,0,kChunkSize,kChunkSize,concrete,plaza?8.0f:0.0f);
+    {
+        const float a[3]={ox, -0.06f, oz};
+        const float b[3]={ox, -0.06f, oz+kChunkSize};
+        const float c[3]={ox+kChunkSize, -0.06f, oz+kChunkSize};
+        const float d[3]={ox+kChunkSize, -0.06f, oz};
+        addQuad(out,a,b,c,d,concrete,plaza?8.0f:0.0f,20.0f,20.0f);
+    }
     // Four road corridors continue seamlessly across chunk boundaries.
     ground(0,0,kChunkSize,9.0f,asphalt,1);
     ground(0,75.0f,kChunkSize,kChunkSize,asphalt,1);
@@ -483,24 +490,24 @@ void CityWorld::addChunkGround(std::vector<Vertex>& out, int chunkX, int chunkZ,
     // Dashed lane guides and short crosswalk bars at each intersection.
     for (int dash=0;dash<8;++dash) {
         const float dx=5.0f+dash*10.5f;
-        ground(dx,4.33f,dx+4.5f,4.48f,paint,6);
-        ground(dx,79.4f,dx+4.5f,79.55f,paint,6);
+        ground(dx,4.33f,dx+4.5f,4.48f,paint,6,.014f);
+        ground(dx,79.4f,dx+4.5f,79.55f,paint,6,.014f);
         const float dz=15.0f+dash*8.0f;
-        ground(4.33f,dz,4.48f,dz+3.5f,paint,6);
-        ground(79.4f,dz,79.55f,dz+3.5f,paint,6);
+        ground(4.33f,dz,4.48f,dz+3.5f,paint,6,.014f);
+        ground(79.4f,dz,79.55f,dz+3.5f,paint,6,.014f);
     }
     for (int stripe=0;stripe<6;++stripe) {
         const float x=33.0f+stripe*2.5f;
-        ground(x,9.7f,x+1.25f,12.0f,paint,6);
-        ground(x,72.0f,x+1.25f,74.3f,paint,6);
-        ground(9.7f,33.0f+stripe*2.5f,12.0f,34.25f+stripe*2.5f,paint,6);
-        ground(72.0f,33.0f+stripe*2.5f,74.3f,34.25f+stripe*2.5f,paint,6);
+        ground(x,9.7f,x+1.25f,12.0f,paint,6,.014f);
+        ground(x,72.0f,x+1.25f,74.3f,paint,6,.014f);
+        ground(9.7f,33.0f+stripe*2.5f,12.0f,34.25f+stripe*2.5f,paint,6,.014f);
+        ground(72.0f,33.0f+stripe*2.5f,74.3f,34.25f+stripe*2.5f,paint,6,.014f);
     }
 }
 
 void CityWorld::buildChunk(int chunkX, int chunkZ, int lod) {
     std::vector<Vertex> vertices;
-    vertices.reserve(lod==0?150000u:42000u);
+    vertices.reserve(lod==0?85000u:30000u);
     const float ox=chunkX*kChunkSize, oz=chunkZ*kChunkSize;
     const std::uint32_t seed=hash(static_cast<std::uint32_t>(chunkX)*73856093u ^
                                   static_cast<std::uint32_t>(chunkZ)*19349663u ^ 0x9e3779b9u);
@@ -683,7 +690,7 @@ void CityWorld::render(const float* viewProjection, float cameraX, float cameraY
     const float skyScale=300.0f;
     const float skyModel[16] = {
         skyScale,0,0,0, 0,skyScale,0,0, 0,0,skyScale,0,
-        cameraX,cameraY-6.0f,cameraZ,1
+        cameraX,cameraY-0.6f,cameraZ,1
     };
     float skyMvp[16]{};
     // Column-major multiplication: viewProjection * skyModel.
