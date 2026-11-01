@@ -18,11 +18,11 @@ NEW_GEOMETRY = """
 PILLOW_HALF_WIDTH = .475
 PILLOW_HALF_DEPTH = .33
 PILLOW_EDGE_TOP = .025
-PILLOW_EDGE_BOTTOM = -.115
-PILLOW_CROWN_HEIGHT = .175
-PILLOW_CORNER_EXPONENT = 3.1
-PILLOW_RING_SEGMENTS = 112
-PILLOW_RING_ROWS = 20
+PILLOW_EDGE_BOTTOM = -.125
+PILLOW_CROWN_HEIGHT = .205
+PILLOW_CORNER_EXPONENT = 3.8
+PILLOW_RING_SEGMENTS = 128
+PILLOW_RING_ROWS = 32
 PILLOW_REAR_TILT = math.radians(50.0)
 PILLOW_REST_PIVOT = np.array([0.0, PILLOW_EDGE_BOTTOM, PILLOW_HALF_DEPTH], dtype=float)
 
@@ -36,24 +36,47 @@ def pillow_outline(angle, scale=1.0):
     )
 
 def pillow_crown_height(x, z, side):
-    # A restrained dome keeps the pillow full without making it look inflated.
+    # A fuller, softly squared crown with slight settling at the two contact edges.
     gauge = (
         (abs(x) / PILLOW_HALF_WIDTH) ** PILLOW_CORNER_EXPONENT
         + (abs(z) / PILLOW_HALF_DEPTH) ** PILLOW_CORNER_EXPONENT
     )
     radius = min(1.0, max(0.0, gauge ** (1.0 / PILLOW_CORNER_EXPONENT)))
-    crown = PILLOW_CROWN_HEIGHT * max(0.0, 1.0 - radius * radius) ** .66
-    # The rear edge is fractionally compressed where the pillow meets the headboard.
-    rear_contact = min(1.0, max(0.0, (-z / PILLOW_HALF_DEPTH - .52) / .48))
-    crown *= 1.0 - .09 * rear_contact
+    envelope = max(0.0, 1.0 - radius * radius)
+    crown = PILLOW_CROWN_HEIGHT * envelope ** .62
 
-    # Very low-amplitude, broad cloth relaxation keeps the crown from looking molded.
-    crease_envelope = radius ** 2.0 * math.sqrt(max(0.0, 1.0 - radius))
+    # Compress the casing lightly where it rests against the headboard and mattress.
+    rear_contact = min(1.0, max(0.0, (-z / PILLOW_HALF_DEPTH - .66) / .34))
+    front_contact = min(1.0, max(0.0, (z / PILLOW_HALF_DEPTH - .78) / .22))
+    crown *= 1.0 - .17 * rear_contact ** 1.35
+    crown *= 1.0 - .07 * front_contact ** 1.5
+
+    # Two broad, low relief fill lobes keep the surface from reading as a perfect dome.
+    fill_lobes = (
+        .0045 * math.exp(-(((x - side*.12) / .23) ** 2 + ((z + .025) / .19) ** 2))
+        + .0030 * math.exp(-(((x + side*.16) / .27) ** 2 + ((z - .095) / .17) ** 2))
+    )
+
+    # Tiny depressions are formed into the cloth mesh at the four tucked corners;
+    # they replace visible raised crease-lines with shallow, soft fabric folds.
+    corner_tucks = 0.0
+    for corner_x in (-1, 1):
+        for corner_z in (-1, 1):
+            dx = x - corner_x * .415
+            dz = z - corner_z * .285
+            along = (-corner_x * dx - corner_z * dz) * .70710678
+            across = (corner_x * dz - corner_z * dx) * .70710678
+            corner_tucks += .0038 * math.exp(
+                -((along - .075) / .085) ** 2 - (across / .022) ** 2
+            )
+
+    # Whisper-soft fabric relaxation, with no repeating rib or quilt pattern.
+    crease_envelope = radius ** 2.0 * math.sqrt(max(0.0, envelope))
     fine_relaxation = (
-        .0018 * math.sin(15.0 * x + side * .55)
-        + .0013 * math.sin(13.0 * z - 5.0 * x + side * .3)
+        .0012 * math.sin(11.0 * x + side * .43)
+        + .0009 * math.sin(9.0 * z - 3.0 * x + side * .27)
     ) * crease_envelope
-    return PILLOW_EDGE_TOP + crown + fine_relaxation
+    return PILLOW_EDGE_TOP + crown + fill_lobes - corner_tucks + fine_relaxation
 
 for side in (-1, 1):
     # These centres match the previous bed layout exactly.
@@ -98,7 +121,7 @@ for side in (-1, 1):
             a, b = inner + segment, inner + nxt
             c, d = outer + nxt, outer + segment
             top_faces.extend(((a, b, c), (a, c, d)))
-    add_mesh(f'Sleep_pillow_top_{side}', top_vertices, top_faces, top_uv, 'sheet')
+    add_mesh(f'Sleep_pillow_top_{side}', top_vertices, top_faces, top_uv, 'pillow_cotton')
 
     # A full-depth side gusset has a slight outward belly between its seams.
     # Tiny perimeter slack adds fabric softness without scalloping the edge.
@@ -108,9 +131,12 @@ for side in (-1, 1):
     for row in range(gusset_rows + 1):
         t = row / gusset_rows
         y = PILLOW_EDGE_BOTTOM + (PILLOW_EDGE_TOP - PILLOW_EDGE_BOTTOM) * t
-        belly = .016 * math.sin(math.pi * t)
         for segment in range(PILLOW_RING_SEGMENTS):
             angle = 2.0 * math.pi * segment / PILLOW_RING_SEGMENTS
+            belly = (
+                .012 * math.sin(math.pi * t)
+                + .0025 * math.sin(2.0 * angle + side * .55) * math.sin(math.pi * t)
+            )
             ox, oz = pillow_outline(angle, 1.0 + belly)
             gusset_vertices.append(pillow_world(ox, y, oz))
             gusset_uv.append((segment / PILLOW_RING_SEGMENTS, t))
@@ -126,7 +152,7 @@ for side in (-1, 1):
             gusset_faces.extend(((a, b, c), (a, c, d)))
     add_mesh(
         f'Sleep_pillow_box_gusset_{side}',
-        gusset_vertices, gusset_faces, gusset_uv, 'pillow'
+        gusset_vertices, gusset_faces, gusset_uv, 'pillow_gusset'
     )
 
     # The underside closes the shell and preserves believable thickness from
@@ -159,7 +185,7 @@ for side in (-1, 1):
             bottom_faces.extend(((a, c, b), (a, d, c)))
     add_mesh(
         f'Sleep_pillow_underside_{side}',
-        bottom_vertices, bottom_faces, bottom_uv, 'sheet'
+        bottom_vertices, bottom_faces, bottom_uv, 'pillow_cotton'
     )
 
     def pillow_top_world(x, z, lift=.003):
@@ -176,26 +202,13 @@ for side in (-1, 1):
         lower_gusset_seam.append(
             pillow_world(ox, PILLOW_EDGE_BOTTOM + .014, oz)
         )
-    curve_tube(f'Sleep_pillow_top_welt_{side}', top_welt, .0036, 'linen')
+    curve_tube(f'Sleep_pillow_top_welt_{side}', top_welt, .0022, 'pillow_thread')
     curve_tube(
         f'Sleep_pillow_lower_gusset_seam_{side}',
-        lower_gusset_seam, .0024, 'pillow'
+        lower_gusset_seam, .0015, 'pillow_thread'
     )
 
-    # One very subtle eased crease near each corner suggests a soft filling
-    # settling inside the casing; it does not turn the pillow into a quilt.
-    for corner_x in (-1, 1):
-        for corner_z in (-1, 1):
-            points = []
-            for step in range(12):
-                t = step / 11.0
-                x = corner_x * (.345 + .075 * t)
-                z = corner_z * (.195 + .035 * t)
-                points.append(pillow_top_world(x, z, .0018))
-            curve_tube(
-                f'Sleep_pillow_corner_fold_{side}_{corner_x}_{corner_z}',
-                points, .0010, 'linen', sides=6
-            )
+    # The four soft corner tucks are sculpted into the top mesh above.
 
 # Exactly two full-size sleep pillows are used; no accent or lumbar cushions.
 
@@ -457,6 +470,24 @@ materials['headboard_crystal']=PBRMaterial(
     name='Clear polished crystal tuft hardware',
     baseColorFactor=[242,248,255,255],metallicFactor=.04,roughnessFactor=.07,
     emissiveFactor=[.035,.045,.065],doubleSided=True
+)
+
+# Warm ivory cotton pillow casing and matching side panels. The gusset is
+# slightly shaded so its thickness reads from side angles without turning blue.
+materials['pillow_cotton']=PBRMaterial(
+    name='Warm ivory cotton pillow casing',
+    baseColorFactor=[244,241,234,255],metallicFactor=0.0,roughnessFactor=.96,
+    baseColorTexture=textures['sheet'],doubleSided=True
+)
+materials['pillow_gusset']=PBRMaterial(
+    name='Ivory cotton pillow box gusset',
+    baseColorFactor=[226,223,216,255],metallicFactor=0.0,roughnessFactor=.97,
+    baseColorTexture=textures['sheet'],doubleSided=True
+)
+materials['pillow_thread']=PBRMaterial(
+    name='Fine warm-grey cotton pillow thread',
+    baseColorFactor=[207,202,193,255],metallicFactor=0.0,roughnessFactor=.98,
+    baseColorTexture=textures['linen'],doubleSided=True
 )
 """
 
