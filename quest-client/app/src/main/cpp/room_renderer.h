@@ -213,6 +213,10 @@ private:
     float chairVelocityZ_ = 0.0f;
     float chairAngularVelocity_ = 0.0f;
     float chairWheelRoll_ = 0.0f;
+    float chairCasterYaw_ = 0.0f;
+    bool hasPreviousHeadPosition_ = false;
+    float previousHeadX_ = 0.0f;
+    float previousHeadZ_ = 0.0f;
     bool previousTurnRight_ = false;
     bool previousTurnLeft_ = false;
     bool menuVisible_ = false;
