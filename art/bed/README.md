@@ -3,11 +3,11 @@
 This update restores the original generated bed body and changes **only the headboard upholstery and pillows**.
 
 ## Headboard
-- Five broad, softly filled charcoal panels.
-- Rounded/eased edges are deliberately restrained: the sections stay rectangular and do not become oversized oval cushions.
-- A nested upholstered perimeter creates a narrow recessed RGB light channel.
-- The strip remains hidden from a reclined/lying-down view and only reveals when the headset is aimed nearly straight at the headboard.
-- No exposed LED tape, added footboard, diamond buttons or decorative crystal parts.
+- Five broad charcoal upholstered panels with flat, softly filled faces.
+- Each panel has a small, even edge radius: softened like padded upholstery, but still clearly rectangular rather than ribbed or capsule-shaped.
+- The surrounding headboard is one clean upholstered slab with a slim, low-profile perimeter lip for the recessed RGB channel.
+- The lip is intentionally subtle. The LED glow is revealed only when the headset is aimed almost straight at the headboard; from a reclined view the strip itself stays hidden.
+- No bulky double rails, vertical side bolsters, exposed LED tape, diamond buttons or decorative crystal parts.
 
 ## Pillows
 - The original pillow arrangement and positions are retained: two sleeping pillows, two smaller accent cushions and one lumbar cushion.
