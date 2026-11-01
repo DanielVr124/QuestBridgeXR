@@ -279,6 +279,29 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertLess(glb_loader.index("cgltf_load_buffers(&options,data,nullptr)"),
                         glb_loader.index("cgltf_accessor_unpack_floats(pos"))
 
+    def test_chair_seating_eases_in_and_mouse_drag_remains_desk_bounded(self):
+        renderer = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
+        header = (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8")
+        host = (ROOT / "host/src/main.cpp").read_text(encoding="utf-8")
+        self.assertIn('tvModel_.load(assets,"models/user_tv.glb.gz")', renderer)
+        self.assertIn('chairModel_.load(assets,"models/user_gaming_chair.glb.gz")', renderer)
+        self.assertIn('mouseModel_.load(assets,"models/user_mouse.glb.gz")', renderer)
+        self.assertIn("if(settings_.showChair&&chairModel_.loaded())", renderer)
+        self.assertIn("const float seatSurfaceY=floorY+.53f", renderer)
+        self.assertIn("seatHitZ>=chairZ-.30f&&seatHitZ<=chairZ+.16f", renderer)
+        self.assertIn("const float anchorBlend=1.0f-std::exp(-std::max(dt,0.0f)*7.5f)", renderer)
+        self.assertIn("moveX_+=(targetMoveX-moveX_)*anchorBlend", renderer)
+        self.assertIn("moveZ_+=(targetMoveZ-moveZ_)*anchorBlend", renderer)
+        self.assertIn("mouseOffsetZ_+.41f)/.82f", renderer)
+        self.assertIn("mouseOffsetX_+1.20f)/2.40f", renderer)
+        self.assertIn("mouseDragging_", header)
+        self.assertIn("MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK", host)
+        self.assertIn("MOUSEEVENTF_LEFTDOWN", host)
+        self.assertIn("MOUSEEVENTF_LEFTUP", host)
+        # The seat ease alters only room offsets; the established camera path stays stable.
+        self.assertIn("XrPosef RoomRenderer::projectionPose(const XrPosef& viewPose) const", renderer)
+        self.assertIn("Mat4 camera=makeView(renderedPose,moveX_,moveZ_,virtualYaw_)", renderer)
+
     def test_room_light_switch_and_environment_led_controls_are_real(self):
         renderer = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
         header = (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8")

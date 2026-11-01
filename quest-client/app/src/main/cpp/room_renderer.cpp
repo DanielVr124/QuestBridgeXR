@@ -2253,9 +2253,18 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     const float deskX=-halfW+1.32f, deskZ=-halfD+.43f;
     const float chairX=deskX, chairZ=deskZ+1.12f;
     if(sitAnchorPending_) {
-        moveX_=chairX-headPose.position.x;
-        moveZ_=(chairZ+.18f)-headPose.position.z;
-        sitAnchorPending_=false;
+        // Ease the virtual room anchor toward the chair instead of teleporting
+        // the player to it. Raw OpenXR head tracking and orientation stay intact.
+        const float targetMoveX=chairX-headPose.position.x;
+        const float targetMoveZ=(chairZ+.18f)-headPose.position.z;
+        const float anchorBlend=1.0f-std::exp(-std::max(dt,0.0f)*7.5f);
+        moveX_+=(targetMoveX-moveX_)*anchorBlend;
+        moveZ_+=(targetMoveZ-moveZ_)*anchorBlend;
+        if(std::fabs(targetMoveX-moveX_)<.002f&&std::fabs(targetMoveZ-moveZ_)<.002f) {
+            moveX_=targetMoveX;
+            moveZ_=targetMoveZ;
+            sitAnchorPending_=false;
+        }
     }
     const float seatedTarget=sittingActive_?1.0f:0.0f;
     const float seatBlendStep=std::clamp(dt*3.8f,0.0f,1.0f);
@@ -2314,7 +2323,8 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
 
 void RoomRenderer::updateMousePayload(std::uint16_t buttons) {
     const float normalizedX=std::clamp((mouseOffsetX_+1.20f)/2.40f,0.0f,1.0f);
-    const float normalizedY=std::clamp((mouseOffsetZ_+.43f)/.86f,0.0f,1.0f);
+    // The mapping exactly matches the desk ray's +/-0.41 m drag limits.
+    const float normalizedY=std::clamp((mouseOffsetZ_+.41f)/.82f,0.0f,1.0f);
     const std::uint16_t nextX=static_cast<std::uint16_t>(std::lround(normalizedX*65535.0f));
     const std::uint16_t nextY=static_cast<std::uint16_t>(std::lround(normalizedY*65535.0f));
     const bool changed=nextX!=lastQueuedMouseX_||nextY!=lastQueuedMouseY_||
@@ -2439,20 +2449,35 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
         return;
     }
 
-    // A trigger tap on the rear upholstered backrest enters seated mode.
-    if(settings_.showChair && direction[2]<-.10f) {
-        const float chairBackZ=chairZ+.455f;
-        const float t=(chairBackZ-origin[2])/direction[2];
-        if(t>0.0f&&t<2.8f) {
-            const float hitX=origin[0]+direction[0]*t;
-            const float hitY=origin[1]+direction[1]*t;
-            if(std::fabs(hitX-chairX)<=.265f&&
-               hitY>=floorY+.60f&&hitY<=floorY+1.34f) {
-                sittingActive_=true;
-                sitAnchorPending_=true;
-                return;
+    // A trigger tap on either the upholstered backrest or the seat cushion
+    // enters seated mode. The seat ray makes sitting feel like touching the chair.
+    bool chairHit=false;
+    if(settings_.showChair&&chairModel_.loaded()) {
+        if(direction[2]<-.10f) {
+            const float chairBackZ=chairZ+.455f;
+            const float t=(chairBackZ-origin[2])/direction[2];
+            if(t>0.0f&&t<2.8f) {
+                const float hitX=origin[0]+direction[0]*t;
+                const float hitY=origin[1]+direction[1]*t;
+                chairHit=std::fabs(hitX-chairX)<=.265f&&
+                         hitY>=floorY+.60f&&hitY<=floorY+1.34f;
             }
         }
+        if(!chairHit&&direction[1]<-.10f) {
+            const float seatSurfaceY=floorY+.53f;
+            const float t=(seatSurfaceY-origin[1])/direction[1];
+            if(t>0.0f&&t<3.0f) {
+                const float seatHitX=origin[0]+direction[0]*t;
+                const float seatHitZ=origin[2]+direction[2]*t;
+                chairHit=std::fabs(seatHitX-chairX)<=.30f&&
+                         seatHitZ>=chairZ-.30f&&seatHitZ<=chairZ+.16f;
+            }
+        }
+    }
+    if(chairHit) {
+        sittingActive_=true;
+        sitAnchorPending_=true;
+        return;
     }
 
     // Existing wall switch interaction remains available.
