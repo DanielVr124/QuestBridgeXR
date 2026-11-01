@@ -1818,6 +1818,7 @@ void RoomRenderer::selectRoomScene(int sceneIndex) {
     applyEnvironment(environmentDropdownIndex_==1?"explorable_city":"skyline_penthouse");
 }
 void RoomRenderer::applyEnvironment(const std::string& environment) {
+    hasPreviousHeadPosition_=false;
     const std::string selectedScene=environment=="explorable_city"?"explorable_city":"skyline_penthouse";
     const bool leavingCity=settings_.environment=="explorable_city" && selectedScene!="explorable_city";
     const bool enteringCity=settings_.environment!="explorable_city" && selectedScene=="explorable_city";
@@ -2040,9 +2041,9 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
             if(menuSelection_==0) {
                 sittingActive_=!sittingActive_;
                 sitAnchorPending_=sittingActive_;
-                if(!sittingActive_) chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f;
+                if(!sittingActive_) { chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f; chairCasterYaw_=0.0f; }
             } else if(menuSelection_==4) {
-                chairOffsetX_=chairOffsetZ_=chairYaw_=chairWheelRoll_=0.0f;
+                chairOffsetX_=chairOffsetZ_=chairYaw_=chairWheelRoll_=chairCasterYaw_=0.0f;
                 chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f;
             } else if(menuSelection_==5) {
                 sittingActive_=false;
@@ -2536,7 +2537,14 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
                                std::clamp(dt*8.0f,0.0f,1.0f);
         chairAngularVelocity_*=std::exp(-std::clamp(settings_.chairFriction,.50f,6.0f)*.35f*dt);
         chairYaw_+=chairAngularVelocity_*dt;
-        chairWheelRoll_+=speedNow*dt/.055f;
+        if(speedNow>.035f) {
+            const float travelHeading=std::atan2(-chairVelocityX_,-chairVelocityZ_);
+            const float casterTarget=travelHeading-chairYaw_;
+            const float casterError=std::atan2(std::sin(casterTarget-chairCasterYaw_),
+                                               std::cos(casterTarget-chairCasterYaw_));
+            chairCasterYaw_+=casterError*std::clamp(dt*9.0f,0.0f,1.0f);
+        }
+        chairWheelRoll_=std::fmod(chairWheelRoll_+speedNow*dt/.065f,2.0f*kPi);
         const float seatedChairX=deskX+chairOffsetX_;
         const float seatedChairZ=deskZ+1.12f+chairOffsetZ_;
         moveX_=seatedChairX-headPose.position.x;
@@ -3378,13 +3386,21 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             // Separate small caster overlays spin as the chair rolls, while the
             // imported upholstered shell remains a single high-quality GLB.
             for(int wheel=0;wheel<5;++wheel) {
-                const float angle=chairYaw_+2.0f*kPi*static_cast<float>(wheel)/5.0f;
-                const float wx=chairX+std::cos(angle)*.37f;
-                const float wz=chairZ+std::sin(angle)*.37f;
-                drawRoundedBox(pv.data(),wx,floorY+.105f,wz,.105f,.072f,.052f,
-                               rgb(.075f,.083f,.098f),angle+chairWheelRoll_,5);
-                drawSphere(pv.data(),wx,floorY+.105f,wz,.020f,.020f,.020f,
-                           rgb(.28f,.31f,.35f),4);
+                const float mountAngle=chairYaw_+2.0f*kPi*static_cast<float>(wheel)/5.0f;
+                const float wx=chairX+std::cos(mountAngle)*.37f;
+                const float wz=chairZ+std::sin(mountAngle)*.37f;
+                const auto tire=rgb(.035f,.041f,.052f);
+                const auto hub=rgb(.24f,.29f,.36f);
+                drawSphere(pv.data(),wx,floorY+.105f,wz,.034f,.064f,.064f,tire,6);
+                const float faceX=wx+(std::cos(chairYaw_+chairCasterYaw_)>=0.0f?.031f:-.031f);
+                drawSphere(pv.data(),faceX,floorY+.105f,wz,.005f,.024f,.024f,hub,5);
+                for(int spoke=0;spoke<3;++spoke) {
+                    const float phase=chairWheelRoll_+spoke*(2.0f*kPi/3.0f);
+                    drawRoundedBox(pv.data(),faceX,
+                                   floorY+.105f+std::cos(phase)*.041f,
+                                   wz+std::sin(phase)*.041f,
+                                   .007f,.026f,.008f,hub,0.0f,4);
+                }
             }
         } else {
             // Deliberately complete fallback: a white high-back gaming chair with
