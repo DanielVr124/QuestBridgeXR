@@ -56,6 +56,7 @@ curve_tube(
 
 # ----------------------- RESTORED BED + HEADBOARD CORRECTION -----------------------
 # Keep the original bed platform and a broad, continuous upholstered headboard.
+# Original mattress, fitted sheet, duvet and throw untouched.
 boxsoft(
     'Headboard_back_shell',(0,1.185,-1.575),
     (1.29,.925,.115),'charcoal2',.16
