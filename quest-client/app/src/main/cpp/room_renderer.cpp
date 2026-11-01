@@ -1640,10 +1640,15 @@ void RoomRenderer::createGeometry() {
 }
 
 void RoomRenderer::setSettings(const RoomSettings& settings) {
-    const bool enteringCity = settings.environment=="explorable_city" && settings_.environment!="explorable_city";
+    const std::string previousEnvironment=settings_.environment;
     settings_=settings;
-    if(enteringCity) citySpawnPending_=true;
-    chooseEnvironment();
+    if(previousEnvironment!=settings.environment) {
+        const std::string requestedEnvironment=settings.environment;
+        settings_.environment=previousEnvironment;
+        applyEnvironment(requestedEnvironment);
+    } else {
+        chooseEnvironment();
+    }
 }
 
 std::array<float,3> RoomRenderer::ledZoneColor(int zone,float position) const {
@@ -1679,6 +1684,31 @@ void RoomRenderer::chooseEnvironment() {
         }
     }
 }
+void RoomRenderer::applyEnvironment(const std::string& environment) {
+    const bool leavingCity=settings_.environment=="explorable_city" && environment!="explorable_city";
+    const bool enteringCity=settings_.environment!="explorable_city" && environment=="explorable_city";
+    if(enteringCity) {
+        roomReturnMoveX_=moveX_;
+        roomReturnMoveZ_=moveZ_;
+        roomReturnYaw_=virtualYaw_;
+        cityReturnValid_=true;
+        citySpawnPending_=true;
+    } else if(leavingCity) {
+        if(cityReturnValid_) {
+            moveX_=roomReturnMoveX_;
+            moveZ_=roomReturnMoveZ_;
+            virtualYaw_=roomReturnYaw_;
+        }
+        cityReturnValid_=false;
+        citySpawnPending_=false;
+        snapCooldown_=0.0f;
+        previousTurnRight_=false;
+        previousTurnLeft_=false;
+    }
+    settings_.environment=environment;
+    chooseEnvironment();
+}
+
 void RoomRenderer::cycleScreenDestination() {
     if (!settings_.roomControlsEnabled) return;
     if (settings_.screenDestination == "monitor") settings_.screenDestination = "tv";
@@ -1689,8 +1719,7 @@ void RoomRenderer::cycleScreenDestination() {
 void RoomRenderer::cycleEnvironment() {
     if (!settings_.roomControlsEnabled) return;
     const int nextIndex = (activeEnvironmentIndex_ + 1) % static_cast<int>(kEnvironmentNames.size());
-    settings_.environment = kEnvironmentNames[nextIndex];
-    chooseEnvironment();
+    applyEnvironment(kEnvironmentNames[nextIndex]);
     LOGI("Room scenery changed to %s", settings_.environment.c_str());
 }
 
@@ -1698,10 +1727,8 @@ void RoomRenderer::toggleMenu() {
     if(settings_.environment=="explorable_city") {
         // The city has no bedroom monitor to host the desktop menu; the menu button
         // is therefore a deliberate, immediate return-to-room control.
-        settings_.environment="skyline_penthouse";
-        citySpawnPending_=true;
+        applyEnvironment("skyline_penthouse");
         menuVisible_=false;
-        chooseEnvironment();
         LOGI("returned from explorable city to the room");
         return;
     }
@@ -1774,8 +1801,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
                 environmentDropdownIndex_=(environmentDropdownIndex_+
                     (direction>0?1:static_cast<int>(kEnvironmentNames.size())-1))%
                     static_cast<int>(kEnvironmentNames.size());
-                settings_.environment=kEnvironmentNames[environmentDropdownIndex_];
-                chooseEnvironment();
+                applyEnvironment(kEnvironmentNames[environmentDropdownIndex_]);
             } else if(menuSelection_==1) {
                 const char* sizes[]={"small","medium","large"};
                 const int index=settings_.roomSize=="small"?0:(settings_.roomSize=="large"?2:1);
@@ -1824,8 +1850,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
 
     if(selectPressed) {
         if(environmentDropdownOpen_) {
-            settings_.environment=kEnvironmentNames[environmentDropdownIndex_];
-            chooseEnvironment();
+            applyEnvironment(kEnvironmentNames[environmentDropdownIndex_]);
             environmentDropdownOpen_=false;
         } else if(menuPage_==0) {
             reconnectRequested_=true;
