@@ -40,8 +40,9 @@ emulator-5554 device product:sdk_gphone64_x86_64 transport_id:9
             tools.mkdir()
             adb = tools / ("adb.exe" if __import__("os").name == "nt" else "adb")
             adb.write_text("test", encoding="utf-8")
-            with mock.patch("usb_connection.shutil.which", return_value=None):
-                found = find_adb_executable(root)
+            with mock.patch.dict("usb_connection.os.environ", {}, clear=True):
+                with mock.patch("usb_connection.shutil.which", return_value=None):
+                    found = find_adb_executable(root)
             self.assertEqual(pathlib.Path(found), adb.resolve())
 
     def test_no_adb_returns_actionable_failure(self):
