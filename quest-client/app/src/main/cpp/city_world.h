@@ -40,6 +40,8 @@ private:
                 float sx, float sy, float sz, const float* color,
                 float material, float yaw = 0.0f);
     void addTree(std::vector<Vertex>& out, float x, float z, float scale, std::uint32_t seed);
+    void addOctahedron(std::vector<Vertex>& out, float x, float y, float z,
+                       float rx, float ry, float rz, const float* color);
     void addBuilding(std::vector<Vertex>& out, float x, float z, float width,
                      float depth, float height, int style, std::uint32_t seed, bool detailed);
     void addStreetFurniture(std::vector<Vertex>& out, float x, float z, std::uint32_t seed);
