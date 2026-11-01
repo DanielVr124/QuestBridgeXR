@@ -151,7 +151,7 @@ void main() {
     vec3 haze = vec3(0.67,0.74,0.80);
     float horizon = smoothstep(-0.12,0.72,vHeight);
     vec3 sky = mix(haze, vec3(0.24,0.43,0.64), horizon);
-    float warm = smoothstep(0.25,-0.05,vHeight) * 0.20;
+    float warm = (1.0 - smoothstep(-0.05,0.25,vHeight)) * 0.20;
     sky = mix(sky, vec3(0.92,0.68,0.48), warm);
     outColor = vec4(mix(sky, vColor, 0.12), 1.0);
 }
@@ -197,8 +197,6 @@ float clampf(float value, float lo, float hi) {
     return std::max(lo, std::min(value, hi));
 }
 
-void emitVertex(std::vector<CityWorld::Vertex>&, float, float, float,
-                float, float, float, float, float, const float*, float);
 } // namespace
 
 std::int64_t CityWorld::chunkKey(int x, int z) {
@@ -363,8 +361,8 @@ void CityWorld::addBuilding(std::vector<Vertex>& out, float x, float z, float wi
     const float sill[3]={0.33f,0.36f,0.37f};
     const float warmWindow[3]={0.95f,0.67f,0.38f};
     const float coolGlass[3]={0.075f,0.17f,0.24f};
-    const int floors=std::max(1,static_cast<int>((height-1.0f)/3.25f));
-    const int columns=std::max(2,static_cast<int>((width-1.2f)/2.7f));
+    const int floors=std::clamp(static_cast<int>((height-1.0f)/3.25f),3,15);
+    const int columns=std::clamp(static_cast<int>((width-1.2f)/2.7f),2,5);
     const float floorHeight=(height-0.65f)/floors;
     if (detailed) {
         for (int side : {-1,1}) {
@@ -462,9 +460,9 @@ void CityWorld::addChunkGround(std::vector<Vertex>& out, int chunkX, int chunkZ,
     const float paint[3]={0.84f,0.84f,0.77f};
     auto ground=[&](float x0,float z0,float x1,float z1,const float* color,float material) {
         const float a[3]={ox+x0,0.0f,oz+z0};
-        const float b[3]={ox+x1,0.0f,oz+z0};
+        const float b[3]={ox+x0,0.0f,oz+z1};
         const float c[3]={ox+x1,0.0f,oz+z1};
-        const float d[3]={ox+x0,0.0f,oz+z1};
+        const float d[3]={ox+x1,0.0f,oz+z0};
         addQuad(out,a,b,c,d,color,material,std::max(1.0f,(x1-x0)*.24f),std::max(1.0f,(z1-z0)*.24f));
     };
     ground(0,0,kChunkSize,kChunkSize,concrete,plaza?8.0f:0.0f);
@@ -638,8 +636,9 @@ bool CityWorld::collides(float worldX, float worldZ) const {
     const float localX=worldX-chunkX*kChunkSize;
     const float localZ=worldZ-chunkZ*kChunkSize;
     if (localX<13.5f || localX>70.5f || localZ<13.5f || localZ>70.5f) return false;
-    const bool greenBlock=(hash(static_cast<std::uint32_t>(chunkX)*73856093u ^
-                                static_cast<std::uint32_t>(chunkZ)*19349663u ^ 0x9e3779b9u + 0xB71u)%11u)==0u;
+    const std::uint32_t seed=hash(static_cast<std::uint32_t>(chunkX)*73856093u ^
+                                static_cast<std::uint32_t>(chunkZ)*19349663u ^ 0x9e3779b9u);
+    const bool greenBlock=! (chunkX==0 && chunkZ==0) && (hash(seed+0xB71u)%11u)==0u;
     if (greenBlock) return false;
     const float centers[2]={25.0f,59.0f};
     for (float cx:centers) for (float cz:centers) {
