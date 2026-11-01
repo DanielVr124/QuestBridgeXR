@@ -16,6 +16,7 @@ TRACKING = struct.Struct('<Q3f4f3f3fI')
 CONTROLLER = struct.Struct('<QBBHIff2f3f4f')
 FRAME_PREFIX = struct.Struct('<QIIHHHH')
 VIDEO_CONFIG = struct.Struct('<IIIIHH')
+MOUSE = struct.Struct('<QHHHH')
 
 spec = importlib.util.spec_from_file_location('stream_test_video', ROOT / 'tools' / 'stream_test_video.py')
 streamer = importlib.util.module_from_spec(spec)
@@ -32,6 +33,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(CONTROLLER.size, 60)
         self.assertEqual(FRAME_PREFIX.size, 24)
         self.assertEqual(VIDEO_CONFIG.size, 20)
+        self.assertEqual(MOUSE.size, 16)
 
     def test_packet_header_and_mtu(self):
         payload = VIDEO_CONFIG.pack(1920, 1080, 72, 8_000_000, 1, 1)
