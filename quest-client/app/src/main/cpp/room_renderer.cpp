@@ -2424,7 +2424,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     float targetX=std::clamp(playerX+stepX,-halfW+0.34f,halfW-0.34f);
     float targetZ=std::clamp(playerZ+stepZ,-halfD+0.34f,halfD-0.34f);
 
-    const float bedX=halfW-1.72f, bedZ=-halfD+2.10f;
+    const float bedX=halfW-1.80f, bedZ=-halfD+2.10f;
     auto overlaps=[](float x,float z,float cx,float cz,float rx,float rz) {
         return std::fabs(x-cx)<rx && std::fabs(z-cz)<rz;
     };
@@ -2531,7 +2531,9 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
             const float halfW=settings_.roomSize=="large"?6.0f:(settings_.roomSize=="medium"?4.2f:3.0f);
             const float halfD=settings_.roomSize=="large"?7.5f:(settings_.roomSize=="medium"?5.4f:3.8f);
             const float deskX=-halfW+1.36f,deskZ=-halfD+.56f;
-            const float monitorX=deskX;
+            const int pointerMonitorCount=std::clamp(settings_.monitorCount,1,3);
+            const float pointerMonitorBaseX=deskX-(pointerMonitorCount-1)*.335f;
+            const float monitorX=pointerMonitorCount==3?deskX:pointerMonitorBaseX;
             const float monitorZ=deskZ-.31f;
             const float menuY=settings_.floorOffsetY+1.03f;
             if(pointerDirection[2]<-.08f) {
@@ -2564,6 +2566,21 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
                                     handleMenuInput(0.0f,0.0f,0.0f,true);
                                     break;
                                 }
+                            }
+                        } else if(menuPage_==3&&lightingColorPickerOpen_&&
+                                  hitX>bodyX+.125f&&hitY<menuY-.105f) {
+                            lightingColorPickerOpen_=false;
+                        } else if(menuPage_==3&&lightingColorPickerOpen_&&
+                                  hitX<bodyX+.165f&&hitY>menuY-.075f&&hitY<menuY+.055f) {
+                            const float dx=hitX-(bodyX+.095f);
+                            const float dy=hitY-(menuY-.008f);
+                            const float radius=std::sqrt(dx*dx+dy*dy);
+                            if(radius>.010f) {
+                                lightingPickerHue_=std::fmod(std::atan2(dy,dx)/(2.0f*kPi)+.25f+1.0f,1.0f);
+                                lightingPickerSaturation_=std::clamp(radius/.060f,0.0f,1.0f);
+                                const auto picked=hsvToRgb(lightingPickerHue_,lightingPickerSaturation_,lightingPickerValue_);
+                                auto& zone=ledZones_[static_cast<size_t>(lightingZoneIndex_)];
+                                if(lightingColorTarget_==0) zone.primary=picked; else zone.secondary=picked;
                             }
                         } else {
                             int selection=-1;
@@ -2880,7 +2897,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform3f(locPracticalLight2Position_,halfW-0.30f,floorY+1.92f,-1.45f);
     glUniform3f(locPracticalLight2Color_,ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]);
     glUniform1f(locPracticalLight2Intensity_,ledZones_[6].enabled?0.82f*roomLightScale:0.0f);
-    glUniform3f(locHeadboardGlowPosition_,halfW-1.72f,floorY+1.43f,-halfD+2.10f-1.22f);
+    glUniform3f(locHeadboardGlowPosition_,halfW-1.80f,floorY+1.43f,-halfD+2.10f-1.22f);
     glUniform3f(locHeadboardGlowColor_,ledHeadboard[0],ledHeadboard[1],ledHeadboard[2]);
     glUniform1f(locHeadboardGlowIntensity_,ledZones_[0].enabled?2.60f*roomLightScale:0.0f);
     glUniform3f(locNeonBluePosition_,-halfW+0.20f,floorY+2.75f,-0.45f);
@@ -3062,7 +3079,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // separate pillows, tailored headboard, bedside storage and practical lamps.
     // Geometry stays inside the existing room bounds and is fully walkable around.
     // -------------------------------------------------------------------------
-    const float bedX=halfW-1.72f;
+    const float bedX=halfW-1.80f;
     const float bedZ=backZ+2.10f;
     const auto bedBase=rgb(.018f,.024f,.043f);
     const auto bedMetal=rgb(.16f,.20f,.30f);
@@ -3128,7 +3145,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     }
 
     // Place the supplied desk almost flush to both walls in the back-left corner.
-    const float deskZ=backZ+0.43f;
+    const float deskZ=backZ+0.56f;
     const float deskX=-halfW+1.36f;
     const int monitorCount=std::clamp(settings_.monitorCount,1,3);
     const float monitorBaseX=deskX-(monitorCount-1)*.335f;
