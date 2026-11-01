@@ -119,7 +119,7 @@ def patch_bed_geometry(source: str) -> str:
     )
 
     old_design = "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',"
-    new_design = "'design':'Original bed platform, frame, mattress and bedding retained; five softly padded charcoal headboard sections with gently eased rectangular edges, a nested recessed RGB perimeter channel and refreshed fabric pillows',"
+    new_design = "'design':'Original bed platform, frame, mattress and bedding retained; five broad charcoal upholstered panels with gently eased rectangular faces, a slim recessed RGB perimeter lip and refreshed fabric pillows',"
     if source.count(old_design) != 1:
         raise RuntimeError("Bed metadata design marker changed; update the design patch.")
     source = source.replace(old_design, new_design, 1)
