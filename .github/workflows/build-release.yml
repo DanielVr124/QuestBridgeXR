@@ -93,7 +93,7 @@ jobs:
       - name: Install Blender for Touch Plus controller models
         run: |
           sudo apt-get update
-          sudo apt-get install --yes blender
+          sudo apt-get install --yes blender python3-numpy
 
       - name: Generate the custom upholstered bed model
         env:
@@ -117,7 +117,7 @@ jobs:
  
       - name: Generate Meta Touch Plus controller replicas
         run: |
-          blender --background --python tools/generate_touch_plus_controllers.py
+          PYTHONPATH=/usr/lib/python3/dist-packages blender --background --python tools/generate_touch_plus_controllers.py
           python - <<'PY'
           import json
           from pathlib import Path
