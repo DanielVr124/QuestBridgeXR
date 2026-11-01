@@ -595,15 +595,19 @@ std::array<float,3> rotateByQuaternion(const XrQuaternionf& q,const std::array<f
 }
 XrPosef mapTrackedPoseToRoom(const XrPosef& tracked,const XrPosef& headCenter,
                             float moveX,float moveZ,float yaw,float seatDrop) {
+    // Invert the same scene->physical transform used by renderEye:
+    // T(pivot) * R(-yaw) * T(-pivot) * T(-moveX,+seatDrop,-moveZ).
+    // Translation belongs after the pivoted rotation; applying it before the
+    // rotation made controller models and aim rays drift after virtual turns.
     const float c=std::cos(yaw),s=std::sin(yaw);
-    const float dx=tracked.position.x-moveX-headCenter.position.x;
-    const float dz=tracked.position.z-moveZ-headCenter.position.z;
+    const float dx=tracked.position.x-headCenter.position.x;
+    const float dz=tracked.position.z-headCenter.position.z;
     XrPosef mapped=tracked;
-    mapped.position.x=headCenter.position.x+c*dx-s*dz;
-    mapped.position.y=headCenter.position.y+tracked.position.y+seatDrop-headCenter.position.y;
-    mapped.position.z=headCenter.position.z+s*dx+c*dz;
-    const XrQuaternionf roomInverseYaw{0.0f,-std::sin(yaw*.5f),0.0f,std::cos(yaw*.5f)};
-    mapped.orientation=quatMul(roomInverseYaw,tracked.orientation);
+    mapped.position.x=headCenter.position.x+c*dx+s*dz+moveX;
+    mapped.position.y=tracked.position.y-seatDrop;
+    mapped.position.z=headCenter.position.z-s*dx+c*dz+moveZ;
+    const XrQuaternionf roomYaw{0.0f,std::sin(yaw*.5f),0.0f,std::cos(yaw*.5f)};
+    mapped.orientation=quatMul(roomYaw,tracked.orientation);
     return mapped;
 }
 Mat4 makeView(const XrPosef& pose, float locomotionX, float locomotionZ, float virtualYaw) {
@@ -2217,7 +2221,7 @@ void RoomRenderer::drawPanoramaSkybox(const float* pv,float cameraX,float camera
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
     glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
     // Keep the photographic city panorama at its intended night exposure.
-    glUniform4f(locColor_,0.40f,0.44f,0.52f,1.0f);
+    glUniform4f(locColor_,0.29f,0.31f,0.37f,1.0f);
     glUniform1i(locTextured_,1);
     glUniform1i(locMaterial_,-1);
     glUniform1i(locRounded_,0);
@@ -2393,7 +2397,28 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float cente
 
 void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
     if(dt<0.0f||dt>0.1f)dt=0.0f;
-    const float yaw=headYaw(headPose)+virtualYaw_+(sittingActive_?chairYaw_:0.0f);
+    const float virtualHeading=virtualYaw_+(sittingActive_?chairYaw_:0.0f);
+    if(!hasPreviousHeadPosition_) {
+        previousHeadX_=headPose.position.x;
+        previousHeadZ_=headPose.position.z;
+        hasPreviousHeadPosition_=true;
+    } else {
+        const float physicalDx=headPose.position.x-previousHeadX_;
+        const float physicalDz=headPose.position.z-previousHeadZ_;
+        if(!sittingActive_) {
+            // Keep real walking aligned with the virtual room after snap/smooth turns.
+            // The world rotates about the tracked head; compensate the raw tracking delta
+            // so its virtual-room displacement is rotated by the current virtual heading.
+            const float c=std::cos(virtualHeading),s=std::sin(virtualHeading);
+            const float roomDx=c*physicalDx+s*physicalDz;
+            const float roomDz=-s*physicalDx+c*physicalDz;
+            moveX_+=roomDx-physicalDx;
+            moveZ_+=roomDz-physicalDz;
+        }
+        previousHeadX_=headPose.position.x;
+        previousHeadZ_=headPose.position.z;
+    }
+    const float yaw=headYaw(headPose)+virtualHeading;
     const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
 
     if(settings_.environment=="explorable_city") {
@@ -2468,7 +2493,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     float targetX=std::clamp(playerX+stepX,-halfW+0.34f,halfW-0.34f);
     float targetZ=std::clamp(playerZ+stepZ,-halfD+0.34f,halfD-0.34f);
 
-    constexpr float bedScale=1.16f;
+    constexpr float bedScale=1.28f;
     const float bedWidth=3.20f*bedScale,bedDepth=4.05f*bedScale;
     const float bedX=halfW-bedWidth*.5f,bedZ=-halfD+bedDepth*.5f;
     auto overlaps=[](float x,float z,float cx,float cz,float rx,float rz) {
@@ -2812,12 +2837,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
     (void)eyeIndex; (void)width; (void)height;
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
-    const std::array<float,4> deskExposure{{.78f,.77f,.75f,1.0f}};
-    const std::array<float,4> monitorExposure{{.76f,.77f,.82f,1.0f}};
-    const std::array<float,4> chairExposure{{.75f,.76f,.80f,1.0f}};
-    const std::array<float,4> mouseExposure{{.72f,.74f,.78f,1.0f}};
-    const std::array<float,4> tvExposure{{.72f,.73f,.78f,1.0f}};
-    const std::array<float,4> controllerExposure{{.76f,.77f,.80f,1.0f}};
+    const std::array<float,4> deskExposure{{.66f,.64f,.61f,1.0f}};
+    const std::array<float,4> monitorExposure{{.65f,.66f,.70f,1.0f}};
+    const std::array<float,4> chairExposure{{.64f,.65f,.68f,1.0f}};
+    const std::array<float,4> mouseExposure{{.62f,.64f,.68f,1.0f}};
+    const std::array<float,4> tvExposure{{.60f,.62f,.66f,1.0f}};
+    const std::array<float,4> controllerExposure{{.65f,.66f,.69f,1.0f}};
     Mat4 projection=makeProjection(view.fov);
 
     // Keep the eye camera on its real OpenXR pose. Virtual turning and room
@@ -3160,7 +3185,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Geometry stays inside the existing room bounds and is fully walkable around.
     // -------------------------------------------------------------------------
     // Place the enlarged upholstered bed flush into the far-right/back corner.
-    constexpr float bedScale=1.16f;
+    constexpr float bedScale=1.28f;
     const float bedWidth=3.20f*bedScale;
     const float bedDepth=4.05f*bedScale;
     const float bedRenderX=halfW-bedWidth*.5f;
@@ -3411,10 +3436,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // User-supplied tall-stand TV replaces the former procedural screen and console.
     // The imported display faces back toward the bed and retains PC stream routing.
     if(settings_.showTv) {
-        const float tvX=bedX, tvZ=bedZ+3.18f;
+        const float tvX=bedX, tvZ=bedZ+bedDepth*.5f+.85f;
         const float tvRenderX=tvX+.20f;
         // Scale the full stand and display together to better balance it beside the bed.
-        constexpr float tvModelScale=1.14f;
+        constexpr float tvModelScale=1.32f;
         const float tvScreenWidth=1.218f*tvModelScale;
         const float tvScreenHeight=.685f*tvModelScale;
         const float tvScreenCenterY=floorY+.984f*tvModelScale;
@@ -3506,7 +3531,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const auto green=rgb(.24f,.88f,.62f,1.0f);
         const auto amber=rgb(1.0f,.68f,.28f,1.0f);
         auto panel=[&](float x,float y,float w,float h,const std::array<float,4>& tint) {
-            drawCurvedPanel(pv.data(),x,y,menuZ,w,h,uiCurve,0,tint,32);
+            // Square-corner, flat rectangles: the menu is a genuine 2D monitor overlay.
+            drawPlane(pv.data(),x,y,menuZ,w,h,0,tint);
         };
         auto label=[&](const char* value,float x,float y,float size,const std::array<float,4>& tint) {
             drawText(pv.data(),value,x,y,menuZ+.0015f,size,tint,monitorX,uiWidth,uiCurve,menuY);
@@ -3538,7 +3564,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         panel(navX,menuY-.006f,.132f,.270f,navBase);
         panel(monitorX-.143f,menuY-.006f,.0025f,.270f,rgb(.09f,.16f,.25f,1.0f));
         label("LIBRARY",navX-.050f,menuY+.105f,.00135f,muted);
-        const char* tabs[5]={"COMPUTERS","ROOM","DISPLAY","LED COLORS","CHAIR"};
+        const char* tabs[5]={"PC","ROOM","DISPLAY","LIGHTS","CHAIR"};
         const float tabY[5]={menuY+.061f,menuY+.015f,menuY-.031f,menuY-.077f,menuY-.123f};
         for(int i=0;i<5;++i) {
             panel(navX,tabY[i],.119f,.037f,i==menuPage_?selected:navBase);
