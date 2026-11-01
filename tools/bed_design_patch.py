@@ -53,8 +53,8 @@ def pillow_crown_height(x, z, side):
 
     # Two broad, low relief fill lobes keep the surface from reading as a perfect dome.
     fill_lobes = (
-        .0045 * math.exp(-(((x - side*.12) / .23) ** 2 + ((z + .025) / .19) ** 2))
-        + .0030 * math.exp(-(((x + side*.16) / .27) ** 2 + ((z - .095) / .17) ** 2))
+        .0075 * math.exp(-(((x - side*.12) / .23) ** 2 + ((z + .025) / .19) ** 2))
+        + .0050 * math.exp(-(((x + side*.16) / .27) ** 2 + ((z - .095) / .17) ** 2))
     )
 
     # Tiny depressions are formed into the cloth mesh at the four tucked corners;
@@ -66,7 +66,7 @@ def pillow_crown_height(x, z, side):
             dz = z - corner_z * .285
             along = (-corner_x * dx - corner_z * dz) * .70710678
             across = (corner_x * dz - corner_z * dx) * .70710678
-            pillow_corner_tucks += .0038 * math.exp(
+            pillow_corner_tucks += .0060 * math.exp(
                 -((along - .075) / .085) ** 2 - (across / .022) ** 2
             )
 
@@ -480,7 +480,7 @@ def _make_pillow_cotton_normal_map(size=512):
     warp = np.sin(2.0 * math.pi * x / 18.0)
     weft = np.sin(2.0 * math.pi * y / 18.0)
     cross = .20 * np.sin(2.0 * math.pi * (x + y) / 9.0)
-    height = .010 * (warp + weft) + .002 * cross
+    height = .018 * (warp + weft) + .004 * cross
     grad_x = np.gradient(height, axis=1) * 22.0
     grad_y = np.gradient(height, axis=0) * 22.0
     nx = -grad_x
@@ -491,14 +491,34 @@ def _make_pillow_cotton_normal_map(size=512):
     pixels = np.clip((normal * .5 + .5) * 255.0, 0, 255).astype(np.uint8)
     return Image.fromarray(pixels, mode='RGB')
 
+
+def _make_pillow_cotton_albedo(size=512):
+    # Fine, low-contrast plain-weave percale on a warm ivory ground.
+    y, x = np.mgrid[0:size, 0:size].astype(np.float32)
+    warp = np.sin(2.0 * math.pi * x / 7.0 + .10 * np.sin(2.0 * math.pi * y / 84.0))
+    weft = np.sin(2.0 * math.pi * y / 7.0 + .10 * np.sin(2.0 * math.pi * x / 92.0))
+    interlace = warp * weft
+    rng = np.random.default_rng(9173)
+    fibre_noise = rng.normal(0.0, .62, (size, size)).astype(np.float32)
+    variation = 1.30 * warp + 1.30 * weft + .42 * interlace + fibre_noise
+    red = np.clip(247.0 + variation, 0, 255)
+    green = np.clip(243.0 + variation, 0, 255)
+    blue = np.clip(233.0 + variation, 0, 255)
+    pixels = np.stack((red, green, blue), axis=-1).astype(np.uint8)
+    image = Image.fromarray(pixels, mode='RGB').filter(ImageFilter.GaussianBlur(.16))
+    image.save(TEXTURES / 'pillow_cotton_percale.png', optimize=True)
+    return image
+
+
 _pillow_cotton_normal = _make_pillow_cotton_normal_map()
+_pillow_cotton_albedo = _make_pillow_cotton_albedo()
 
 # Warm ivory cotton pillow casing. Top, gusset and underside share this one
 # material so the pillow pair stays inside the runtime draw-call budget.
 materials['pillow_cotton']=PBRMaterial(
     name='Warm ivory woven cotton pillow casing',
-    baseColorFactor=[244,241,234,255],metallicFactor=0.0,roughnessFactor=.97,
-    baseColorTexture=textures['sheet'],
+    baseColorFactor=[255,255,255,255],metallicFactor=0.0,roughnessFactor=.91,
+    baseColorTexture=_pillow_cotton_albedo,
     normalTexture=_pillow_cotton_normal,
     doubleSided=True
 )
