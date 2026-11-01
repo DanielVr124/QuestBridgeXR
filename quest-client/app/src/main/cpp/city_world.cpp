@@ -765,11 +765,16 @@ void CityWorld::render(const float* viewProjection, float cameraX, float cameraY
     if (!initialized_) return;
     const int newCenterX=static_cast<int>(std::floor(cameraX/kChunkSize));
     const int newCenterZ=static_cast<int>(std::floor(cameraZ/kChunkSize));
-    centerChunkX_=newCenterX;
-    centerChunkZ_=newCenterZ;
+    // A small hysteresis prevents the two stereo eyes from disagreeing about the
+    // active block when the headset is exactly on an 84 m chunk boundary.
+    if(newCenterX>centerChunkX_ && cameraX>(centerChunkX_+1)*kChunkSize+0.18f) centerChunkX_=newCenterX;
+    else if(newCenterX<centerChunkX_ && cameraX<centerChunkX_*kChunkSize-0.18f) centerChunkX_=newCenterX;
+    if(newCenterZ>centerChunkZ_ && cameraZ>(centerChunkZ_+1)*kChunkSize+0.18f) centerChunkZ_=newCenterZ;
+    else if(newCenterZ<centerChunkZ_ && cameraZ<centerChunkZ_*kChunkSize-0.18f) centerChunkZ_=newCenterZ;
 
-    // Keep a 5x5 neighborhood resident. The inner 3x3 uses window-level facade detail;
-    // the outer ring uses broad bands and reduced height/detail. Chunks are deterministic.
+    // Keep a 5x5 neighborhood resident. The inner 3x3 uses facade detail;
+    // the outer ring uses reduced geometry. Build at most two new chunks per eye
+    // so first entry never uploads all 25 meshes in a single frame.
     for (auto it=chunks_.begin();it!=chunks_.end();) {
         const int dx=it->second.x-centerChunkX_;
         const int dz=it->second.z-centerChunkZ_;
@@ -781,18 +786,34 @@ void CityWorld::render(const float* viewProjection, float cameraX, float cameraY
             ++it;
         }
     }
+    std::vector<std::array<int,4>> pendingChunks;
+    pendingChunks.reserve(25);
     for (int dz=-2;dz<=2;++dz) for (int dx=-2;dx<=2;++dx) {
         const int cx=centerChunkX_+dx, cz=centerChunkZ_+dz;
         const auto key=chunkKey(cx,cz);
         const int desiredLod=(std::abs(dx)<=1 && std::abs(dz)<=1)?0:1;
+        const auto existing=chunks_.find(key);
+        if(existing!=chunks_.end() && existing->second.lod==desiredLod) continue;
+        pendingChunks.push_back({cx,cz,desiredLod,dx*dx+dz*dz});
+    }
+    std::sort(pendingChunks.begin(),pendingChunks.end(),
+        [](const std::array<int,4>& a,const std::array<int,4>& b) {
+            if(a[3]!=b[3]) return a[3]<b[3];
+            if(a[1]!=b[1]) return a[1]<b[1];
+            return a[0]<b[0];
+        });
+    const size_t buildCount=std::min<size_t>(2u,pendingChunks.size());
+    for(size_t i=0;i<buildCount;++i) {
+        const int cx=pendingChunks[i][0],cz=pendingChunks[i][1];
+        const auto key=chunkKey(cx,cz);
         auto existing=chunks_.find(key);
-        if(existing!=chunks_.end() && existing->second.lod!=desiredLod) {
+        if(existing!=chunks_.end()) {
+            // Keep the old far LOD visible until its replacement is ready.
             if(existing->second.vao) glDeleteVertexArrays(1,&existing->second.vao);
             if(existing->second.vbo) glDeleteBuffers(1,&existing->second.vbo);
             chunks_.erase(existing);
-            existing=chunks_.end();
         }
-        if(existing==chunks_.end()) buildChunk(cx,cz,desiredLod);
+        buildChunk(cx,cz,pendingChunks[i][2]);
     }
 
     glEnable(GL_DEPTH_TEST);
