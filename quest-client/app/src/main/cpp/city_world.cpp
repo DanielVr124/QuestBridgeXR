@@ -595,7 +595,11 @@ void CityWorld::buildChunk(int chunkX, int chunkZ, int lod) {
     const bool greenBlock=!plaza && (hash(seed+0xB71u)%11u==0u);
     if (greenBlock) {
         // Occasional small park blocks give long walks a visual pause without breaking the street grid.
-        ground(14.0f,14.0f,70.0f,70.0f,grass,5,.008f);
+        const float grassA[3]={ox+14.0f,.008f,oz+14.0f};
+        const float grassB[3]={ox+14.0f,.008f,oz+70.0f};
+        const float grassC[3]={ox+70.0f,.008f,oz+70.0f};
+        const float grassD[3]={ox+70.0f,.008f,oz+14.0f};
+        addQuad(vertices,grassA,grassB,grassC,grassD,grass,5,14.0f,14.0f);
         for (int i=0;i<9;++i) {
             const float x=ox+18.0f+random01(seed+i*13u)*48.0f;
             const float z=oz+18.0f+random01(seed+i*37u)*48.0f;
