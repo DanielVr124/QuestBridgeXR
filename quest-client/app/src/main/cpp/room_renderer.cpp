@@ -2895,7 +2895,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     }
     const float roomLightScale=roomLightsOn_?1.0f:0.0f;
     // Warm indirect fill gives the bedroom a softer, more lived-in balance.
-    glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?0.78f:0.18f);
+    glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?0.78f:0.075f);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
     glUniform3f(locCeilingLightColor_,1.0f,0.82f,0.70f);
     glUniform1f(locCeilingLightIntensity_,1.02f*roomLightScale);
