@@ -3359,33 +3359,42 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     if(settings_.showTv) {
         const float tvX=bedX, tvZ=bedZ+3.18f;
         const float tvRenderX=tvX+.20f;
+        // Scale the full stand and display together to better balance it beside the bed.
+        constexpr float tvModelScale=.90f;
+        const float tvScreenWidth=1.218f*tvModelScale;
+        const float tvScreenHeight=.685f*tvModelScale;
+        const float tvScreenCenterY=floorY+.984f*tvModelScale;
         const bool tvStream=settings_.screenDestination=="tv"||settings_.screenDestination=="both";
         const GLuint tvTex=(tvStream&&hasVideo)?videoTexture:env;
         if(tvModel_.loaded()) {
             const float tvPlacement[16]={
-                -1,0,0,0, 0,1,0,0, 0,0,-1,0, tvRenderX,floorY,tvZ,1
+                -tvModelScale,0,0,0, 0,tvModelScale,0,0, 0,0,-tvModelScale,0,
+                tvRenderX,floorY,tvZ,1
             };
             tvModel_.draw(pv.data(),tvPlacement,locMvp_,locModel_,locColor_,locTextured_,
                           locTexture_,locMaterial_,locRounded_,locUvScale_);
-            drawPlane(pv.data(),tvX+.20f,floorY+.984f,tvZ-.002f,1.218f,.685f,tvTex,rgb(1,1,1),kPi);
+            drawPlane(pv.data(),tvX+.20f,tvScreenCenterY,tvZ-.002f,
+                      tvScreenWidth,tvScreenHeight,tvTex,rgb(1,1,1),kPi);
         } else {
             // Reliable 55-inch-style TV fallback: slim dark bezel, lit screen,
             // central metal pedestal and a wide weighted foot, facing the bed.
             const auto bezel=rgb(.012f,.016f,.027f);
             const auto stand=rgb(.17f,.20f,.27f);
-            drawGroundShadow(pv.data(),tvRenderX,floorY+.004f,tvZ+.05f,1.72f,.92f,.34f);
-            drawRoundedBox(pv.data(),tvRenderX,floorY+1.10f,tvZ+.045f,1.52f,.91f,.105f,
-                           bezel,0.0f,5);
-            drawRoundedBox(pv.data(),tvRenderX,floorY+1.10f,tvZ-.013f,1.43f,.82f,.018f,
+            drawGroundShadow(pv.data(),tvRenderX,floorY+.004f,tvZ+.05f,
+                             1.72f*tvModelScale,.92f*tvModelScale,.34f);
+            drawRoundedBox(pv.data(),tvRenderX,floorY+1.10f*tvModelScale,tvZ+.045f,
+                           1.52f*tvModelScale,.91f*tvModelScale,.105f*tvModelScale,bezel,0.0f,5);
+            drawRoundedBox(pv.data(),tvRenderX,floorY+1.10f*tvModelScale,tvZ-.013f,
+                           1.43f*tvModelScale,.82f*tvModelScale,.018f*tvModelScale,
                            rgb(.035f,.045f,.075f),0.0f,5);
-            drawPlane(pv.data(),tvRenderX,floorY+1.10f,tvZ-.026f,1.405f,.795f,
-                      tvTex,rgb(1,1,1),kPi);
-            drawSphere(pv.data(),tvRenderX,floorY+.60f,tvZ+.07f,.035f,.035f,.035f,
-                       rgb(.16f,.65f,1.0f),7);
-            drawRoundedBox(pv.data(),tvRenderX,floorY+.31f,tvZ+.12f,.12f,.49f,.13f,
-                           stand,0.0f,4);
-            drawRoundedBox(pv.data(),tvRenderX,floorY+.075f,tvZ+.16f,.78f,.07f,.35f,
-                           stand,0.0f,4);
+            drawPlane(pv.data(),tvRenderX,tvScreenCenterY,tvZ-.026f,
+                      1.405f*tvModelScale,.795f*tvModelScale,tvTex,rgb(1,1,1),kPi);
+            drawSphere(pv.data(),tvRenderX,floorY+.60f*tvModelScale,tvZ+.07f,
+                       .035f*tvModelScale,.035f*tvModelScale,.035f*tvModelScale,rgb(.16f,.65f,1.0f),7);
+            drawRoundedBox(pv.data(),tvRenderX,floorY+.31f*tvModelScale,tvZ+.12f,
+                           .12f*tvModelScale,.49f*tvModelScale,.13f*tvModelScale,stand,0.0f,4);
+            drawRoundedBox(pv.data(),tvRenderX,floorY+.075f*tvModelScale,tvZ+.16f,
+                           .78f*tvModelScale,.07f*tvModelScale,.35f*tvModelScale,stand,0.0f,4);
         }
     }
 
