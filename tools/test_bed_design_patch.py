@@ -21,19 +21,19 @@ class BedDesignPatchTests(unittest.TestCase):
     def test_headboard_uses_five_softly_eased_filled_panels(self):
         for token in (
             "Headboard_back_shell",
-            "Headboard_quilt_backing",
             "Headboard_filled_panel_",
             "Headboard_outer_lip_side_",
-            "Headboard_inner_lip_side_",
             "Headboard_outer_lip_edge_",
-            "Headboard_inner_lip_edge_",
             "Headboard_mount_",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
-        self.assertIn("(.225,.705,.112)", self.patched)
-        self.assertIn("taper=.10", self.patched)
-        self.assertIn("nested recessed RGB perimeter channel", self.patched)
+        self.assertIn("(.232,.675,.112)", self.patched)
+        self.assertIn("boxsoft(", self.patched)
+        self.assertIn("flat central faces", self.patched)
+        self.assertIn("slim upholstered perimeter lip", self.patched)
+        self.assertNotIn("Headboard_inner_lip_", self.patched)
+        self.assertNotIn("Headboard_side_bolster_", self.patched)
 
     def test_old_bed_base_and_bedding_are_not_replaced(self):
         # The patch is an exact replacement of the original pillow/headboard block.
@@ -74,6 +74,8 @@ class BedDesignPatchTests(unittest.TestCase):
             "Headboard_crystal_tuft_button_",
             "Headboard_channel_",
             "Headboard_LED_strip",
+            "Headboard_side_bolster_",
+            "Headboard_inner_lip_",
         ):
             with self.subTest(token=token):
                 self.assertNotIn(token, self.patched)
