@@ -47,6 +47,8 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertIn("tuft_y = (1.705,1.355,1.015,.665)", self.patched)
         self.assertIn("<= .206", self.patched)
         self.assertIn(".0034,'charcoal2',sides=8", self.patched)
+        self.assertIn("tuft_y[row],-1.270", self.patched)
+        self.assertIn("*.5,-1.278", self.patched)
         self.assertIn("recessed perimeter RGB backlight", self.patched)
         self.assertEqual(self.patched.count("Headboard_crystal_tufted_silver_insert"), 1)
 
