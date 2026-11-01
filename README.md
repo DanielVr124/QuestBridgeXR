@@ -82,7 +82,7 @@ Requirements: Android Studio, JDK 17, Android SDK Platform 35, NDK `27.2.1247901
 6. Click **Install Quest INI via ADB**, or export `config.ini` and push it to `/sdcard/Android/data/com.questbridge.xr/files/config.ini` manually. Restart the app after changing client settings.
 7. Inspect `adb logcat -s QuestBridgeXR` and the Windows host console for bring-up diagnostics.
 
-This Android source has not been built and hardware-validated in this development environment. Treat device compatibility and video latency as unverified until tested on your headset.
+The GitHub Actions workflow builds and packages the Android APK, but this code has not yet been exercised on a physical Quest from this development environment. Treat cable compatibility, decoder behavior, device compatibility, throughput, and video latency as unverified until tested on your headset.
 
 ## Test video transport
 
