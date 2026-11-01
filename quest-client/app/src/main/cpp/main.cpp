@@ -544,6 +544,7 @@ struct EyeSwapchain {
 struct HandActions {
     XrPath handPath = XR_NULL_PATH;
     XrAction pose = XR_NULL_HANDLE;
+    XrAction aimPose = XR_NULL_HANDLE;
     XrAction trigger = XR_NULL_HANDLE;
     XrAction squeeze = XR_NULL_HANDLE;
     XrAction thumbstick = XR_NULL_HANDLE;
@@ -554,6 +555,7 @@ struct HandActions {
     XrAction squeezeClick = XR_NULL_HANDLE;
     XrAction triggerClick = XR_NULL_HANDLE;
     XrSpace poseSpace = XR_NULL_HANDLE;
+    XrSpace aimPoseSpace = XR_NULL_HANDLE;
 };
 
 class QuestRuntimeClient {
@@ -784,6 +786,7 @@ private:
             else LOGW("Could not resolve input path %s", pathString.c_str());
         };
         bind(hands_[0].pose, std::string("/user/hand/left/input/") + config_.controllerPose + "/pose");
+        bind(hands_[0].aimPose, "/user/hand/left/input/aim/pose");
         bind(hands_[0].trigger, "/user/hand/left/input/trigger/value");
         bind(hands_[0].squeeze, "/user/hand/left/input/squeeze/value");
         bind(hands_[0].thumbstick, "/user/hand/left/input/thumbstick");
@@ -795,6 +798,7 @@ private:
         bind(hands_[0].menu, "/user/hand/left/input/menu/click");
         // OpenXR Touch profiles expose squeeze as a value, not a portable squeeze/click path.
         bind(hands_[1].pose, std::string("/user/hand/right/input/") + config_.controllerPose + "/pose");
+        bind(hands_[1].aimPose, "/user/hand/right/input/aim/pose");
         bind(hands_[1].trigger, "/user/hand/right/input/trigger/value");
         bind(hands_[1].squeeze, "/user/hand/right/input/squeeze/value");
         bind(hands_[1].thumbstick, "/user/hand/right/input/thumbstick");
@@ -816,7 +820,9 @@ private:
             spaceInfo.action = hand.pose;
             spaceInfo.subactionPath = hand.handPath;
             spaceInfo.poseInActionSpace.orientation.w = 1.0f;
-            if (!xrOk(xrCreateActionSpace(session_, &spaceInfo, &hand.poseSpace), "xrCreateActionSpace(controller)")) return false;
+            if (!xrOk(xrCreateActionSpace(session_, &spaceInfo, &hand.poseSpace), "xrCreateActionSpace(controller grip)")) return false;
+            spaceInfo.action = hand.aimPose;
+            if (!xrOk(xrCreateActionSpace(session_, &spaceInfo, &hand.aimPoseSpace), "xrCreateActionSpace(controller aim)")) return false;
         }
         return true;
     }
@@ -834,6 +840,7 @@ private:
             return xrOk(xrCreateAction(actionSet_, &info, action), info.actionName);
         };
         return create(XR_ACTION_TYPE_POSE_INPUT, "pose", &hand.pose) &&
+               create(XR_ACTION_TYPE_POSE_INPUT, "aim_pose", &hand.aimPose) &&
                create(XR_ACTION_TYPE_FLOAT_INPUT, "trigger", &hand.trigger) &&
                create(XR_ACTION_TYPE_FLOAT_INPUT, "squeeze", &hand.squeeze) &&
                create(XR_ACTION_TYPE_VECTOR2F_INPUT, "thumbstick", &hand.thumbstick) &&
@@ -999,14 +1006,28 @@ private:
 
         // Use the existing right-hand pose/trigger for physical room hardware.
         // The ray interaction is independent of PC controller telemetry forwarding.
+        std::array<XrPosef,2> gripPoses{};
+        std::array<bool,2> gripPoseValid{{false,false}};
+        for(int handIndex=0;handIndex<2;++handIndex) {
+            uint32_t gripFlags=0;
+            gripPoses[handIndex].orientation.w=1.0f;
+            gripPoseValid[handIndex]=locatePose(hands_[handIndex].poseSpace,predictedTime,
+                                                gripPoses[handIndex],gripFlags) &&
+                                     (gripFlags&3u)==3u;
+        }
+        room_.setTrackedControllerPoses(gripPoses,gripPoseValid);
+
+        // Use OpenXR's dedicated aim pose for the laser; grip pose remains the
+        // controller model and telemetry transform.
         XrPosef roomPointerPose{};
+        roomPointerPose.orientation.w=1.0f;
         uint32_t roomPointerFlags=0;
-        const bool roomPointerValid=locatePose(hands_[1].poseSpace,predictedTime,
+        const bool roomPointerValid=locatePose(hands_[1].aimPoseSpace,predictedTime,
                                                roomPointerPose,roomPointerFlags) &&
                                    (roomPointerFlags&3u)==3u;
         const bool roomTriggerPressed=roomPointerValid &&
             floatAction(hands_[1].trigger,hands_[1].handPath)>.72f;
-        room_.handleRoomInteraction(roomPointerPose,roomTriggerPressed);
+        room_.handleRoomInteraction(roomPointerPose,headPose,roomTriggerPressed);
         qbx::MousePayload mouse{};
         if (room_.consumeMousePayload(mouse)) {
             mouse.timestampNs = nowNs();
@@ -1019,10 +1040,8 @@ private:
             qbx::ControllerPayload out{};
             out.timestampNs = tracking.timestampNs;
             out.hand = static_cast<uint8_t>(config_.swapHands ? 1 - handIndex : handIndex);
-            XrPosef controllerPose{};
-            controllerPose.orientation.w = 1.0f;
-            uint32_t controllerFlags = 0;
-            locatePose(hand.poseSpace, predictedTime, controllerPose, controllerFlags);
+            const XrPosef& controllerPose=gripPoses[handIndex];
+            const uint32_t controllerFlags=gripPoseValid[handIndex]?3u:0u;
             out.trackingFlags = static_cast<uint8_t>(controllerFlags);
             out.position[0] = controllerPose.position.x * config_.positionScale + config_.offsetX;
             out.position[1] = controllerPose.position.y * config_.positionScale + config_.offsetY;
@@ -1160,7 +1179,9 @@ private:
         }
         for (auto& hand : hands_) {
             if (hand.poseSpace) xrDestroySpace(hand.poseSpace);
+            if (hand.aimPoseSpace) xrDestroySpace(hand.aimPoseSpace);
             hand.poseSpace = XR_NULL_HANDLE;
+            hand.aimPoseSpace = XR_NULL_HANDLE;
         }
         for (auto& sc : swapchains_) {
             if (sc.handle) xrDestroySwapchain(sc.handle);
