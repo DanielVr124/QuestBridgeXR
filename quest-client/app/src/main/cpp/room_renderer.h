@@ -103,7 +103,7 @@ private:
         std::array<float,3> secondary{{0.50f,0.12f,1.0f}};
         bool gradient = false;
         bool enabled = true;
-        float brightness = 0.78f;
+        float brightness = 0.68f;
     };
     RoomSettings settings_{};
     std::array<LedZoneSettings,7> ledZones_{};
