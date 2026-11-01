@@ -433,7 +433,23 @@ def main():
     except Exception:pass
     cams={};apply_theme(THEMES[0]);set_monitor_count(1)
     for name,loc,target,lens,dof in CAMERAS:
-        c=camera(name,loc,target,lens,dof);cams[name]=c;render(scene,c,rd/(name+".png"))
+        cams[name]=camera(name,loc,target,lens,dof)
+
+    # The Quest renderer uses Y-up room coordinates. Blender is Z-up, so rotate
+    # the complete review scene (including imported GLBs, lights and cameras)
+    # into Blender space once, without changing any runtime transforms.
+    coordinate_root=bpy.data.objects.new("Quest_Y_Up_to_Blender_Z_Up",None)
+    scene.collection.objects.link(coordinate_root)
+    for obj in list(scene.objects):
+        if obj is coordinate_root or obj.parent is not None:
+            continue
+        obj.parent=coordinate_root
+        obj.matrix_parent_inverse=Matrix.Identity(4)
+    coordinate_root.rotation_euler[0]=-PI/2
+    bpy.context.view_layer.update()
+
+    for name,loc,target,lens,dof in CAMERAS:
+        render(scene,cams[name],rd/(name+".png"))
     for theme in THEMES[1:]:
         apply_theme(theme)
         for nm in ("01_room_entry_wide","05_bed_three_quarter","08_desk_corner"):
