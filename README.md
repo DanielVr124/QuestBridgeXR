@@ -11,7 +11,7 @@ On Windows, double-click `QuestBridgeStudio.bat`, or run:
 py -3 .\tools\questbridge_studio.py
 ```
 
-Studio exposes **75 settings** across Connection, Video, Tracking & Input, Display, Advanced, Virtual Room, and Fake VR. The Play Modes tab explains the difference between cozy-room/fake head-look mode and real PCVR through Meta Quest Link. Hover a setting to see a detailed explanation of what it does, how it changes behavior, and its trade-offs. Tabs scroll when needed. All values are range-validated before saving. Width, height, and FPS fields accept custom values as well as presets; **Restore Defaults** resets the active config without deleting named profiles.
+Studio opens on a **Connect** home screen with a USB/ADB test, headset/app checks, and separate Quest-to-PC handshake and video-setup evidence from Android logs. Detailed settings remain in the Connection, Video, Tracking & Input, Display, Advanced, Virtual Room, and Fake VR tabs (75 settings total). The Play Modes tab explains the difference between cozy-room/fake head-look mode and real PCVR through Meta Quest Link. Hover a setting to see what it does, how it changes behavior, and its trade-offs. Tabs scroll when needed. All values are range-validated before saving. Width, height, and FPS fields accept custom values as well as presets; **Restore Defaults** resets the active config without deleting named profiles.
 
 Starter profiles include Balanced, Low Latency, Ultra Low Latency, High Quality, Cinema Quality, WiFi Stable, Comfort Accessibility, and Network Debug. These are starting points, not universal best settings; network quality and PC hardware vary. You can save/import/export JSON profiles and export or install the Quest-side `config.ini` through ADB.
 
