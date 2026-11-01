@@ -1255,15 +1255,23 @@ private:
                     auto& sc = swapchains_[eye];
                     uint32_t imageIndex = 0;
                     XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-                    if (XR_FAILED(xrAcquireSwapchainImage(sc.handle, &acquireInfo, &imageIndex))) {
+                    const XrResult acquireResult = xrAcquireSwapchainImage(sc.handle, &acquireInfo, &imageIndex);
+                    if (XR_FAILED(acquireResult)) {
+                        LOGE("Eye %u swapchain acquire failed: %d; projection layer suppressed this frame",
+                             eye, static_cast<int>(acquireResult));
                         allEyesRendered = false;
                         break;
                     }
                     XrSwapchainImageWaitInfo waitSwapInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
                     waitSwapInfo.timeout = XR_INFINITE_DURATION;
-                    if (XR_FAILED(xrWaitSwapchainImage(sc.handle, &waitSwapInfo))) {
+                    const XrResult waitResult = xrWaitSwapchainImage(sc.handle, &waitSwapInfo);
+                    if (XR_FAILED(waitResult)) {
+                        LOGE("Eye %u swapchain wait failed: %d; projection layer suppressed this frame",
+                             eye, static_cast<int>(waitResult));
                         XrSwapchainImageReleaseInfo rel{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-                        xrReleaseSwapchainImage(sc.handle, &rel);
+                        const XrResult releaseResult = xrReleaseSwapchainImage(sc.handle, &rel);
+                        if (XR_FAILED(releaseResult))
+                            LOGE("Eye %u cleanup release failed: %d", eye, static_cast<int>(releaseResult));
                         allEyesRendered = false;
                         break;
                     }
@@ -1278,6 +1286,18 @@ private:
                         depthWidth_ = static_cast<int>(sc.width); depthHeight_ = static_cast<int>(sc.height);
                     }
                     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuffer_);
+                    const GLenum framebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+                    if (framebufferStatus != GL_FRAMEBUFFER_COMPLETE) {
+                        LOGE("Eye %u XR framebuffer incomplete: 0x%04x (image=%u size=%ux%u)",
+                             eye, static_cast<unsigned>(framebufferStatus), imageIndex, sc.width, sc.height);
+                        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                        XrSwapchainImageReleaseInfo rel{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+                        const XrResult releaseResult = xrReleaseSwapchainImage(sc.handle, &rel);
+                        if (XR_FAILED(releaseResult))
+                            LOGE("Eye %u release after framebuffer failure: %d", eye, static_cast<int>(releaseResult));
+                        allEyesRendered = false;
+                        break;
+                    }
                     glViewport(0, 0, static_cast<GLsizei>(sc.width), static_cast<GLsizei>(sc.height));
                     const float shade = eye == 0 ? 0.035f : 0.055f;
                     glClearColor(shade, shade, shade + 0.025f, 1.0f);
@@ -1286,7 +1306,10 @@ private:
                                     views_[eye], desktopTexture, video_.hasFrame());
                     glBindFramebuffer(GL_FRAMEBUFFER, 0);
                     XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-                    if (XR_FAILED(xrReleaseSwapchainImage(sc.handle, &releaseInfo))) {
+                    const XrResult releaseResult = xrReleaseSwapchainImage(sc.handle, &releaseInfo);
+                    if (XR_FAILED(releaseResult)) {
+                        LOGE("Eye %u swapchain release failed: %d; projection layer suppressed this frame",
+                             eye, static_cast<int>(releaseResult));
                         allEyesRendered = false;
                         break;
                     }
@@ -1300,6 +1323,8 @@ private:
                     projectionViews_[eye].subImage.imageArrayIndex = 0;
                 }
                 layerReady = allEyesRendered;
+                if (!layerReady)
+                    LOGE("Stereo frame incomplete; no projection layer submitted (viewCount=%u)", viewCount);
             } else {
                 LOGW("xrLocateViews failed or returned an unexpected number of views");
                 sendTracking(frameState.predictedDisplayTime);
@@ -1321,7 +1346,9 @@ private:
             endInfo.layerCount = 1;
             endInfo.layers = layers;
         }
-        xrEndFrame(session_, &endInfo);
+        const XrResult endResult = xrEndFrame(session_, &endInfo);
+        if (XR_FAILED(endResult))
+            LOGE("xrEndFrame failed: %d (layerReady=%d)", static_cast<int>(endResult), layerReady ? 1 : 0);
     }
 
     void shutdown() {
