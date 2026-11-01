@@ -2597,13 +2597,13 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
     // interrupts a drag operation.
     if(menuVisible_) {
         menuPointerValid_=false;
-        auto pointerDirection=pointerDirection;
-        const float pointerLength=std::sqrt(pointerDirection[0]*pointerDirection[0]+
-            pointerDirection[1]*pointerDirection[1]+pointerDirection[2]*pointerDirection[2]);
+        auto menuPointerDirection=pointerDirection;
+        const float pointerLength=std::sqrt(menuPointerDirection[0]*menuPointerDirection[0]+
+            menuPointerDirection[1]*menuPointerDirection[1]+menuPointerDirection[2]*menuPointerDirection[2]);
         if(pointerLength>.0001f) {
-            auto normalizedPointerDirection=pointerDirection;
+            auto normalizedPointerDirection=menuPointerDirection;
             for(float& component:normalizedPointerDirection) component/=pointerLength;
-            pointerDirection=normalizedPointerDirection;
+            menuPointerDirection=normalizedPointerDirection;
             const float halfW=settings_.roomSize=="large"?6.0f:(settings_.roomSize=="medium"?4.2f:3.0f);
             const float halfD=settings_.roomSize=="large"?7.5f:(settings_.roomSize=="medium"?5.4f:3.8f);
             const float deskX=-halfW+1.32f+.04f,deskZ=-halfD+.56f;
@@ -2612,11 +2612,11 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
             const float monitorX=pointerMonitorCount==3?deskX:pointerMonitorBaseX;
             const float monitorZ=deskZ-.31f;
             const float menuY=settings_.floorOffsetY+1.03f;
-            if(pointerDirection[2]<-.08f) {
-                const float t=(monitorZ+.001f-pointerOrigin[2])/pointerDirection[2];
+            if(menuPointerDirection[2]<-.08f) {
+                const float t=(monitorZ+.001f-pointerOrigin[2])/menuPointerDirection[2];
                 if(t>.02f&&t<8.0f) {
-                    const float hitX=pointerOrigin[0]+pointerDirection[0]*t;
-                    const float hitY=pointerOrigin[1]+pointerDirection[1]*t;
+                    const float hitX=pointerOrigin[0]+menuPointerDirection[0]*t;
+                    const float hitY=pointerOrigin[1]+menuPointerDirection[1]*t;
                     menuPointerOrigin_=pointerOrigin;
                     menuPointerHit_={hitX,hitY,monitorZ+.003f};
                     menuPointerValid_=hitX>=monitorX-.300f&&hitX<=monitorX+.300f&&
