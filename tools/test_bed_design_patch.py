@@ -65,7 +65,7 @@ class BedDesignPatchTests(unittest.TestCase):
         ):
             with self.subTest(token=token):
                 self.assertIn(token, NEW_GEOMETRY)
-        self.assertIn("bed platform, rails, legs, foot end", NEW_GEOMETRY.lower())
+        self.assertIn("keep the original bed platform", NEW_GEOMETRY.lower())
         self.assertIn("mattress, fitted sheet", NEW_GEOMETRY)
         self.assertIn("duvet and throw untouched", NEW_GEOMETRY)
 
