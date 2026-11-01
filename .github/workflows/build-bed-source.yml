@@ -100,6 +100,15 @@ jobs:
           test -s art/bed/renders/bed_side_profile.png
           test -s art/bed/renders/bed_foot_three_quarter.png
 
+      - name: Upload five bed review renders
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuestBridgeXR-Bed-Review-Renders
+          path: art/bed/renders/*.png
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Render whole-room tour and LED colour variants
         if: steps.changes.outputs.changed == 'true'
         shell: bash

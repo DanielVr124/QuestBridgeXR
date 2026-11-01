@@ -53,25 +53,21 @@ curve_tube(
 )
 
 # ----------------------- RESTORED BED + HEADBOARD CORRECTION -----------------------
-# Keep the original bed platform, rails, legs, foot end, mattress, fitted sheet,
-# duvet and throw untouched. Build the headboard as one clean upholstered panel, not ribs.
+# Keep the original bed platform and a broad, continuous upholstered headboard.
 boxsoft(
     'Headboard_back_shell',(0,1.185,-1.575),
     (1.29,.925,.115),'charcoal2',.16
 )
 
-# Five broad filled panels. The flat central faces and gently eased edges make
-# them read as padded rectangular upholstery rather than tall oval channels.
-for i in range(5):
-    x=(i-2)*.49
-    boxsoft(
-        f'Headboard_filled_panel_{i+1:02d}',
-        (x,1.275,-1.435),
-        (.232,.675,.112),'charcoal',.14
-    )
+# One single filled cushion replaces the five tall pieces that created a ribbed look.
+# It stays rectangular, with only a restrained soft radius on the edges.
+boxsoft(
+    'Headboard_single_soft_panel',(0,1.185,-1.435),
+    (1.12,.675,.112),'charcoal',.18
+)
 
-# A very slim upholstered perimeter lip shades the RGB channel. It sits almost
-# flush with the headboard so the trim is not a set of chunky visible rails.
+# A slim upholstered perimeter lip shades the recessed RGB channel.
+# The compositor reveals the emitter only when the headset points nearly straight on.
 for side in (-1,1):
     boxsoft(
         f'Headboard_outer_lip_side_{side}',
@@ -119,7 +115,7 @@ def patch_bed_geometry(source: str) -> str:
     )
 
     old_design = "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',"
-    new_design = "'design':'Original bed platform, frame, mattress and bedding retained; five broad charcoal upholstered panels with gently eased rectangular faces, a slim recessed RGB perimeter lip and refreshed fabric pillows',"
+    new_design = "'design':'Original bed platform, frame, mattress and bedding retained; one broad continuous charcoal upholstered headboard cushion with gently eased rectangular edges and a slim recessed RGB perimeter lip',"
     if source.count(old_design) != 1:
         raise RuntimeError("Bed metadata design marker changed; update the design patch.")
     source = source.replace(old_design, new_design, 1)

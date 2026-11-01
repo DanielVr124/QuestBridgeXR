@@ -18,22 +18,25 @@ class BedDesignPatchTests(unittest.TestCase):
         cls.source = gzip.decompress(compressed.read_bytes()).decode("utf-8")
         cls.patched = patch_bed_geometry(cls.source)
 
-    def test_headboard_uses_five_softly_eased_filled_panels(self):
+    def test_headboard_is_one_broad_soft_panel_not_vertical_ribs(self):
         for token in (
             "Headboard_back_shell",
-            "Headboard_filled_panel_",
+            "Headboard_single_soft_panel",
             "Headboard_outer_lip_side_",
             "Headboard_outer_lip_edge_",
             "Headboard_mount_",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
-        self.assertIn("(.232,.675,.112)", self.patched)
-        self.assertIn("boxsoft(", self.patched)
-        self.assertIn("flat central faces", self.patched)
-        self.assertIn("slim upholstered perimeter lip", self.patched)
-        self.assertNotIn("Headboard_inner_lip_", self.patched)
-        self.assertNotIn("Headboard_side_bolster_", self.patched)
+        self.assertIn("(1.12,.675,.112)", self.patched)
+        self.assertIn("'charcoal',.18", self.patched)
+        self.assertEqual(self.patched.count("Headboard_single_soft_panel"), 1)
+        for obsolete in (
+            "Headboard_filled_panel_", "Headboard_channel_",
+            "Headboard_side_bolster_", "Headboard_top_rail",
+        ):
+            with self.subTest(obsolete=obsolete):
+                self.assertNotIn(obsolete, self.patched)
 
     def test_old_bed_base_and_bedding_are_not_replaced(self):
         # The patch is an exact replacement of the original pillow/headboard block.
@@ -45,7 +48,7 @@ class BedDesignPatchTests(unittest.TestCase):
             "    merged.vertex_normals  # include normals in optimized runtime batches\n", "", 1
         )
         restored = restored.replace(
-            "'design':'Original bed platform, frame, mattress and bedding retained; five broad charcoal upholstered panels with gently eased rectangular faces, a slim recessed RGB perimeter lip and refreshed fabric pillows',",
+            "'design':'Original bed platform, frame, mattress and bedding retained; one broad continuous charcoal upholstered headboard cushion with gently eased rectangular edges and a slim recessed RGB perimeter lip',",
             "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',",
             1
         )

@@ -1,25 +1,21 @@
-# QuestBridge XR — original bed restoration with a targeted headboard + pillow update
+# QuestBridge XR — original bed with a corrected padded headboard
 
-This update restores the original generated bed body and changes **only the headboard upholstery and pillows**.
+This update keeps the original bed body and the existing pillow arrangement, and corrects the headboard into one continuous upholstered cushion.
 
 ## Headboard
-- Five broad charcoal upholstered panels with flat, softly filled faces.
-- Each panel has a small, even edge radius: softened like padded upholstery, but still clearly rectangular rather than ribbed or capsule-shaped.
-- The surrounding headboard is one clean upholstered slab with a slim, low-profile perimeter lip for the recessed RGB channel.
-- The lip is intentionally subtle. The LED glow is revealed only when the headset is aimed almost straight at the headboard; from a reclined view the strip itself stays hidden.
-- No bulky double rails, vertical side bolsters, exposed LED tape, diamond buttons or decorative crystal parts.
-
-## Pillows
-- The original pillow arrangement and positions are retained: two sleeping pillows, two smaller accent cushions and one lumbar cushion.
-- Their soft forms, fabric welt/seams and subtle corner tension folds are refreshed to make them read as filled fabric rather than hard blocks.
+- One wide charcoal padded panel, not five separate vertical cushions.
+- Broad rectangular silhouette with gently eased corners; the padding stays full without becoming an oversized oval.
+- A slim, low-profile upholstered perimeter lip protects the recessed RGB channel.
+- The LED emitter is rendered by the room compositor and appears only when looking almost straight at the headboard; it stays hidden from a reclined view.
+- No vertical ribs, tall cushion channels, bulky double rails, exposed LED tape, diamond buttons or decorative crystal parts.
 
 ## What stays exactly as it was
-- Original bed platform, rails, legs and foot end.
-- Original mattress, fitted sheet, duvet and throw.
+- Original bed platform, rails, legs, foot end, mattress, fitted sheet, duvet and throw.
+- Existing refreshed pillows and their arrangement.
 - Bed position, scale, renderer anchor and collision footprint.
 - Bedside cabinets, lights, TV, desk, monitor, window and all other room geometry.
 - Head tracking, turning, locomotion, controller bindings and room menus.
-- Existing per-zone LED colour settings; only the headboard emitter visibility is gated by viewing angle.
+- Existing per-zone LED colour settings.
 
 ## Regenerate
 From the repository root:
