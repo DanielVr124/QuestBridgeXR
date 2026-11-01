@@ -1197,12 +1197,24 @@ class QuestBridgeStudio(tk.Tk):
                 )
             serial = online[0]
 
-            installed = subprocess.run(
-                [adb, "-s", serial, "shell", "pm", "path", "com.questbridge.xr"],
-                capture_output=True, text=True, timeout=15, check=False,
+            # Always put the matching APK on the headset; an older installed client
+            # will not understand the new USB-only TCP transport setting.
+            apk_candidates = [
+                ROOT / "QuestClient" / "QuestBridgeXR-Quest-debug.apk",
+                ROOT / "quest-client" / "app" / "build" / "outputs" / "apk" / "debug" / "app-debug.apk",
+            ]
+            apk = next((item for item in apk_candidates if item.is_file()), None)
+            if apk is None:
+                raise RuntimeError(
+                    "The matching Quest APK is missing. Use the combined portable ZIP, "
+                    "which includes QuestClient/QuestBridgeXR-Quest-debug.apk."
+                )
+            install = subprocess.run(
+                [adb, "-s", serial, "install", "-r", str(apk)],
+                capture_output=True, text=True, timeout=120, check=False,
             )
-            if installed.returncode != 0 or "package:" not in installed.stdout:
-                raise RuntimeError("QuestBridge XR is not installed on this headset. Use Install / Launch Quest App first.")
+            if install.returncode != 0:
+                raise RuntimeError(install.stderr.strip() or install.stdout.strip() or "Could not install the matching Quest USB client APK.")
 
             reverse = subprocess.run(
                 [adb, "-s", serial, "reverse", f"tcp:{USB_STREAM_PORT}", f"tcp:{USB_STREAM_PORT}"],
