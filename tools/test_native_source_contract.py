@@ -243,7 +243,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("drawPlane(pv.data(),tvX", renderer)
         self.assertNotIn("DESK CHAIR", renderer)
         self.assertIn("kEnvironmentNames[environmentDropdownIndex_]", renderer)
-        self.assertIn("Mat4 camera=makeView(view.pose,moveX_,moveZ_,virtualYaw_)", renderer)
+        self.assertIn("Mat4 camera=makeView(renderedPose,moveX_,moveZ_,virtualYaw_)", renderer)
         self.assertIn("XrPosef RoomRenderer::projectionPose(const XrPosef& viewPose) const", renderer)
         self.assertIn("projectionViews_[eye].pose = room_.projectionPose(views_[eye].pose)", source)
         self.assertIn("adjusted.position.x+=moveX_", renderer)
