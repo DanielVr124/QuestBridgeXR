@@ -13,7 +13,7 @@ The headboard is rebuilt around the visual structure of the Brambley Bed w/ LED 
 
 ## Pillow refinement
 
-Exactly two full-size sleep pillows remain on the bed, one on each side with a small gap between them. Both are propped back against the headboard at a steep, natural recline: the lower front edge rests on the mattress while the upper rear edge leans into the upholstery instead of lying flat. Each pillow is an editable rounded-rectangle mesh with a fuller, softly domed crown, rounded corners, a deep continuous box gusset and closed underside. Fine welt stitching and barely visible cloth relaxation keep the casing soft without making it look quilted or over-decorated. There are no accent cushions or lumbar pillow.
+Exactly two full-size sleep pillows remain on the bed, one on each side with a small gap between them. Both are propped back against the headboard at a steep, natural recline: the lower front edge rests on the mattress while the upper rear edge leans into the upholstery instead of lying flat. Each pillow is an editable rounded-rectangle mesh with a fuller, softly domed crown, a slightly squarer rounded silhouette, a deep continuous box gusset and a closed underside. The crown has a tiny amount of uneven fill and shallow corner tucks sculpted into the mesh rather than artificial raised crease-lines. The shell uses a warm ivory cotton-percale texture, with a subtly darker matching gusset and very fine low-contrast seam thread. A denser, smoother mesh keeps the soft transitions clean without adding decorative quilting. There are no accent cushions or lumbar pillow.
 
 ## What stays unchanged
 - Original bed platform, rails, legs, foot end, mattress, fitted sheet, duvet and throw.
