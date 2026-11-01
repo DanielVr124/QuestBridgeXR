@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import ipaddress
 import re
-import shutil
 import socket
 import subprocess
+
+from usb_connection import find_adb_executable
 
 
 _IPV4_TOKEN = re.compile(r"\b(?:inet|src)\s+(\d{1,3}(?:\.\d{1,3}){3})(?:/\d+)?\b")
@@ -62,9 +63,9 @@ def discover_pc_ipv4() -> str | None:
                 candidates[0] if candidates else None)
 
 
-def discover_quest_ipv4() -> tuple[str | None, str]:
+def discover_quest_ipv4(adb_path: str | None = None) -> tuple[str | None, str]:
     """Read the Wi-Fi IPv4 from one authorized ADB device; never selects among multiple devices."""
-    adb = shutil.which("adb")
+    adb = adb_path or find_adb_executable()
     if not adb:
         return None, "ADB was not found. Install Android platform-tools and put adb on PATH."
 
