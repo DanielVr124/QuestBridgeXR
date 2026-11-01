@@ -90,6 +90,11 @@ jobs:
       - name: Install bed model generator dependencies
         run: python -m pip install --disable-pip-version-check numpy pillow scipy trimesh networkx
 
+      - name: Install Blender for Touch Plus controller models
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes blender
+
       - name: Generate the custom upholstered bed model
         env:
           QBX_BED_OUTPUT_DIR: ${{ github.workspace }}/art/bed
@@ -108,6 +113,25 @@ jobs:
           assert manifest["editable_mesh_objects"] >= 40
           print("Bed GLB generated:", manifest["dimensions"], "metres;",
                 manifest["triangles"], "triangles")
+          PY
+ 
+      - name: Generate Meta Touch Plus controller replicas
+        run: |
+          blender --background --python tools/generate_touch_plus_controllers.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("art/controllers/controller_manifest.json").read_text())
+          for asset in (
+              "quest-client/app/src/main/assets/models/meta_touch_plus_left.glb",
+              "quest-client/app/src/main/assets/models/meta_touch_plus_right.glb",
+              "art/controllers/meta_touch_plus_controllers.blend",
+          ):
+              path = Path(asset)
+              assert path.is_file() and path.stat().st_size > 20_000, f"Missing or empty controller asset: {asset}"
+          assert "not Meta's proprietary source FBX" in manifest["provenance"]
+          assert len(manifest["renders"]) >= 3
+          print("Touch Plus reference replicas generated and verified.")
           PY
 
       - name: Set up Gradle
@@ -135,6 +159,17 @@ jobs:
             art/bed/arc_upholstered_bed_editable.glb
             art/bed/bed_manifest.json
             art/bed/textures/*.png
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Blender Touch Plus controller source and renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: touch-plus-controller-source
+          path: |
+            art/controllers/meta_touch_plus_controllers.blend
+            art/controllers/controller_manifest.json
+            art/controllers/renders/*.png
           if-no-files-found: error
           retention-days: 30
 
