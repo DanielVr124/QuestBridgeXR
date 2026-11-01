@@ -42,6 +42,8 @@ private:
     void addTree(std::vector<Vertex>& out, float x, float z, float scale, std::uint32_t seed);
     void addOctahedron(std::vector<Vertex>& out, float x, float y, float z,
                        float rx, float ry, float rz, const float* color);
+    void addCylinderZ(std::vector<Vertex>& out, float x, float y, float z,
+                      float radius, float depth, const float* color, float material, int sides = 10);
     void addBuilding(std::vector<Vertex>& out, float x, float z, float width,
                      float depth, float height, int style, std::uint32_t seed, bool detailed);
     void addStreetFurniture(std::vector<Vertex>& out, float x, float z, std::uint32_t seed);
