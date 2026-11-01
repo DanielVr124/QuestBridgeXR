@@ -50,7 +50,7 @@ jobs:
               target.mkdir(parents=True, exist_ok=True)
               for member, filename in expected.items():
                   compressed = zf.read(member)
-                  if not compressed.startswith(b"\\x1f\\x8b"):
+                  if not compressed.startswith(bytes((31, 139))):
                       raise SystemExit(f"{filename} is not a gzip-compressed GLB.")
                   raw = gzip.decompress(compressed)
                   if len(raw) < 12 or raw[:4] != b"glTF":
