@@ -1262,6 +1262,13 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
 bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings) {
     if(initialized_) return true;
     settings_=settings;
+    if(settings_.environment=="explorable_city") {
+        cityReturnValid_=true;
+        roomReturnMoveX_=moveX_;
+        roomReturnMoveZ_=moveZ_;
+        roomReturnYaw_=virtualYaw_;
+        citySpawnPending_=true;
+    }
     if(!ledDefaultsSeeded_) {
         ledZones_[0].primary={.04f,.48f,1.0f}; ledZones_[0].secondary={.58f,.12f,1.0f};
         ledZones_[1].primary={.36f,.10f,1.0f}; ledZones_[1].secondary={.04f,.56f,1.0f};
