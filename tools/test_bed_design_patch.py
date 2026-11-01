@@ -79,20 +79,20 @@ class BedDesignPatchTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, self.patched)
         self.assertNotIn("superellipsoid(f'Sleep_pillow_", self.patched)
-        self.assertIn("np.array([side*.49, 1.095, -1.115]", self.patched)
-        self.assertIn("f'Slate_accent_cushion_{side}'", self.patched)
-        self.assertIn("'Lumbar_cushion'", self.patched)
+        self.assertIn("np.array([side*.50, 1.105, -.86]", self.patched)
+        self.assertEqual(self.patched.count("f'Sleep_pillow_top_{side}'"), 1)
+        self.assertNotIn("Slate_accent", self.patched)
+        self.assertNotIn("Lumbar_cushion", self.patched)
 
-    def test_pillow_pair_does_not_overlap_and_accents_do_not_form_a_bolster(self):
-        self.assertIn("PILLOW_HALF_WIDTH = .46", self.patched)
-        self.assertIn("PILLOW_HALF_DEPTH = .31", self.patched)
-        self.assertIn("x = side * .235", self.patched)
-        self.assertIn("(.205, .105, .145)", self.patched)
-        self.assertIn("(x, 1.14, -.66)", self.patched)
-        self.assertIn("'Lumbar_cushion'", self.patched)
-        self.assertIn("(.18, .065, .085)", self.patched)
-        self.assertIn("(.18, .065, .085)", self.patched)
-        self.assertNotIn("(.445, .125, .145)", self.patched)
+    def test_exactly_two_sleep_pillows_are_propped_against_the_headboard(self):
+        self.assertIn("PILLOW_HALF_WIDTH = .475", self.patched)
+        self.assertIn("PILLOW_HALF_DEPTH = .33", self.patched)
+        self.assertIn("PILLOW_REAR_TILT = math.radians(12.0)", self.patched)
+        self.assertIn("PILLOW_REST_PIVOT", self.patched)
+        self.assertIn("pillow_rotation[:3, :3] @ (local - PILLOW_REST_PIVOT)", self.patched)
+        self.assertIn("for side in (-1, 1):", self.patched)
+        self.assertNotIn("Slate_accent", self.patched)
+        self.assertNotIn("Lumbar_cushion", self.patched)
 
     def test_headboard_is_not_the_failed_plain_slab_or_vertical_ribs(self):
         for obsolete in (
@@ -105,7 +105,7 @@ class BedDesignPatchTests(unittest.TestCase):
             with self.subTest(obsolete=obsolete):
                 self.assertNotIn(obsolete, self.patched)
 
-    def test_original_bed_body_bedding_and_existing_pillow_layout_are_retained(self):
+    def test_original_bed_body_bedding_and_two_pillow_layout_are_retained(self):
         restored = self.patched.replace(NEW_GEOMETRY, OLD_GEOMETRY, 1)
         restored = restored.replace(
             "        m.vertex_normals  # cache smooth per-vertex normals for GLB export\n", "", 1
