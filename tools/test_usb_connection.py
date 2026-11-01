@@ -63,6 +63,23 @@ emulator-5554 device product:sdk_gphone64_x86_64 transport_id:9
         self.assertEqual(run.call_count, 1)
 
     @mock.patch("usb_connection.subprocess.run")
+    def test_non_quest_android_device_is_not_reported_as_quest_ready(self, run):
+        outputs = [
+            (0, "List of devices attached\\nR58M123456 device product:generic model:Android_Phone transport_id:7\\n"),
+            (0, "Android Phone\\n"),
+            (0, "14\\n"),
+        ]
+        run.side_effect = [
+            mock.Mock(returncode=code, stdout=stdout, stderr="")
+            for code, stdout in outputs
+        ]
+        with mock.patch("usb_connection.pathlib.Path.is_file", return_value=True):
+            report = probe_usb_connection(adb_path="C:/Android/adb.exe")
+        self.assertFalse(report["ok"])
+        self.assertIn("not identified as a Meta Quest", report["summary"])
+        self.assertEqual(run.call_count, 3)
+
+    @mock.patch("usb_connection.subprocess.run")
     def test_usb_quest_with_installed_running_app_passes(self, run):
         outputs = [
             (0, "List of devices attached\n1WMHH123 device product:eureka model:Quest_3 transport_id:7\n"),
