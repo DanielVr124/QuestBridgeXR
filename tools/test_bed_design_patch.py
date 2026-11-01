@@ -89,7 +89,8 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertIn("x = side * .235", self.patched)
         self.assertIn("(.205, .105, .145)", self.patched)
         self.assertIn("(x, 1.14, -.66)", self.patched)
-        self.assertNotIn("Lumbar_cushion", self.patched)
+        self.assertIn("'Lumbar_cushion'", self.patched)
+        self.assertIn("(.18, .065, .085)", self.patched)
         self.assertIn("(.18, .065, .085)", self.patched)
         self.assertNotIn("(.445, .125, .145)", self.patched)
 
