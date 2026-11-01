@@ -21,6 +21,7 @@ enum class PacketType : std::uint16_t {
     FrameChunk = 6, // encoded video access-unit chunk
     Goodbye = 7,
     VideoConfig = 8, // host/test sender announces dimensions and stereo layout
+    Mouse = 9,       // normalized virtual-desktop pointer position and button state
 };
 
 #pragma pack(push, 1)
@@ -73,6 +74,16 @@ struct HeartbeatPayload {
     std::uint64_t timestampNs;
 };
 
+// Normalized pointer position across the Windows virtual desktop. buttons bit 0
+// is the left mouse button; all other bits are reserved and must be zero.
+struct MousePayload {
+    std::uint64_t timestampNs;
+    std::uint16_t x;       // 0..65535, left to right
+    std::uint16_t y;       // 0..65535, top to bottom
+    std::uint16_t buttons; // bit 0 = left button held while dragging
+    std::uint16_t reserved;
+};
+
 // Sent before FrameChunk packets by the PC sender. layout: 0 = mono (same image per eye), 1 = side-by-side stereo.
 struct VideoConfigPayload {
     std::uint32_t width;       // encoded frame width (full frame, including both eyes for SBS)
@@ -100,5 +111,6 @@ static_assert(sizeof(PacketHeader) == 16);
 static_assert(sizeof(TrackingPayload) == 64);
 static_assert(sizeof(ControllerPayload) == 60);
 static_assert(sizeof(VideoConfigPayload) == 20);
+static_assert(sizeof(MousePayload) == 16);
 
 } // namespace qbx
