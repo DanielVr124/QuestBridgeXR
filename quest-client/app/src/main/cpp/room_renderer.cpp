@@ -585,6 +585,27 @@ XrQuaternionf quatMul(const XrQuaternionf& a,const XrQuaternionf& b) {
             a.w*b.z+a.x*b.y-a.y*b.x+a.z*b.w,
             a.w*b.w-a.x*b.x-a.y*b.y-a.z*b.z};
 }
+std::array<float,3> rotateByQuaternion(const XrQuaternionf& q,const std::array<float,3>& v) {
+    const float tx=2.0f*(q.y*v[2]-q.z*v[1]);
+    const float ty=2.0f*(q.z*v[0]-q.x*v[2]);
+    const float tz=2.0f*(q.x*v[1]-q.y*v[0]);
+    return {v[0]+q.w*tx+(q.y*tz-q.z*ty),
+            v[1]+q.w*ty+(q.z*tx-q.x*tz),
+            v[2]+q.w*tz+(q.x*ty-q.y*tx)};
+}
+XrPosef mapTrackedPoseToRoom(const XrPosef& tracked,const XrPosef& headCenter,
+                            float moveX,float moveZ,float yaw,float seatDrop) {
+    const float c=std::cos(yaw),s=std::sin(yaw);
+    const float dx=tracked.position.x-moveX-headCenter.position.x;
+    const float dz=tracked.position.z-moveZ-headCenter.position.z;
+    XrPosef mapped=tracked;
+    mapped.position.x=headCenter.position.x+c*dx-s*dz;
+    mapped.position.y=headCenter.position.y+tracked.position.y+seatDrop-headCenter.position.y;
+    mapped.position.z=headCenter.position.z+s*dx+c*dz;
+    const XrQuaternionf roomInverseYaw{0.0f,-std::sin(yaw*.5f),0.0f,std::cos(yaw*.5f)};
+    mapped.orientation=quatMul(roomInverseYaw,tracked.orientation);
+    return mapped;
+}
 Mat4 makeView(const XrPosef& pose, float locomotionX, float locomotionZ, float virtualYaw) {
     XrQuaternionf yawQ{0.0f, std::sin(virtualYaw*0.5f), 0.0f, std::cos(virtualYaw*0.5f)};
     XrQuaternionf q=quatMul(yawQ, pose.orientation);
@@ -1855,6 +1876,11 @@ void RoomRenderer::setConnectionState(bool connected, const std::string& hostIp,
     pcStreaming_ = streaming;
     pcHostIp_ = hostIp.empty() ? "Not configured" : hostIp;
 }
+void RoomRenderer::setTrackedControllerPoses(const std::array<XrPosef,2>& poses,
+                                             const std::array<bool,2>& valid) {
+    controllerPoses_=poses;
+    controllerPoseValid_=valid;
+}
 
 bool RoomRenderer::consumeReconnectRequest() {
     const bool requested = reconnectRequested_;
@@ -2504,7 +2530,8 @@ bool RoomRenderer::consumeMousePayload(qbx::MousePayload& payload) {
     return true;
 }
 
-void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool triggerPressed) {
+void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const XrPosef& headPose,
+                                         bool triggerPressed) {
     const bool triggerEdge=triggerPressed&&!previousRoomTrigger_;
     previousRoomTrigger_=triggerPressed;
 
@@ -2517,33 +2544,27 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
     const float deskX=-halfW+1.32f+.04f;
     const float deskZ=-halfD+.56f;
     const float deskSurface=floorY+.75f;
-    const float chairX=deskX;
-    const float chairZ=deskZ+1.12f;
+    const float chairX=deskX+chairOffsetX_;
+    const float chairZ=deskZ+1.12f+chairOffsetZ_;
+    const float effectiveYaw=virtualYaw_+(sittingActive_?chairYaw_:0.0f);
+    const XrPosef roomPointerPose=mapTrackedPoseToRoom(
+        controllerAimPose,headPose,moveX_,moveZ_,effectiveYaw,.42f*seatedBlend_);
+    const auto pointerOrigin=std::array<float,3>{roomPointerPose.position.x,
+                                                 roomPointerPose.position.y,
+                                                 roomPointerPose.position.z};
+    const auto pointerDirection=rotateByQuaternion(roomPointerPose.orientation,{0.0f,0.0f,-1.0f});
 
     // Never leave a host-side mouse button held when a menu or settings change
     // interrupts a drag operation.
     if(menuVisible_) {
         menuPointerValid_=false;
-        const XrQuaternionf roomYaw{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
-        const XrQuaternionf roomOrientation=quatMul(roomYaw,controllerPose.orientation);
-        auto rotatePointerVector=[](const XrQuaternionf& q,const std::array<float,3>& v) {
-            const float tx=2.0f*(q.y*v[2]-q.z*v[1]);
-            const float ty=2.0f*(q.z*v[0]-q.x*v[2]);
-            const float tz=2.0f*(q.x*v[1]-q.y*v[0]);
-            return std::array<float,3>{
-                v[0]+q.w*tx+(q.y*tz-q.z*ty),
-                v[1]+q.w*ty+(q.z*tx-q.x*tz),
-                v[2]+q.w*tz+(q.x*ty-q.y*tx)
-            };
-        };
-        const auto pointerOrigin=rotatePointerVector(roomYaw,
-            {controllerPose.position.x+moveX_,controllerPose.position.y,
-             controllerPose.position.z+moveZ_});
-        auto pointerDirection=rotatePointerVector(roomOrientation,{0.0f,0.0f,-1.0f});
+        auto pointerDirection=pointerDirection;
         const float pointerLength=std::sqrt(pointerDirection[0]*pointerDirection[0]+
             pointerDirection[1]*pointerDirection[1]+pointerDirection[2]*pointerDirection[2]);
         if(pointerLength>.0001f) {
-            for(float& c:pointerDirection)c/=pointerLength;
+            auto normalizedPointerDirection=pointerDirection;
+            for(float& component:normalizedPointerDirection) component/=pointerLength;
+            pointerDirection=normalizedPointerDirection;
             const float halfW=settings_.roomSize=="large"?6.0f:(settings_.roomSize=="medium"?4.2f:3.0f);
             const float halfD=settings_.roomSize=="large"?7.5f:(settings_.roomSize=="medium"?5.4f:3.8f);
             const float deskX=-halfW+1.32f+.04f,deskZ=-halfD+.56f;
@@ -2632,22 +2653,8 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
         return;
     }
 
-    const XrQuaternionf roomYaw{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
-    const XrQuaternionf roomOrientation=quatMul(roomYaw,controllerPose.orientation);
-    auto rotateVector=[](const XrQuaternionf& q,const std::array<float,3>& v) {
-        const float tx=2.0f*(q.y*v[2]-q.z*v[1]);
-        const float ty=2.0f*(q.z*v[0]-q.x*v[2]);
-        const float tz=2.0f*(q.x*v[1]-q.y*v[0]);
-        return std::array<float,3>{
-            v[0]+q.w*tx+(q.y*tz-q.z*ty),
-            v[1]+q.w*ty+(q.z*tx-q.x*tz),
-            v[2]+q.w*tz+(q.x*ty-q.y*tx)
-        };
-    };
-    const auto origin=rotateVector(roomYaw,{controllerPose.position.x+moveX_,
-                                             controllerPose.position.y,
-                                             controllerPose.position.z+moveZ_});
-    auto direction=rotateVector(roomOrientation,{0.0f,0.0f,-1.0f});
+    const auto origin=pointerOrigin;
+    auto direction=pointerDirection;
     const float directionLength=std::sqrt(direction[0]*direction[0]+direction[1]*direction[1]+direction[2]*direction[2]);
     if(directionLength<0.0001f) {
         if(mouseDragging_&&!triggerPressed) {
@@ -2771,9 +2778,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float pivotX=headCenterPose.position.x;
     const float pivotY=headCenterPose.position.y;
     const float pivotZ=headCenterPose.position.z;
+    const float effectiveWorldYaw=virtualYaw_+(sittingActive_?chairYaw_:0.0f);
     const Mat4 inverseVirtualRotation=mul(
         translation(pivotX,pivotY,pivotZ),
-        mul(rotateY(-virtualYaw_),translation(-pivotX,-pivotY,-pivotZ)));
+        mul(rotateY(-effectiveWorldYaw),translation(-pivotX,-pivotY,-pivotZ)));
     const Mat4 inverseVirtualTranslation=
         translation(-moveX_,.42f*seatedBlend_,-moveZ_);
     const Mat4 inverseVirtualWorld=mul(inverseVirtualRotation,inverseVirtualTranslation);
