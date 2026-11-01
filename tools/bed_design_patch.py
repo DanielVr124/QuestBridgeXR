@@ -23,8 +23,8 @@ PILLOW_CROWN_HEIGHT = .175
 PILLOW_CORNER_EXPONENT = 3.1
 PILLOW_RING_SEGMENTS = 112
 PILLOW_RING_ROWS = 20
-PILLOW_REAR_TILT = math.radians(12.0)
-PILLOW_REST_PIVOT = np.array([0.0, PILLOW_EDGE_BOTTOM, -PILLOW_HALF_DEPTH], dtype=float)
+PILLOW_REAR_TILT = math.radians(50.0)
+PILLOW_REST_PIVOT = np.array([0.0, PILLOW_EDGE_BOTTOM, PILLOW_HALF_DEPTH], dtype=float)
 
 def pillow_outline(angle, scale=1.0):
     power = 2.0 / PILLOW_CORNER_EXPONENT
@@ -57,11 +57,11 @@ def pillow_crown_height(x, z, side):
 
 for side in (-1, 1):
     # These centres match the previous bed layout exactly.
-    pillow_center = np.array([side*.50, 1.105, -.86], dtype=float)
-    # Rotate around the lower rear edge so each pillow rests on the mattress
-    # while its top leans naturally back into the upholstered headboard.
+    pillow_center = np.array([side*.50, 1.105, -1.35], dtype=float)
+    # Rotate around the lower front edge: it stays at the mattress while
+    # the upper rear edge rises and leans back into the upholstered headboard.
     pillow_rotation = trimesh.transformations.rotation_matrix(
-        -PILLOW_REAR_TILT, (1.0, 0.0, 0.0)
+        PILLOW_REAR_TILT, (1.0, 0.0, 0.0)
     )
 
     def pillow_world(x, y, z):
