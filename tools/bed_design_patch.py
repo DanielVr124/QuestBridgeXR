@@ -59,14 +59,14 @@ def pillow_crown_height(x, z, side):
 
     # Tiny depressions are formed into the cloth mesh at the four tucked corners;
     # they replace visible raised crease-lines with shallow, soft fabric folds.
-    corner_tucks = 0.0
+    pillow_corner_tucks = 0.0
     for corner_x in (-1, 1):
         for corner_z in (-1, 1):
             dx = x - corner_x * .415
             dz = z - corner_z * .285
             along = (-corner_x * dx - corner_z * dz) * .70710678
             across = (corner_x * dz - corner_z * dx) * .70710678
-            corner_tucks += .0038 * math.exp(
+            pillow_corner_tucks += .0038 * math.exp(
                 -((along - .075) / .085) ** 2 - (across / .022) ** 2
             )
 
@@ -76,7 +76,7 @@ def pillow_crown_height(x, z, side):
         .0012 * math.sin(11.0 * x + side * .43)
         + .0009 * math.sin(9.0 * z - 3.0 * x + side * .27)
     ) * crease_envelope
-    return PILLOW_EDGE_TOP + crown + fill_lobes - corner_tucks + fine_relaxation
+    return PILLOW_EDGE_TOP + crown + fill_lobes - pillow_corner_tucks + fine_relaxation
 
 for side in (-1, 1):
     # These centres match the previous bed layout exactly.
@@ -152,7 +152,7 @@ for side in (-1, 1):
             gusset_faces.extend(((a, b, c), (a, c, d)))
     add_mesh(
         f'Sleep_pillow_box_gusset_{side}',
-        gusset_vertices, gusset_faces, gusset_uv, 'pillow_gusset'
+        gusset_vertices, gusset_faces, gusset_uv, 'pillow_cotton'
     )
 
     # The underside closes the shell and preserves believable thickness from
@@ -202,10 +202,10 @@ for side in (-1, 1):
         lower_gusset_seam.append(
             pillow_world(ox, PILLOW_EDGE_BOTTOM + .014, oz)
         )
-    curve_tube(f'Sleep_pillow_top_welt_{side}', top_welt, .0022, 'pillow_thread')
+    curve_tube(f'Sleep_pillow_top_welt_{side}', top_welt, .0022, 'linen')
     curve_tube(
         f'Sleep_pillow_lower_gusset_seam_{side}',
-        lower_gusset_seam, .0015, 'pillow_thread'
+        lower_gusset_seam, .0015, 'linen'
     )
 
     # The four soft corner tucks are sculpted into the top mesh above.
@@ -478,16 +478,6 @@ materials['pillow_cotton']=PBRMaterial(
     name='Warm ivory cotton pillow casing',
     baseColorFactor=[244,241,234,255],metallicFactor=0.0,roughnessFactor=.96,
     baseColorTexture=textures['sheet'],doubleSided=True
-)
-materials['pillow_gusset']=PBRMaterial(
-    name='Ivory cotton pillow box gusset',
-    baseColorFactor=[226,223,216,255],metallicFactor=0.0,roughnessFactor=.97,
-    baseColorTexture=textures['sheet'],doubleSided=True
-)
-materials['pillow_thread']=PBRMaterial(
-    name='Fine warm-grey cotton pillow thread',
-    baseColorFactor=[207,202,193,255],metallicFactor=0.0,roughnessFactor=.98,
-    baseColorTexture=textures['linen'],doubleSided=True
 )
 """
 
