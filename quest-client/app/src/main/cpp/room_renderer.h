@@ -7,10 +7,11 @@
 #include <android/asset_manager.h>
 #include <openxr/openxr.h>
 #include "glb_model.h"
+#include "city_world.h"
 #include "qbx/protocol.hpp"
 
 struct RoomSettings {
-    std::string environment = "skyline_penthouse";       // 208 scenes; see Studio Virtual Room settings
+    std::string environment = "skyline_penthouse";       // 209 scenes, including the streamed explorable city; see Studio settings
     std::string roomSize = "medium";           // small | medium | large
     std::string screenDestination = "monitor"; // monitor | tv | both
     int monitorCount = 1;                       // 1..3, replicated stream
@@ -110,6 +111,8 @@ private:
     GlbModel tvModel_;
     GlbModel chairModel_;
     GlbModel mouseModel_;
+    CityWorld cityWorld_;
+    bool citySpawnPending_ = true;
     GLuint program_ = 0;
     GLuint vignetteProgram_ = 0;
     GLuint vao_ = 0;
