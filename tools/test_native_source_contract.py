@@ -339,7 +339,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn('chairWheelRoll_+=speedNow*dt/.055f', renderer)
         self.assertIn('scene.render.resolution_x = 1400', generator)
         self.assertIn("not Meta's proprietary FBX source mesh", generator)
-        self.assertIn('blender --background --python tools/generate_touch_plus_controllers.py', workflow)
+        self.assertIn("sudo apt-get install --yes blender python3-numpy", workflow)
+        self.assertIn("PYTHONPATH=/usr/lib/python3/dist-packages blender --background", workflow)
         self.assertIn('touch-plus-controller-source', workflow)
 
     def test_room_light_switch_and_environment_led_controls_are_real(self):
