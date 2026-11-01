@@ -59,20 +59,21 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("bedModel_.draw(pv.data(),bedPlacement", bed_section)
         self.assertIn("drawGradientBar(0,bedX", bed_section)
         self.assertIn("const float emitterZ=bedZ-1.270f", bed_section)
-        self.assertIn("if(ledZones_[0].enabled)", bed_section)
-        self.assertNotIn("straightOn>0.985f", bed_section)
+        self.assertIn("if(ledZones_[0].enabled&&straightOn>0.985f)", bed_section)
+        self.assertIn("const float straightOn=", bed_section)
+        self.assertIn("const float viewForwardX=-camera[8]", bed_section)
         self.assertIn("drawGradientBarY(0,x", bed_section)
         self.assertNotIn("LED_reveal", bed_section)
         self.assertNotIn("drawPillow(pv.data(),bedX", bed_section)
         self.assertNotIn("const float headboardZ=bedZ-1.48f", bed_section)
         bed_design = (ROOT / "tools/bed_design_patch.py").read_text(encoding="utf-8")
         for design_marker in (
-            "Headboard_quilt_backing", "Headboard_diamond_tuft_",
-            "Headboard_diamond_stitch_", "Headboard_tuft_button_base_",
-            "Headboard_crystal_tuft_button_", "Headboard_side_frame_",
+            "Headboard_quilt_backing", "Headboard_filled_panel_",
+            "Headboard_outer_lip_side_", "Headboard_inner_lip_side_",
+            "Headboard_outer_lip_edge_", "Headboard_inner_lip_edge_",
             "Headboard_mount_", "Sleep_pillow_piping_",
-            "Slate_accent_cushion_", "Lumbar_cushion",
-            "headboard_crystal"
+            "Sleep_pillow_corner_fold_", "Slate_accent_cushion_",
+            "Slate_accent_piping_", "Lumbar_cushion_seam"
         ):
             with self.subTest(bed_detail=design_marker):
                 self.assertIn(design_marker, bed_design)
