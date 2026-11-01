@@ -294,7 +294,10 @@ scene.render.resolution_percentage = 100
 scene.render.image_settings.file_format = "PNG"
 scene.render.image_settings.color_mode = "RGBA"
 scene.render.film_transparent = False
-scene.view_settings.view_transform = "AgX"
+try:
+    scene.view_settings.view_transform = "AgX"
+except TypeError:
+    scene.view_settings.view_transform = "Filmic"
 scene.world.color = (0.018, 0.022, 0.030)
 
 def add_area(name, location, power, color, size):
