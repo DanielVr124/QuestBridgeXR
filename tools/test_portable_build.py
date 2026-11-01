@@ -15,6 +15,9 @@ class PortableBuildTests(unittest.TestCase):
         self.assertIn("openxr_runtime.py", script)
         self.assertIn("qbx_openxr_runtime.dll", script)
         self.assertIn("-S (Join-Path $root 'runtime')", script)
+        self.assertIn("ANDROID_SDK_ROOT", script)
+        self.assertIn("AdbWinApi.dll", script)
+        self.assertIn("platform-tools", script)
 
     def test_ci_builds_windows_and_android_products(self):
         workflow = (ROOT / ".github" / "workflows" / "build-release.yml").read_text(encoding="utf-8")
