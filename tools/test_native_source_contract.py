@@ -26,7 +26,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("glDrawArrays(GL_TRIANGLES,0,chunk.vertexCount)", city_source)
         self.assertIn("addBuilding(vertices", city_source)
         self.assertIn('value == "explorable_city"', main_source)
-        self.assertIn('"explorable_city"', city_header)
+        self.assertIn("class CityWorld", city_header)
 
     def test_room_renderer_contains_requested_environment_and_seating_paths(self):
         header = (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8")
