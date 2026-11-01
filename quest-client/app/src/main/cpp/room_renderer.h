@@ -46,9 +46,8 @@ public:
     void handleMenuInput(float horizontal, float vertical, float adjust, bool selectPressed);
     void setConnectionState(bool connected, const std::string& hostIp, bool streaming);
     bool consumeReconnectRequest();
-    XrPosef projectionPose(const XrPosef& viewPose) const;
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
-                   GLuint videoTexture, bool hasVideo);
+                   const XrPosef& headCenterPose, GLuint videoTexture, bool hasVideo);
     float locomotionX() const { return moveX_; }
     float locomotionZ() const { return moveZ_; }
 
