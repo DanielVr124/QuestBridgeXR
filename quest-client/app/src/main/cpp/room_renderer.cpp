@@ -2883,8 +2883,11 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform1i(locRoughnessAtlas_,3);
     glUniform1i(locHasRoughnessAtlas_,roughnessAtlasTexture_?1:0);
     glActiveTexture(GL_TEXTURE0);
-    if(mainRoomPanoramaTexture_) {
-        drawPanoramaSkybox(pv.data(),cameraX,cameraY,cameraZ,mainRoomPanoramaTexture_);
+    // Always fill the window background. Prefer the uploaded night panorama,
+    // but fall back to the bundled environment texture if JPEG decode failed.
+    const GLuint roomSkyboxTexture=mainRoomPanoramaTexture_?mainRoomPanoramaTexture_:env;
+    if(roomSkyboxTexture) {
+        drawPanoramaSkybox(pv.data(),cameraX,cameraY,cameraZ,roomSkyboxTexture);
     }
     const float roomLightScale=roomLightsOn_?1.0f:0.0f;
     glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?1.0f:0.075f);
