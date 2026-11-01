@@ -324,7 +324,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("roomLightsOn_", header)
         self.assertIn("previousRoomTrigger_", header)
         self.assertIn("uRoomAmbientIntensity", renderer)
-        self.assertIn("glUniform1f(locCeilingLightIntensity_,1.55f*roomLightScale)", renderer)
+        self.assertIn("glUniform1f(locCeilingLightIntensity_,1.02f*roomLightScale)", renderer)
         self.assertIn("const float lightSwitchFaceZ=frontZ-.132f", renderer)
         self.assertNotIn("LedRemote", renderer)
         self.assertNotIn("remoteTopY", renderer)
