@@ -68,8 +68,10 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertNotIn("const float headboardZ=bedZ-1.48f", bed_section)
         bed_design = (ROOT / "tools/bed_design_patch.py").read_text(encoding="utf-8")
         for design_marker in (
-            "Headboard_back_shell", "Headboard_single_soft_panel",
-            "Headboard_outer_lip_side_", "Headboard_outer_lip_edge_",
+            "Headboard_structural_backing", "Headboard_alligator_side_band_",
+            "Headboard_alligator_scale_", "Headboard_mirror_bevel_",
+            "Headboard_recessed_LED_channel_", "Headboard_crystal_tufted_silver_insert",
+            "Headboard_crystal_tuft_button_", "Headboard_tuft_seam_",
             "Headboard_mount_", "Sleep_pillow_piping_",
             "Sleep_pillow_corner_fold_", "Slate_accent_cushion_",
             "Slate_accent_piping_", "Lumbar_cushion_seam"
