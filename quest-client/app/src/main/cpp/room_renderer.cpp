@@ -1894,11 +1894,9 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
         menuSelection_=0;
     } else if(navigatingVertical&&!previousMenuNavigation_) {
         if(environmentDropdownOpen_) {
-            environmentDropdownIndex_=(environmentDropdownIndex_+
-                (vertical>0.0f?static_cast<int>(kEnvironmentNames.size())-1:1))%
-                static_cast<int>(kEnvironmentNames.size());
+            environmentDropdownIndex_=(environmentDropdownIndex_+(vertical>0.0f?1:1))%2;
         } else {
-            const int rowCounts[5]={1,6,3,6,4};
+            const int rowCounts[5]={1,6,3,6,6};
             const int count=rowCounts[menuPage_];
             menuSelection_=(menuSelection_+(vertical>0.0f?count-1:1))%count;
         }
@@ -1907,10 +1905,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
     auto adjustSelected=[&](int direction) {
         if(menuPage_==1) {
             if(menuSelection_==0) {
-                environmentDropdownIndex_=(environmentDropdownIndex_+
-                    (direction>0?1:static_cast<int>(kEnvironmentNames.size())-1))%
-                    static_cast<int>(kEnvironmentNames.size());
-                applyEnvironment(kEnvironmentNames[environmentDropdownIndex_]);
+                selectRoomScene(settings_.environment=="explorable_city"?0:1);
             } else if(menuSelection_==1) {
                 const char* sizes[]={"small","medium","large"};
                 const int index=settings_.roomSize=="small"?0:(settings_.roomSize=="large"?2:1);
@@ -1940,18 +1935,18 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
 
         } else if(menuPage_==4) {
             if(menuSelection_==1) {
-                settings_.turnSpeed=std::clamp(settings_.turnSpeed+direction*0.10f,0.2f,3.5f);
+                settings_.chairRollSpeed=std::clamp(settings_.chairRollSpeed+direction*0.10f,0.30f,2.60f);
             } else if(menuSelection_==2) {
-                settings_.snapTurnDegrees=std::clamp(settings_.snapTurnDegrees+direction*15.0f,15.0f,60.0f);
+                settings_.chairSpinSpeed=std::clamp(settings_.chairSpinSpeed+direction*0.10f,0.30f,3.50f);
+            } else if(menuSelection_==3) {
+                settings_.chairFriction=std::clamp(settings_.chairFriction+direction*0.20f,0.50f,6.00f);
             }
         }
     };
 
     if(adjusting&&!previousMenuAdjust_) {
         if(environmentDropdownOpen_) {
-            environmentDropdownIndex_=(environmentDropdownIndex_+
-                (adjust>0.0f?1:static_cast<int>(kEnvironmentNames.size())-1))%
-                static_cast<int>(kEnvironmentNames.size());
+            environmentDropdownIndex_=(environmentDropdownIndex_+(adjust>0.0f?1:1))%2;
         } else {
             adjustSelected(adjust>0.0f?1:-1);
         }
@@ -1959,7 +1954,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
 
     if(selectPressed) {
         if(environmentDropdownOpen_) {
-            applyEnvironment(kEnvironmentNames[environmentDropdownIndex_]);
+            selectRoomScene(environmentDropdownIndex_);
             environmentDropdownOpen_=false;
         } else if(menuPage_==0) {
             reconnectRequested_=true;
@@ -1967,7 +1962,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
             switch(menuSelection_) {
             case 0:
                 environmentDropdownOpen_=true;
-                environmentDropdownIndex_=activeEnvironmentIndex_;
+                environmentDropdownIndex_=settings_.environment=="explorable_city"?1:0;
                 break;
             case 1: adjustSelected(1); break;
             case 2: settings_.roomMovementEnabled=!settings_.roomMovementEnabled; break;
@@ -2012,9 +2007,20 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
 
             }
         } else if(menuPage_==4) {
-            if(menuSelection_==0) settings_.smoothTurn=!settings_.smoothTurn;
-            else if(menuSelection_==3) settings_.comfortVignette=!settings_.comfortVignette;
-            else if(menuSelection_==1||menuSelection_==2) adjustSelected(1);
+            if(menuSelection_==0) {
+                sittingActive_=!sittingActive_;
+                sitAnchorPending_=sittingActive_;
+                if(!sittingActive_) chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f;
+            } else if(menuSelection_==4) {
+                chairOffsetX_=chairOffsetZ_=chairYaw_=chairWheelRoll_=0.0f;
+                chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f;
+            } else if(menuSelection_==5) {
+                sittingActive_=false;
+                sitAnchorPending_=false;
+                chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f;
+            } else {
+                adjustSelected(1);
+            }
         }
     }
     previousMenuNavigation_=navigatingVertical;
@@ -2567,15 +2573,13 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
                                 lightingColorPickerOpen_=false;
                                 break;
                             }
-                        } else if(environmentDropdownOpen_&&hitX>bodyX-.145f&&hitX<bodyX+.225f) {
-                            const int sceneCount=static_cast<int>(kEnvironmentNames.size());
-                            for(int item=0;item<5;++item) {
-                                const float rowY=menuY+.033f-item*.032f;
-                                if(std::fabs(hitY-rowY)<.016f) {
-                                    environmentDropdownIndex_=(environmentDropdownIndex_+item-2+sceneCount)%sceneCount;
-                                    handleMenuInput(0.0f,0.0f,0.0f,true);
-                                    break;
-                                }
+                        } else if(environmentDropdownOpen_&&hitX>bodyX-.155f&&hitX<bodyX+.225f) {
+                            if(std::fabs(hitY-(menuY+.018f))<.020f) {
+                                selectRoomScene(0);
+                                environmentDropdownOpen_=false;
+                            } else if(std::fabs(hitY-(menuY-.030f))<.020f) {
+                                selectRoomScene(1);
+                                environmentDropdownOpen_=false;
                             }
                         } else if(menuPage_==3&&lightingColorPickerOpen_&&
                                   hitX>bodyX+.125f&&hitY<menuY-.105f) {
@@ -2598,12 +2602,12 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
                             static const float envRows[6]={.038f,.005f,-.028f,-.061f,-.094f,-.127f};
                             static const float displayRows[3]={.034f,-.018f,-.070f};
                             static const float ledRows[6]={.046f,.009f,-.028f,-.065f,-.102f,-.139f};
-                            static const float comfortRows[4]={.034f,-.010f,-.054f,-.098f};
+                            static const float chairRows[6]={.046f,.009f,-.028f,-.065f,-.102f,-.139f};
                             int count=0;
                             if(menuPage_==1){rows=envRows;count=6;}
                             else if(menuPage_==2){rows=displayRows;count=3;}
                             else if(menuPage_==3&&!lightingColorPickerOpen_){rows=ledRows;count=6;}
-                            else if(menuPage_==4){rows=comfortRows;count=4;}
+                            else if(menuPage_==4){rows=chairRows;count=6;}
                             else if(menuPage_==0) {
                                 if(std::fabs(hitY-(menuY-.075f))<.025f) selection=0;
                             }
@@ -3430,7 +3434,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     }
     // Full monitor UI with persistent navigation and distinct virtual-desktop-style pages.
     if (menuVisible_) {
-        const float uiCurve=.029f,uiWidth=.574f,uiHeight=.322f;
+        const float uiCurve=0.0f,uiWidth=.574f,uiHeight=.322f;
         const float menuY=deskSurface+.280f,menuZ=monitorZ+.001f;
         const float navX=monitorX-.216f,bodyX=monitorX+.063f,bodyWidth=.405f;
         const auto background=rgb(.010f,.015f,.030f,.985f);
@@ -3477,7 +3481,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         panel(navX,menuY-.006f,.132f,.270f,navBase);
         panel(monitorX-.143f,menuY-.006f,.0025f,.270f,rgb(.09f,.16f,.25f,1.0f));
         label("LIBRARY",navX-.050f,menuY+.105f,.00135f,muted);
-        const char* tabs[5]={"COMPUTERS","ENVIRONMENT","DISPLAY","LED COLORS","COMFORT"};
+        const char* tabs[5]={"COMPUTERS","ROOM","DISPLAY","LED COLORS","CHAIR"};
         const float tabY[5]={menuY+.061f,menuY+.015f,menuY-.031f,menuY-.077f,menuY-.123f};
         for(int i=0;i<5;++i) {
             panel(navX,tabY[i],.119f,.037f,i==menuPage_?selected:navBase);
@@ -3510,32 +3514,28 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             char speed[24];std::snprintf(speed,sizeof(speed),"%.1f M/S",settings_.movementSpeed);
             const float envRows[6]={menuY+.038f,menuY+.005f,menuY-.028f,menuY-.061f,menuY-.094f,menuY-.127f};
             const char* envTitles[6]={"ENVIRONMENT","ROOM SIZE","ROOM MOVEMENT","MOVE SPEED","RESET POSITION","LED COLORS"};
-            const std::string envValues[6]={prettyName(settings_.environment),sizeValue,settings_.roomMovementEnabled?"ON":"OFF",speed,"RESET","CUSTOMIZE"};
+            const std::string envValues[6]={settings_.environment=="explorable_city"?"EXPLORABLE CITY":"GAMING ROOM",sizeValue,settings_.roomMovementEnabled?"ON":"OFF",speed,"RESET","CUSTOMIZE"};
             for(int row=0;row<6;++row) {
                 panel(bodyX,envRows[row],bodyWidth,.030f,menuSelection_==row?selected:card);
                 label(envTitles[row],bodyX-.184f,envRows[row]+.002f,.00138f,white);
                 label(envValues[row].c_str(),bodyX+.060f,envRows[row]+.002f,.00132f,row==5?cyan:blue);
             }
             if(environmentDropdownOpen_) {
-                // Five large rows keep the browse target clear and the focused scene centred.
-                panel(bodyX+.035f,menuY-.020f,.365f,.207f,rgb(.009f,.017f,.034f,.995f));
-                label("CHOOSE A SCENE",bodyX-.132f,menuY+.067f,.00148f,cyan);
-                char sceneCountText[24];
-                std::snprintf(sceneCountText,sizeof(sceneCountText),"%03d / %03d",
-                              environmentDropdownIndex_+1,static_cast<int>(kEnvironmentNames.size()));
-                label(sceneCountText,bodyX+.145f,menuY+.067f,.00118f,muted);
-                const int sceneCount=static_cast<int>(kEnvironmentNames.size());
-                for(int item=0;item<5;++item) {
-                    const int index=(environmentDropdownIndex_+item-2+sceneCount)%sceneCount;
-                    const float yy=menuY+.033f-item*.032f;
-                    panel(bodyX+.035f,yy,.342f,.027f,item==2?selected:card);
-                    if(item==2) panel(bodyX-.129f,yy,.0035f,.017f,blue);
-                    const std::string display=prettyName(kEnvironmentNames[index]);
-                    label(display.c_str(),bodyX-.116f,yy-.004f,.00131f,item==2?white:muted);
-                    if(index==activeEnvironmentIndex_) label("ACTIVE",bodyX+.151f,yy-.004f,.00102f,green);
-                    if(item==2) label(">",bodyX+.183f,yy-.004f,.00130f,cyan);
+                // Exactly two destinations; the large, flat rows are also the pointer hit targets.
+                panel(bodyX+.015f,menuY-.006f,.370f,.160f,rgb(.009f,.017f,.034f,.995f));
+                label("SELECT ENVIRONMENT",bodyX-.132f,menuY+.052f,.00148f,cyan);
+                const float sceneRows[2]={menuY+.018f,menuY-.030f};
+                const char* sceneNames[2]={"GAMING ROOM","EXPLORABLE CITY"};
+                for(int item=0;item<2;++item) {
+                    const bool selectedScene=item==environmentDropdownIndex_;
+                    panel(bodyX+.015f,sceneRows[item],.348f,.038f,selectedScene?selected:card);
+                    if(selectedScene) panel(bodyX-.149f,sceneRows[item],.004f,.023f,blue);
+                    label(sceneNames[item],bodyX-.130f,sceneRows[item]-.004f,.00140f,
+                          selectedScene?white:muted);
+                    label(item==0?"NEON BEDROOM":"WALKABLE CITY",bodyX+.076f,
+                          sceneRows[item]-.004f,.00108f,selectedScene?cyan:muted);
                 }
-                label("UP / DOWN  BROWSE     A  APPLY",bodyX-.131f,menuY-.117f,.00117f,muted);
+                label("A  SELECT",bodyX-.130f,menuY-.068f,.00118f,muted);
             }
         } else if(menuPage_==2) {
             label("DISPLAY",bodyX-.184f,contentTop,.00205f,white);
@@ -3620,18 +3620,23 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 }
             }
         } else {
-            label("COMFORT",bodyX-.184f,contentTop,.00205f,white);
-            label("Tune turning and room comfort",bodyX-.184f,
+            label("CHAIR PHYSICS",bodyX-.184f,contentTop,.00205f,white);
+            label("Sit down, roll freely and spin the chair.",bodyX-.184f,
                   contentTop-.024f,.00135f,muted);
-            char turnSpeed[24],snap[24];
-            std::snprintf(turnSpeed,sizeof(turnSpeed),"%.1f",settings_.turnSpeed);
-            std::snprintf(snap,sizeof(snap),"%.0f DEG",settings_.snapTurnDegrees);
-            drawRow(0,menuY+.034f,"TURN MODE",settings_.smoothTurn?"SMOOTH":"SNAP");
-            drawRow(1,menuY-.010f,"TURN SPEED",turnSpeed);
-            drawRow(2,menuY-.054f,"SNAP ANGLE",snap);
-            drawRow(3,menuY-.098f,"COMFORT VIGNETTE",settings_.comfortVignette?"ON":"OFF");
-            label("Use the right stick to adjust highlighted values.",
-                  bodyX-.184f,menuY-.145f,.00127f,muted);
+            char roll[24],spin[24],friction[24];
+            std::snprintf(roll,sizeof(roll),"%.1f M/S",settings_.chairRollSpeed);
+            std::snprintf(spin,sizeof(spin),"%.1f",settings_.chairSpinSpeed);
+            std::snprintf(friction,sizeof(friction),"%.1f",settings_.chairFriction);
+            const float chairRows[6]={menuY+.046f,menuY+.009f,menuY-.028f,menuY-.065f,menuY-.102f,menuY-.139f};
+            const char* chairTitles[6]={"CHAIR STATE","ROLL SPEED","SPIN SPEED","FRICTION","RESET CHAIR","STAND UP"};
+            const std::string chairValues[6]={sittingActive_?"SITTING":"STANDING",roll,spin,friction,"RESET","GET UP"};
+            for(int row=0;row<6;++row) {
+                panel(bodyX,chairRows[row],bodyWidth,.032f,menuSelection_==row?selected:card);
+                label(chairTitles[row],bodyX-.184f,chairRows[row]+.003f,.00148f,white);
+                label(chairValues[row].c_str(),bodyX+.060f,chairRows[row]+.003f,.00140f,
+                      row==0&&sittingActive_?green:blue);
+            }
+            label("LEFT STICK  ROLL     RIGHT STICK  SPIN",bodyX-.184f,menuY-.170f,.00115f,muted);
         }
         if(!lightingColorPickerOpen_) {
             label("A  SELECT",monitorX-.270f,menuY-.151f,.00120f,muted);
@@ -3662,6 +3667,7 @@ void RoomRenderer::release() {
     cityWorld_.release();
     bedModel_.release(); deskModel_.release(); monitorModel_.release();
     tvModel_.release(); chairModel_.release(); mouseModel_.release();
+    leftControllerModel_.release(); rightControllerModel_.release();
     if(gFontAtlasTexture){glDeleteTextures(1,&gFontAtlasTexture);gFontAtlasTexture=0;gFontAtlasReady=false;}
     if(!initialized_&&!program_&&!vao_)return;
     if(program_)glDeleteProgram(program_);if(vignetteProgram_)glDeleteProgram(vignetteProgram_);if(vao_)glDeleteVertexArrays(1,&vao_);if(vbo_)glDeleteBuffers(1,&vbo_);
