@@ -15,6 +15,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import time
 import tkinter as tk
 import webbrowser
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -24,6 +25,7 @@ from typing import Any
 ROOT = project_root(__file__)
 TOOLS = ROOT / "tools"
 GENERATED = ROOT / ".generated"
+USB_STREAM_PORT = 9946
 
 # Hover text is deliberately specific: each control explains its effect, trade-offs,
 # supported range, and whether it changes the current streaming/client path.
@@ -355,13 +357,15 @@ class QuestBridgeStudio(tk.Tk):
         ttk.Button(usb_actions, text="Install / Launch Quest App",
                    command=self._install_quest_app).grid(row=0, column=2, padx=7)
         ttk.Button(usb_actions, text="Send Settings to Quest",
-                   command=self._install_quest_ini).grid(row=0, column=3, padx=(7, 0))
+                   command=self._install_quest_ini).grid(row=0, column=3, padx=7)
+        ttk.Button(usb_actions, text="Start Wired USB Streaming", style="Accent.TButton",
+                   command=self._start_usb_streaming).grid(row=0, column=4, padx=(7, 0))
 
         self.usb_transport_note = ttk.Label(
             f,
-            text=("Important: this is a real USB/ADB setup test, not a wired video-stream test. "
-                  "QuestBridge currently sends video and tracking over UDP on your local Wi-Fi/LAN. "
-                  "USB is used here for device detection, installation, diagnostics, and settings transfer."),
+            text=("Wired mode uses ADB reverse plus a bidirectional TCP stream: headset/controller data travels to the PC "
+                  "and encoded video returns to the Quest over the USB cable. Click Start Wired USB Streaming with exactly "
+                  "one authorized Quest connected. This mode does not use Wi-Fi for the stream; normal UDP/LAN mode remains available."),
             wraplength=840, justify="left",
         )
         self.usb_transport_note.grid(row=3, column=0, sticky="w", pady=(0, 16))
@@ -1156,6 +1160,124 @@ class QuestBridgeStudio(tk.Tk):
             return
         save_quest_ini(cfg, path)
         self.status_var.set(f"Exported Quest client config: {path}")
+
+    def _start_usb_streaming(self) -> None:
+        """Arm the ADB reverse tunnel, host relay, TCP video sender, and Quest USB client."""
+        if not self._save_settings():
+            return
+        adb = self._resolve_adb()
+        if not adb:
+            messagebox.showerror(
+                "ADB not found",
+                "Locate adb.exe or install Android Platform-Tools before starting wired streaming.",
+                parent=self,
+            )
+            return
+        if self.stream_process and self.stream_process.poll() is None:
+            messagebox.showwarning(
+                "Video streamer already running",
+                "Stop the current UDP/video streamer first, then start wired USB streaming.",
+                parent=self,
+            )
+            return
+
+        serial = None
+        try:
+            devices_result = subprocess.run(
+                [adb, "devices", "-l"], capture_output=True, text=True, timeout=15, check=True
+            )
+            online = [
+                device.serial for device in parse_adb_devices(devices_result.stdout)
+                if device.transport == "usb" and device.state == "device"
+            ]
+            if len(online) != 1:
+                raise RuntimeError(
+                    f"Expected exactly one authorized USB headset, found {len(online)}. "
+                    "Connect one Quest, unlock it, and approve USB debugging."
+                )
+            serial = online[0]
+
+            installed = subprocess.run(
+                [adb, "-s", serial, "shell", "pm", "path", "com.questbridge.xr"],
+                capture_output=True, text=True, timeout=15, check=False,
+            )
+            if installed.returncode != 0 or "package:" not in installed.stdout:
+                raise RuntimeError("QuestBridge XR is not installed on this headset. Use Install / Launch Quest App first.")
+
+            reverse = subprocess.run(
+                [adb, "-s", serial, "reverse", f"tcp:{USB_STREAM_PORT}", f"tcp:{USB_STREAM_PORT}"],
+                capture_output=True, text=True, timeout=15, check=False,
+            )
+            if reverse.returncode != 0:
+                raise RuntimeError(reverse.stderr.strip() or reverse.stdout.strip() or "Could not create the ADB reverse USB tunnel.")
+
+            GENERATED.mkdir(parents=True, exist_ok=True)
+            local_ini = save_quest_ini(
+                self.config_data,
+                GENERATED / "quest-client-usb-config.ini",
+                transport_mode="usb",
+                usb_port=USB_STREAM_PORT,
+            )
+            target_dir = "/sdcard/Android/data/com.questbridge.xr/files"
+            mkdir_result = subprocess.run(
+                [adb, "-s", serial, "shell", "mkdir", "-p", target_dir],
+                capture_output=True, text=True, timeout=15, check=False,
+            )
+            if mkdir_result.returncode != 0:
+                raise RuntimeError(mkdir_result.stderr.strip() or "Could not prepare the QuestBridge settings folder.")
+            push_result = subprocess.run(
+                [adb, "-s", serial, "push", str(local_ini), target_dir + "/config.ini"],
+                capture_output=True, text=True, timeout=30, check=False,
+            )
+            if push_result.returncode != 0:
+                raise RuntimeError(push_result.stderr.strip() or push_result.stdout.strip() or "Could not send USB transport settings to the Quest.")
+
+            if not self.host_process or self.host_process.poll() is not None:
+                self._start_host()
+                if not self.host_process or self.host_process.poll() is not None:
+                    raise RuntimeError("The Windows QuestBridge host could not be started. Check that QuestBridgeHost.exe is included in this build.")
+
+            command = self._tool_command(
+                "stream_test_video.py",
+                "--config", str(DEFAULT_CONFIG_PATH),
+                "--transport", "usb",
+                "--usb-port", str(USB_STREAM_PORT),
+                "--host-port", str(self.config_data["network"]["host_port"]),
+            )
+            self.stream_process = subprocess.Popen(command, cwd=str(ROOT))
+            # Give the loopback listener time to bind before the Quest app reconnects.
+            time.sleep(0.35)
+            if self.stream_process.poll() is not None:
+                raise RuntimeError("The wired video server exited during startup. Check FFmpeg and the USB port.")
+
+            subprocess.run(
+                [adb, "-s", serial, "shell", "am", "force-stop", "com.questbridge.xr"],
+                capture_output=True, text=True, timeout=15, check=False,
+            )
+            launch = subprocess.run(
+                [adb, "-s", serial, "shell", "monkey", "-p", "com.questbridge.xr", "1"],
+                capture_output=True, text=True, timeout=20, check=False,
+            )
+            if launch.returncode != 0:
+                raise RuntimeError("The USB tunnel is ready, but QuestBridge XR did not launch: " +
+                                   (launch.stderr.strip() or launch.stdout.strip()))
+
+            self.status_var.set(
+                f"Wired USB session armed for {serial}: ADB reverse TCP {USB_STREAM_PORT}; video and tracking use the cable."
+            )
+            self.stream_probe_var.set("Wired USB transport selected. Waiting for Quest handshake and decoded video.")
+            self._refresh_usb_status()
+            messagebox.showinfo(
+                "Wired USB streaming started",
+                "QuestBridge XR was restarted in USB-only transport mode. Keep the USB cable connected. "
+                "The stream server is waiting for the Quest handshake; Wi-Fi is not used for video or tracking.",
+                parent=self,
+            )
+        except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as exc:
+            if self.stream_process and self.stream_process.poll() is None:
+                self.stream_process.terminate()
+                self.stream_process = None
+            messagebox.showerror("Could not start wired streaming", str(exc), parent=self)
 
     def _install_quest_ini(self) -> None:
         if not self._save_settings():
