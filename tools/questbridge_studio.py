@@ -484,7 +484,7 @@ class QuestBridgeStudio(tk.Tk):
         host_seen = report.get("host_handshake_seen")
         video_seen = report.get("video_config_seen")
         if host_seen is None and video_seen is None:
-            stream_summary = "Quest-to-PC UDP / video: not checked (install and launch QuestBridge XR first)."
+            stream_summary = "Quest-to-PC stream / video: not checked (install and launch QuestBridge XR first)."
         else:
             host_text = "handshake seen in Quest logs" if host_seen else "handshake not seen in latest Quest logs"
             video_text = "video setup seen in Quest logs" if video_seen else "video setup not seen in latest Quest logs"
