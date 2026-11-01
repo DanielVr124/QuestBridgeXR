@@ -12,7 +12,7 @@ NEW_GEOMETRY = """
 # duvet and throw untouched; this patch replaces only the pillows/headboard.
 # ----------------------- PILLOWS AND HEADBOARD -----------------------
 # ----------------------- PILLOWS -----------------------
-# Preserve the two main pillow centres and the original accent/lumbar layout.
+# Preserve the two main sleep-pillow centres and rebuild the accent layout.
 # Replace only the primitive sleep-pillow ellipsoids with tailored, softly
 # squared cotton shells: gently puffed crowns, rounded corners, and real gussets.
 PILLOW_HALF_WIDTH = .46
@@ -202,6 +202,18 @@ for side in (-1, 1):
         [(x-.16, 1.17, -.79), (x, 1.205, -.805), (x+.16, 1.17, -.79)],
         .0015, 'throw', sides=6
     )
+
+# Keep a small centre lumbar accent as a separate front layer; it no longer
+# intersects the main sleeping pillows or the two graphite accent cushions.
+superellipsoid(
+    'Lumbar_cushion', (0, 1.03, -.34),
+    (.18, .065, .085), 'throw', .60, 72, 48, taper=.16
+)
+curve_tube(
+    'Lumbar_cushion_seam',
+    [(-.13, 1.065, -.414), (0, 1.085, -.42), (.13, 1.065, -.414)],
+    .0012, 'pillow', sides=6
+)
 
 # ----------------------- BRAMBLEY-STYLE HEADBOARD -----------------------
 # Keep the existing bed platform, rails, legs, foot end, mattress and bedding.

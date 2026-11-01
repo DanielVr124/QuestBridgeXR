@@ -81,7 +81,7 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertNotIn("superellipsoid(f'Sleep_pillow_", self.patched)
         self.assertIn("np.array([side*.49, 1.095, -1.115]", self.patched)
         self.assertIn("f'Slate_accent_cushion_{side}'", self.patched)
-        self.assertNotIn("'Lumbar_cushion'", self.patched)
+        self.assertIn("'Lumbar_cushion'", self.patched)
 
     def test_pillow_pair_does_not_overlap_and_accents_do_not_form_a_bolster(self):
         self.assertIn("PILLOW_HALF_WIDTH = .46", self.patched)
@@ -90,6 +90,7 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertIn("(.205, .105, .145)", self.patched)
         self.assertIn("(x, 1.14, -.66)", self.patched)
         self.assertNotIn("Lumbar_cushion", self.patched)
+        self.assertIn("(.18, .065, .085)", self.patched)
         self.assertNotIn("(.445, .125, .145)", self.patched)
 
     def test_headboard_is_not_the_failed_plain_slab_or_vertical_ribs(self):
