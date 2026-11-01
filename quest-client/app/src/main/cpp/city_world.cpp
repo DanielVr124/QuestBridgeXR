@@ -328,18 +328,42 @@ void CityWorld::addBox(std::vector<Vertex>& out, float x, float y, float z,
     face(point(-hx,-hy,-hz),point(hx,-hy,-hz),point(hx,-hy,hz),point(-hx,-hy,hz));
 }
 
+void CityWorld::addOctahedron(std::vector<Vertex>& out, float x, float y, float z,
+                              float rx, float ry, float rz, const float* color) {
+    const std::array<float,3> top={x,y+ry,z};
+    const std::array<float,3> bottom={x,y-ry,z};
+    const std::array<float,3> east={x+rx,y,z};
+    const std::array<float,3> north={x,y,z+rz};
+    const std::array<float,3> west={x-rx,y,z};
+    const std::array<float,3> south={x,y,z-rz};
+    auto triangle=[&](std::array<float,3> a,std::array<float,3> b,std::array<float,3> c) {
+        const float ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2];
+        const float vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
+        const float nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+        const float mx=(a[0]+b[0]+c[0])/3.0f-x;
+        const float my=(a[1]+b[1]+c[1])/3.0f-y;
+        const float mz=(a[2]+b[2]+c[2])/3.0f-z;
+        if(nx*mx+ny*my+nz*mz<0.0f) std::swap(b,c);
+        addQuad(out,a.data(),b.data(),c.data(),c.data(),color,5.0f);
+    };
+    triangle(top,north,east); triangle(top,west,north);
+    triangle(top,south,west); triangle(top,east,south);
+    triangle(bottom,east,north); triangle(bottom,north,west);
+    triangle(bottom,west,south); triangle(bottom,south,east);
+}
+
 void CityWorld::addTree(std::vector<Vertex>& out, float x, float z, float scale, std::uint32_t seed) {
-    const float trunk[3]={0.26f,0.20f,0.14f};
-    const float leafA[3]={0.18f,0.30f,0.20f};
-    const float leafB[3]={0.23f,0.36f,0.24f};
-    const float leafC[3]={0.31f,0.39f,0.27f};
-    addBox(out,x,1.05f*scale,z,.28f*scale,2.10f*scale,.28f*scale,trunk,3);
-    // Overlapping low-poly crowns read as dense street trees at headset distance.
-    addBox(out,x,2.42f*scale,z,.98f*scale,1.00f*scale,.90f*scale,leafA,5,0.10f);
-    addBox(out,x-.30f*scale,2.10f*scale,z+.13f*scale,.72f*scale,.80f*scale,.76f*scale,leafB,5,-.18f);
-    addBox(out,x+.29f*scale,2.18f*scale,z-.18f*scale,.76f*scale,.82f*scale,.72f*scale,
-           (hash(seed)&1u)?leafC:leafA,5,.22f);
-    addBox(out,x,2.88f*scale,z,.58f*scale,.72f*scale,.58f*scale,leafB,5,0.05f);
+    const float trunk[3]={0.28f,0.20f,0.13f};
+    const float leafA[3]={0.16f,0.29f,0.19f};
+    const float leafB[3]={0.21f,0.34f,0.22f};
+    const float leafC[3]={0.28f,0.38f,0.25f};
+    addBox(out,x,1.02f*scale,z,.25f*scale,2.04f*scale,.25f*scale,trunk,3);
+    const float jitterX=(random01(seed+1u)-0.5f)*.18f*scale;
+    const float jitterZ=(random01(seed+2u)-0.5f)*.18f*scale;
+    addOctahedron(out,x+jitterX,2.30f*scale,z+jitterZ,.70f*scale,.87f*scale,.66f*scale,leafA);
+    addOctahedron(out,x-.33f*scale,2.02f*scale,z+.14f*scale,.55f*scale,.64f*scale,.58f*scale,leafB);
+    addOctahedron(out,x+.32f*scale,2.10f*scale,z-.20f*scale,.58f*scale,.66f*scale,.57f*scale,leafC);
+    addOctahedron(out,x,2.88f*scale,z,.42f*scale,.55f*scale,.40f*scale,leafB);
 }
 
 void CityWorld::addBuilding(std::vector<Vertex>& out, float x, float z, float width,
