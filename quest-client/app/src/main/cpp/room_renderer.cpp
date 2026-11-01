@@ -2557,12 +2557,12 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
                                 lightingColorPickerOpen_=false;
                                 break;
                             }
-                        } else if(environmentDropdownOpen_&&hitX>bodyX-.115f&&hitX<bodyX+.205f) {
-                            for(int item=0;item<4;++item) {
-                                const float rowY=menuY-.012f-item*.031f;
-                                if(std::fabs(hitY-rowY)<.017f) {
-                                    environmentDropdownIndex_=(environmentDropdownIndex_+item)%
-                                        static_cast<int>(kEnvironmentNames.size());
+                        } else if(environmentDropdownOpen_&&hitX>bodyX-.145f&&hitX<bodyX+.225f) {
+                            const int sceneCount=static_cast<int>(kEnvironmentNames.size());
+                            for(int item=0;item<5;++item) {
+                                const float rowY=menuY+.033f-item*.032f;
+                                if(std::fabs(hitY-rowY)<.016f) {
+                                    environmentDropdownIndex_=(environmentDropdownIndex_+item-2+sceneCount)%sceneCount;
                                     handleMenuInput(0.0f,0.0f,0.0f,true);
                                     break;
                                 }
@@ -3498,17 +3498,25 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 label(envValues[row].c_str(),bodyX+.060f,envRows[row]+.002f,.00132f,row==5?cyan:blue);
             }
             if(environmentDropdownOpen_) {
-                panel(bodyX+.050f,menuY-.044f,.298f,.158f,rgb(.014f,.024f,.044f,1.0f));
-                label("CHOOSE ENVIRONMENT",bodyX-.080f,menuY+.020f,.00148f,cyan);
-                for(int item=0;item<4;++item) {
-                    const int index=(environmentDropdownIndex_+item)%
-                        static_cast<int>(kEnvironmentNames.size());
-                    const float yy=menuY-.012f-item*.031f;
-                    panel(bodyX+.050f,yy,.282f,.027f,item==0?selected:card);
+                // Five large rows keep the browse target clear and the focused scene centred.
+                panel(bodyX+.035f,menuY-.020f,.365f,.207f,rgb(.009f,.017f,.034f,.995f));
+                label("CHOOSE A SCENE",bodyX-.132f,menuY+.067f,.00148f,cyan);
+                char sceneCountText[24];
+                std::snprintf(sceneCountText,sizeof(sceneCountText),"%03d / %03d",
+                              environmentDropdownIndex_+1,static_cast<int>(kEnvironmentNames.size()));
+                label(sceneCountText,bodyX+.145f,menuY+.067f,.00118f,muted);
+                const int sceneCount=static_cast<int>(kEnvironmentNames.size());
+                for(int item=0;item<5;++item) {
+                    const int index=(environmentDropdownIndex_+item-2+sceneCount)%sceneCount;
+                    const float yy=menuY+.033f-item*.032f;
+                    panel(bodyX+.035f,yy,.342f,.027f,item==2?selected:card);
+                    if(item==2) panel(bodyX-.129f,yy,.0035f,.017f,blue);
                     const std::string display=prettyName(kEnvironmentNames[index]);
-                    label(display.c_str(),bodyX-.080f,yy-.004f,.00130f,item==0?white:muted);
+                    label(display.c_str(),bodyX-.116f,yy-.004f,.00131f,item==2?white:muted);
+                    if(index==activeEnvironmentIndex_) label("ACTIVE",bodyX+.151f,yy-.004f,.00102f,green);
+                    if(item==2) label(">",bodyX+.183f,yy-.004f,.00130f,cyan);
                 }
-                label("A  APPLY",bodyX+.100f,menuY-.143f,.00125f,blue);
+                label("UP / DOWN  BROWSE     A  APPLY",bodyX-.131f,menuY-.117f,.00117f,muted);
             }
         } else if(menuPage_==2) {
             label("DISPLAY",bodyX-.184f,contentTop,.00205f,white);
