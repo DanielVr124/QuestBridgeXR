@@ -99,6 +99,8 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertNotIn("Slate_accent", self.patched)
         self.assertNotIn("Lumbar_cushion", self.patched)
         self.assertIn("materials['pillow_cotton']", self.patched)
+        self.assertIn("def _make_pillow_cotton_normal_map", self.patched)
+        self.assertIn("normalTexture=_pillow_cotton_normal", self.patched)
         self.assertNotIn("materials['pillow_gusset']", self.patched)
         self.assertNotIn("materials['pillow_thread']", self.patched)
         self.assertIn("top_welt, .0022, 'linen'", self.patched)
