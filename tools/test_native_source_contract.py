@@ -254,10 +254,10 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertNotIn("DESK CHAIR", renderer)
         self.assertIn("kEnvironmentNames[environmentDropdownIndex_]", renderer)
         self.assertIn("Mat4 camera=makeView(renderedPose,moveX_,moveZ_,virtualYaw_)", renderer)
-        self.assertIn("XrPosef RoomRenderer::projectionPose(const XrPosef& viewPose) const", renderer)
-        self.assertIn("projectionViews_[eye].pose = room_.projectionPose(views_[eye].pose)", source)
-        self.assertIn("adjusted.position.x+=moveX_", renderer)
-        self.assertIn("adjusted.position.z+=moveZ_", renderer)
+        # Virtual yaw is rendered by the room view matrix; OpenXR receives the raw tracked pose
+        # so late compositor reprojection never treats a virtual turn as physical head motion.
+        self.assertIn("projectionViews_[eye].pose = views_[eye].pose", source)
+        self.assertNotIn("projectionViews_[eye].pose = room_.projectionPose", source)
         self.assertIn("const float localZ = curveDepth * normalized * normalized", renderer)
         self.assertIn("kMonitorScreenPitch = 0.05f", renderer)
         self.assertIn("curveDepth * normalized * normalized", renderer)
@@ -289,9 +289,9 @@ class NativeSourceContractTests(unittest.TestCase):
         renderer = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
         header = (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8")
         host = (ROOT / "host/src/main.cpp").read_text(encoding="utf-8")
-        self.assertIn('tvModel_.load(assets,"models/user_tv.glb.gz")', renderer)
-        self.assertIn('chairModel_.load(assets,"models/user_gaming_chair.glb.gz")', renderer)
-        self.assertIn('mouseModel_.load(assets,"models/user_mouse.glb.gz")', renderer)
+        self.assertIn('tvModel_.load(assets,"models/tv_on_2_mattress_tall_stand.glb")', renderer)
+        self.assertIn('chairModel_.load(assets,"models/white_gaming_chair.glb")', renderer)
+        self.assertIn('mouseModel_.load(assets,"models/onitoon_cw902_white_mouse_no_cable.glb")', renderer)
         self.assertIn("if(settings_.showChair&&chairModel_.loaded())", renderer)
         self.assertIn("const float seatSurfaceY=floorY+.53f", renderer)
         self.assertIn("seatHitZ>=chairZ-.30f&&seatHitZ<=chairZ+.16f", renderer)
@@ -305,7 +305,6 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("MOUSEEVENTF_LEFTDOWN", host)
         self.assertIn("MOUSEEVENTF_LEFTUP", host)
         # The seat ease alters only room offsets; the established camera path stays stable.
-        self.assertIn("XrPosef RoomRenderer::projectionPose(const XrPosef& viewPose) const", renderer)
         self.assertIn("Mat4 camera=makeView(renderedPose,moveX_,moveZ_,virtualYaw_)", renderer)
 
     def test_room_light_switch_and_environment_led_controls_are_real(self):
