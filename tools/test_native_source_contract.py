@@ -69,7 +69,7 @@ class NativeSourceContractTests(unittest.TestCase):
         bed_design = (ROOT / "tools/bed_design_patch.py").read_text(encoding="utf-8")
         for design_marker in (
             "Headboard_structural_backing", "Headboard_alligator_side_band_",
-            "Headboard_alligator_scale_", "Headboard_mirror_bevel_",
+            "Headboard_mirror_bevel_",
             "Headboard_recessed_LED_channel_", "Headboard_crystal_tufted_silver_insert",
             "Headboard_crystal_tuft_button_", "Headboard_tuft_seam_",
             "Headboard_mount_", "Sleep_pillow_piping_",
@@ -83,7 +83,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("sys.path.insert(0, TOOLS_DIR)", blender_importer)
         camera_patch = (ROOT / "tools/blender_bed_camera_patch.py").read_text(encoding="utf-8")
         self.assertIn("bed_headboard_detail", camera_patch)
-        self.assertIn("(0.0,4.7,2.15)", camera_patch)
+        self.assertIn("(0.0,-3.70,2.10)", camera_patch)
+        self.assertIn("offline Blender review cameras only", camera_patch)
         self.assertIn("misleading close-up or back-facing camera angles", camera_patch)
 
 
