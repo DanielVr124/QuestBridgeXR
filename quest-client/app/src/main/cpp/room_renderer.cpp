@@ -2389,7 +2389,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}
     else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
 
-    const float deskX=-halfW+1.36f, deskZ=-halfD+.56f;
+    const float deskX=-halfW+1.32f+.04f, deskZ=-halfD+.56f;
     const float chairX=deskX, chairZ=deskZ+1.12f;
     if(sitAnchorPending_) {
         // Ease the virtual room anchor toward the chair instead of teleporting
@@ -2424,7 +2424,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     float targetX=std::clamp(playerX+stepX,-halfW+0.34f,halfW-0.34f);
     float targetZ=std::clamp(playerZ+stepZ,-halfD+0.34f,halfD-0.34f);
 
-    const float bedX=halfW-1.80f, bedZ=-halfD+2.10f;
+    const float bedX=halfW-2.0f+.20f, bedZ=-halfD+2.10f;
     auto overlaps=[](float x,float z,float cx,float cz,float rx,float rz) {
         return std::fabs(x-cx)<rx && std::fabs(z-cz)<rz;
     };
@@ -2498,7 +2498,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
 
     const float floorY=settings_.floorOffsetY;
     const float frontZ=halfD;
-    const float deskX=-halfW+1.36f;
+    const float deskX=-halfW+1.32f+.04f;
     const float deskZ=-halfD+.56f;
     const float deskSurface=floorY+.75f;
     const float chairX=deskX;
@@ -2530,7 +2530,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
             for(float& c:pointerDirection)c/=pointerLength;
             const float halfW=settings_.roomSize=="large"?6.0f:(settings_.roomSize=="medium"?4.2f:3.0f);
             const float halfD=settings_.roomSize=="large"?7.5f:(settings_.roomSize=="medium"?5.4f:3.8f);
-            const float deskX=-halfW+1.36f,deskZ=-halfD+.56f;
+            const float deskX=-halfW+1.32f+.04f,deskZ=-halfD+.56f;
             const int pointerMonitorCount=std::clamp(settings_.monitorCount,1,3);
             const float pointerMonitorBaseX=deskX-(pointerMonitorCount-1)*.335f;
             const float monitorX=pointerMonitorCount==3?deskX:pointerMonitorBaseX;
@@ -2897,7 +2897,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform3f(locPracticalLight2Position_,halfW-0.30f,floorY+1.92f,-1.45f);
     glUniform3f(locPracticalLight2Color_,ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]);
     glUniform1f(locPracticalLight2Intensity_,ledZones_[6].enabled?0.82f*roomLightScale:0.0f);
-    glUniform3f(locHeadboardGlowPosition_,halfW-1.80f,floorY+1.43f,-halfD+2.10f-1.22f);
+    glUniform3f(locHeadboardGlowPosition_,halfW-2.0f+.20f,floorY+1.43f,-halfD+2.10f-1.22f);
     glUniform3f(locHeadboardGlowColor_,ledHeadboard[0],ledHeadboard[1],ledHeadboard[2]);
     glUniform1f(locHeadboardGlowIntensity_,ledZones_[0].enabled?2.60f*roomLightScale:0.0f);
     glUniform3f(locNeonBluePosition_,-halfW+0.20f,floorY+2.75f,-0.45f);
@@ -3079,7 +3079,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // separate pillows, tailored headboard, bedside storage and practical lamps.
     // Geometry stays inside the existing room bounds and is fully walkable around.
     // -------------------------------------------------------------------------
-    const float bedX=halfW-1.80f;
+    const float bedX=halfW-2.0f+.20f;
     const float bedZ=backZ+2.10f;
     const auto bedBase=rgb(.018f,.024f,.043f);
     const auto bedMetal=rgb(.16f,.20f,.30f);
@@ -3146,7 +3146,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 
     // Place the supplied desk almost flush to both walls in the back-left corner.
     const float deskZ=backZ+0.56f;
-    const float deskX=-halfW+1.36f;
+    const float deskX=-halfW+1.32f+.04f;
     const int monitorCount=std::clamp(settings_.monitorCount,1,3);
     const float monitorBaseX=deskX-(monitorCount-1)*.335f;
     const float monitorX=monitorCount==3?deskX:monitorBaseX;
@@ -3291,8 +3291,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float chairX=deskX, chairZ=deskZ+1.12f;
     if(settings_.showChair) {
         drawGroundShadow(pv.data(),chairX,floorY+.006f,chairZ,1.02f,1.18f,.40f);
-        if(chairModel_.loaded()) {
-            // The supplied GLB faces the desk along local -Z.
+        if(settings_.showChair&&chairModel_.loaded()) {
+            // The supplied GLB already faces the desk along local -Z.
             const float chairPlacement[16]={
                 1,0,0,0, 0,1,0,0, 0,0,1,0, chairX,floorY,chairZ,1
             };
