@@ -2173,7 +2173,7 @@ void RoomRenderer::drawPanoramaSkybox(const float* pv,float cameraX,float camera
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
     glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
     // Keep the photographic city panorama at its intended night exposure.
-    glUniform4f(locColor_,0.60f,0.63f,0.70f,1.0f);
+    glUniform4f(locColor_,0.44f,0.47f,0.56f,1.0f);
     glUniform1i(locTextured_,1);
     glUniform1i(locMaterial_,-1);
     glUniform1i(locRounded_,0);
@@ -2893,28 +2893,28 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawPanoramaSkybox(pv.data(),cameraX,cameraY,cameraZ,roomSkyboxTexture);
     }
     const float roomLightScale=roomLightsOn_?1.0f:0.0f;
-    glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?1.0f:0.075f);
+    glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?0.72f:0.055f);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
     glUniform3f(locCeilingLightColor_,1.0f,0.94f,0.84f);
-    glUniform1f(locCeilingLightIntensity_,1.55f*roomLightScale);
+    glUniform1f(locCeilingLightIntensity_,0.92f*roomLightScale);
     glUniform3f(locPracticalLightPosition_,-halfW+0.30f,floorY+1.92f,-1.45f);
     glUniform3f(locPracticalLightColor_,ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]);
-    glUniform1f(locPracticalLightIntensity_,ledZones_[5].enabled?0.82f*roomLightScale:0.0f);
+    glUniform1f(locPracticalLightIntensity_,ledZones_[5].enabled?0.58f*roomLightScale:0.0f);
     glUniform3f(locPracticalLight2Position_,halfW-0.30f,floorY+1.92f,-1.45f);
     glUniform3f(locPracticalLight2Color_,ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]);
-    glUniform1f(locPracticalLight2Intensity_,ledZones_[6].enabled?0.82f*roomLightScale:0.0f);
+    glUniform1f(locPracticalLight2Intensity_,ledZones_[6].enabled?0.58f*roomLightScale:0.0f);
     glUniform3f(locHeadboardGlowPosition_,halfW-2.0f+.20f,floorY+1.43f,-halfD+2.10f-1.22f);
     glUniform3f(locHeadboardGlowColor_,ledHeadboard[0],ledHeadboard[1],ledHeadboard[2]);
-    glUniform1f(locHeadboardGlowIntensity_,ledZones_[0].enabled?2.60f*roomLightScale:0.0f);
+    glUniform1f(locHeadboardGlowIntensity_,ledZones_[0].enabled?1.00f*roomLightScale:0.0f);
     glUniform3f(locNeonBluePosition_,-halfW+0.20f,floorY+2.75f,-0.45f);
     glUniform3f(locNeonBlueColor_,ledLeftWall[0],ledLeftWall[1],ledLeftWall[2]);
-    glUniform1f(locNeonBlueIntensity_,ledZones_[2].enabled?2.25f*roomLightScale:0.0f);
+    glUniform1f(locNeonBlueIntensity_,ledZones_[2].enabled?1.45f*roomLightScale:0.0f);
     glUniform3f(locNeonVioletPosition_,halfW-0.20f,floorY+2.55f,0.80f);
     glUniform3f(locNeonVioletColor_,ledRightWall[0],ledRightWall[1],ledRightWall[2]);
-    glUniform1f(locNeonVioletIntensity_,ledZones_[3].enabled?2.05f*roomLightScale:0.0f);
+    glUniform1f(locNeonVioletIntensity_,ledZones_[3].enabled?1.35f*roomLightScale:0.0f);
     glUniform3f(locNeonPinkPosition_,0.0f,floorY+2.25f,backZ+0.58f);
     glUniform3f(locNeonPinkColor_,ledRear[0],ledRear[1],ledRear[2]);
-    glUniform1f(locNeonPinkIntensity_,ledZones_[4].enabled?1.55f*roomLightScale:0.0f);
+    glUniform1f(locNeonPinkIntensity_,ledZones_[4].enabled?1.00f*roomLightScale:0.0f);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
     // The right wall is split around the single window aperture. No other wall surface
     // is transparent, and the existing room bounds and wall material are preserved.
@@ -3097,7 +3097,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float bedPlacement[16] = {
         1,0,0,0, 0,1,0,0, 0,0,1,0, bedRenderX,floorY,bedZ,1
     };
-    const std::array<float,4> bedExposure{{.64f,.66f,.76f,1.0f}};
+    const std::array<float,4> bedExposure{{.46f,.49f,.62f,1.0f}};
     bedModel_.draw(pv.data(),bedPlacement,locMvp_,locModel_,locColor_,locTextured_,
                    locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&bedExposure);
     // The recessed headboard emitter is masked from a reclined view by the
@@ -3272,8 +3272,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float deskPlacement[16] = {
         1,0,0,0, 0,1,0,0, 0,0,1,0, deskX,floorY,deskZ,1
     };
+    const std::array<float,4> deskTint{{.76f,.79f,.88f,1.0f}};
     deskModel_.draw(pv.data(),deskPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                    locTexture_,locMaterial_,locRounded_,locUvScale_);
+                    locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&deskTint);
 
     // Place up to three identical 27-inch screens across the supplied corner desk.
     // The central display remains the primary menu surface when a three-screen row is used.
@@ -3284,12 +3285,13 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float monitorPlacement[16] = {
             1,0,0,0, 0,1,0,0, 0,0,1,0, screenX,deskSurface,monitorZ,1
         };
+        const std::array<float,4> monitorTint{{.62f,.67f,.80f,1.0f}};
         monitorModel_.draw(pv.data(),monitorPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                           locTexture_,locMaterial_,locRounded_,locUvScale_);
+                           locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&monitorTint);
         if(streamOn) {
             drawCurvedPanel(pv.data(),screenX,deskSurface+.280f,monitorZ+.001f,
                             .584f,.328f,.029f,
-                            hasVideo?videoTexture:videoFallbackTexture_,rgb(1,1,1),32);
+                            hasVideo?videoTexture:videoFallbackTexture_,rgb(.78f,.82f,.92f),32);
         }
     }
 
