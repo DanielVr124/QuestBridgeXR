@@ -55,10 +55,10 @@ class BedDesignPatchTests(unittest.TestCase):
     def test_original_bed_body_bedding_and_existing_pillow_layout_are_retained(self):
         restored = self.patched.replace(NEW_GEOMETRY, OLD_GEOMETRY, 1)
         restored = restored.replace(
-            "        m.vertex_normals  # cache smooth per-vertex normals for GLB export\\n", "", 1
+            "        m.vertex_normals  # cache smooth per-vertex normals for GLB export\n", "", 1
         )
         restored = restored.replace(
-            "    merged.vertex_normals  # include normals in optimized runtime batches\\n", "", 1
+            "    merged.vertex_normals  # include normals in optimized runtime batches\n", "", 1
         )
         restored = restored.replace(
             "'design':'Original bed platform and bedding retained; Brambley-style silver faux-leather crystal-button diamond-tufted headboard insert, beveled mirror frame, subtly embossed silver outer bands and recessed perimeter RGB backlight',",
