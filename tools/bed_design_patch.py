@@ -116,50 +116,50 @@ for side in (-1,1):
         (side*1.235,1.185,-1.485),(.025,1.55,.032),'charcoal2',.22
     )
 
-# One full-width softly crowned silver faux-leather insert.
+# One full-width silver faux-leather insert with a gently rectangular
+# padded silhouette; this avoids the previous overly-oval cushion shape.
 superellipsoid(
     'Headboard_crystal_tufted_silver_insert',
     (0,1.185,-1.415),
-    (1.055,.685,.128),'headboard_leather',.50,144,88,taper=.025
+    (1.075,.685,.135),'headboard_leather',.28,160,96,taper=.015
 )
 
-# Crystal-button tufting: four even rows of five clear, faceted-looking studs.
-# Each stud has a small shadowed setting under a bright raised crystal.
-tuft_x = (-.82,-.41,0,.41,.82)
+# Staggered crystal-button rows create a proper diamond-tuft grid instead of
+# the visually flat straight-row layout. Shadowed chrome settings sit below
+# each clear crystal stud.
+tuft_rows = (
+    (-.82,-.41,0,.41,.82),
+    (-.615,-.205,.205,.615),
+    (-.82,-.41,0,.41,.82),
+    (-.615,-.205,.205,.615),
+)
 tuft_y = (1.705,1.355,1.015,.665)
-for row,y in enumerate(tuft_y):
-    for col,x in enumerate(tuft_x):
+for row,(xs,y) in enumerate(zip(tuft_rows,tuft_y)):
+    for col,x in enumerate(xs):
         superellipsoid(
             f'Headboard_crystal_button_setting_{row}_{col}',
             (x,y,-1.286),(.036,.036,.012),'headboard_chrome',.72,32,20
         )
         superellipsoid(
             f'Headboard_crystal_tuft_button_{row}_{col}',
-            (x,y,-1.266),(.024,.024,.015),'headboard_crystal',.92,40,28
+            (x,y,-1.266),(.026,.026,.016),'headboard_crystal',.84,40,28
         )
 
-# Soft diagonal seams create the diamond-tufted upholstery between the buttons.
+# Each button connects diagonally to its two nearest neighbours in the next
+# row, producing a continuous diamond seam pattern across the upholstered face.
 for row in range(3):
-    for col in range(5):
-        x=tuft_x[col]
-        if col < 4:
-            nx=tuft_x[col+1]
-            curve_tube(
-                f'Headboard_tuft_seam_down_right_{row}_{col}',
-                [(x,tuft_y[row],-1.291),
-                 ((x+nx)*.5, (tuft_y[row]+tuft_y[row+1])*.5,-1.296),
-                 (nx,tuft_y[row+1],-1.291)],
-                .0022,'charcoal2',sides=6
-            )
-        if col > 0:
-            nx=tuft_x[col-1]
-            curve_tube(
-                f'Headboard_tuft_seam_down_left_{row}_{col}',
-                [(x,tuft_y[row],-1.291),
-                 ((x+nx)*.5, (tuft_y[row]+tuft_y[row+1])*.5,-1.296),
-                 (nx,tuft_y[row+1],-1.291)],
-                .0022,'charcoal2',sides=6
-            )
+    upper=tuft_rows[row]
+    lower=tuft_rows[row+1]
+    for col,x in enumerate(upper):
+        for next_col,nx in enumerate(lower):
+            if abs(x-nx) <= .206:
+                curve_tube(
+                    f'Headboard_tuft_seam_{row}_{col}_{next_col}',
+                    [(x,tuft_y[row],-1.292),
+                     ((x+nx)*.5,(tuft_y[row]+tuft_y[row+1])*.5,-1.302),
+                     (nx,tuft_y[row+1],-1.292)],
+                    .0034,'charcoal2',sides=8
+                )
 
 # Original mounting brackets are retained exactly.
 for side in (-1,1):
@@ -208,7 +208,7 @@ def patch_bed_geometry(source: str) -> str:
     )
 
     old_design = "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',"
-    new_design = "'design':'Original bed platform and bedding retained; Brambley-style pearl-silver bi-cast vinyl diamond-tufted headboard insert, polished mirror chrome bevels, direction-mapped faux-alligator silver panels, clear crystal buttons and recessed perimeter RGB backlight',"
+    new_design = "'design':'Original bed platform and bedding retained; Brambley-style pearl-silver faux-leather diamond-tufted insert with staggered crystal buttons, polished mirror chrome bevels, embossed silver alligator panels and recessed perimeter RGB backlight',"
     if source.count(old_design) != 1:
         raise RuntimeError("Bed metadata design marker changed; update the design patch.")
     source = source.replace(old_design, new_design, 1)
