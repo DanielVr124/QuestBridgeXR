@@ -30,6 +30,8 @@ bool g_clientKnown = false;
 FakeVrBridge g_fakeVr;
 std::uint64_t g_telemetryForwarded = 0;
 std::uint64_t g_telemetryForwardErrors = 0;
+bool g_mouseLeftDown = false;
+std::chrono::steady_clock::time_point g_lastMousePacket{};
 
 BOOL WINAPI consoleHandler(DWORD event) {
     if (event == CTRL_C_EVENT || event == CTRL_CLOSE_EVENT || event == CTRL_BREAK_EVENT) {
@@ -38,6 +40,32 @@ BOOL WINAPI consoleHandler(DWORD event) {
         return TRUE;
     }
     return FALSE;
+}
+
+void releaseHostMouse() {
+    if (!g_mouseLeftDown) return;
+    INPUT input{};
+    input.type = INPUT_MOUSE;
+    input.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+    if (SendInput(1, &input, sizeof(input)) == 1) {
+        g_mouseLeftDown = false;
+    }
+}
+
+bool applyHostMouse(const qbx::MousePayload& mouse) {
+    if (mouse.reserved != 0 || (mouse.buttons & ~std::uint16_t{1}) != 0) return false;
+    const bool leftDown = (mouse.buttons & 1u) != 0;
+    INPUT input{};
+    input.type = INPUT_MOUSE;
+    input.mi.dx = static_cast<LONG>(mouse.x);
+    input.mi.dy = static_cast<LONG>(mouse.y);
+    input.mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK;
+    if (leftDown && !g_mouseLeftDown) input.mi.dwFlags |= MOUSEEVENTF_LEFTDOWN;
+    if (!leftDown && g_mouseLeftDown) input.mi.dwFlags |= MOUSEEVENTF_LEFTUP;
+    if (SendInput(1, &input, sizeof(input)) != 1) return false;
+    g_mouseLeftDown = leftDown;
+    g_lastMousePacket = std::chrono::steady_clock::now();
+    return true;
 }
 
 const char* typeName(qbx::PacketType type) {
@@ -51,6 +79,7 @@ const char* typeName(qbx::PacketType type) {
     case PacketType::FrameChunk: return "FRAME_CHUNK";
     case PacketType::Goodbye: return "GOODBYE";
     case PacketType::VideoConfig: return "VIDEO_CONFIG";
+    case PacketType::Mouse: return "MOUSE";
     default: return "UNKNOWN";
     }
 }
@@ -174,6 +203,10 @@ int main(int argc, char** argv) {
 
     while (g_running.load()) {
         g_fakeVr.pollHotkeys();
+        if (g_mouseLeftDown && g_lastMousePacket != std::chrono::steady_clock::time_point{} &&
+            std::chrono::steady_clock::now() - g_lastMousePacket > std::chrono::milliseconds(900)) {
+            releaseHostMouse();
+        }
         sockaddr_in peer{};
         int peerLen = sizeof(peer);
         const int bytes = recvfrom(g_socket, reinterpret_cast<char*>(buffer.data()),
@@ -214,6 +247,7 @@ int main(int argc, char** argv) {
             qbx::HelloPayload hello{};
             std::memcpy(&hello, payload, sizeof(hello));
             hello.deviceName[sizeof(hello.deviceName) - 1] = '\0';
+            if (g_clientKnown && !samePeer(peer, g_clientPeer)) releaseHostMouse();
             g_clientPeer = peer;
             g_clientKnown = true;
             std::cout << "Client HELLO from " << address << ':' << peerPort
@@ -285,9 +319,26 @@ int main(int argc, char** argv) {
             }
             break;
         }
+        case qbx::PacketType::Mouse: {
+            if (header.payloadBytes != sizeof(qbx::MousePayload)) {
+                std::cerr << "Dropped MOUSE with wrong payload size\n";
+                break;
+            }
+            if (!g_clientKnown || !samePeer(peer, g_clientPeer)) break;
+            qbx::MousePayload mouse{};
+            std::memcpy(&mouse, payload, sizeof(mouse));
+            if (!applyHostMouse(mouse)) {
+                std::cerr << "Dropped invalid or uninjectable MOUSE input\n";
+            }
+            break;
+        }
         case qbx::PacketType::Heartbeat:
             break;
         case qbx::PacketType::Goodbye:
+            if (g_clientKnown && samePeer(peer, g_clientPeer)) {
+                releaseHostMouse();
+                g_clientKnown = false;
+            }
             std::cout << "Client GOODBYE from " << address << ':' << peerPort << "\n";
             break;
         case qbx::PacketType::VideoConfig: {
@@ -323,6 +374,7 @@ int main(int argc, char** argv) {
         }
     }
 
+    releaseHostMouse();
     std::cout << "Stopping; received " << receivedCount << " valid packets; forwarded telemetry="
               << g_telemetryForwarded << " relay errors=" << g_telemetryForwardErrors << ".\n";
     if (g_telemetrySocket != INVALID_SOCKET) closesocket(g_telemetrySocket);
