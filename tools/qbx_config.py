@@ -224,6 +224,7 @@ ROOM_ENVIRONMENTS = (
     "ancient_sky_ruins",
     "midnight_blossom_grove",
     "aurora_lagoon",
+    "explorable_city",
 )
 
 # Friendly labels for the large Studio selector; config and Quest INI keep stable slugs.
