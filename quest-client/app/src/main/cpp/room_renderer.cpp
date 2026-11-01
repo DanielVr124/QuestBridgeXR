@@ -1414,9 +1414,9 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     const bool bedLoaded=bedModel_.load(assets,"models/arc_upholstered_bed.glb");
     const bool deskLoaded=deskModel_.load(assets,"models/arc_gaming_desk.glb");
     const bool monitorLoaded=monitorModel_.load(assets,"models/arc27_curved_monitor.glb");
-    const bool tvLoaded=tvModel_.load(assets,"models/user_tv.glb.gz");
-    const bool chairLoaded=chairModel_.load(assets,"models/user_gaming_chair.glb.gz");
-    const bool mouseLoaded=mouseModel_.load(assets,"models/user_mouse.glb.gz");
+    const bool tvLoaded=tvModel_.load(assets,"models/tv_on_2_mattress_tall_stand.glb");
+    const bool chairLoaded=chairModel_.load(assets,"models/white_gaming_chair.glb");
+    const bool mouseLoaded=mouseModel_.load(assets,"models/onitoon_cw902_white_mouse_no_cable.glb");
     LOGI("custom furniture GLB status: bed=%d desk=%d monitor=%d tv=%d chair=%d mouse=%d",
          bedLoaded?1:0,deskLoaded?1:0,monitorLoaded?1:0,
          tvLoaded?1:0,chairLoaded?1:0,mouseLoaded?1:0);
