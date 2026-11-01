@@ -15,15 +15,16 @@ NEW_GEOMETRY = """
 # Preserve the two main sleep-pillow centres and rebuild the accent layout.
 # Replace only the primitive sleep-pillow ellipsoids with tailored, softly
 # squared cotton shells: gently puffed crowns, rounded corners, and real gussets.
-PILLOW_HALF_WIDTH = .46
-PILLOW_HALF_DEPTH = .31
+PILLOW_HALF_WIDTH = .475
+PILLOW_HALF_DEPTH = .33
 PILLOW_EDGE_TOP = .025
-PILLOW_EDGE_BOTTOM = -.105
-PILLOW_CROWN_HEIGHT = .145
-PILLOW_CORNER_EXPONENT = 3.5
+PILLOW_EDGE_BOTTOM = -.115
+PILLOW_CROWN_HEIGHT = .175
+PILLOW_CORNER_EXPONENT = 3.1
 PILLOW_RING_SEGMENTS = 112
 PILLOW_RING_ROWS = 20
-PILLOW_REAR_TILT = math.radians(8.0)
+PILLOW_REAR_TILT = math.radians(12.0)
+PILLOW_REST_PIVOT = np.array([0.0, PILLOW_EDGE_BOTTOM, -PILLOW_HALF_DEPTH], dtype=float)
 
 def pillow_outline(angle, scale=1.0):
     power = 2.0 / PILLOW_CORNER_EXPONENT
@@ -41,26 +42,34 @@ def pillow_crown_height(x, z, side):
         + (abs(z) / PILLOW_HALF_DEPTH) ** PILLOW_CORNER_EXPONENT
     )
     radius = min(1.0, max(0.0, gauge ** (1.0 / PILLOW_CORNER_EXPONENT)))
-    crown = PILLOW_CROWN_HEIGHT * max(0.0, 1.0 - radius * radius) ** .72
+    crown = PILLOW_CROWN_HEIGHT * max(0.0, 1.0 - radius * radius) ** .66
+    # The rear edge is fractionally compressed where the pillow meets the headboard.
+    rear_contact = min(1.0, max(0.0, (-z / PILLOW_HALF_DEPTH - .52) / .48))
+    crown *= 1.0 - .09 * rear_contact
 
-    # Fine, low-amplitude cloth relaxation fades into the sewn perimeter.
-    crease_envelope = radius ** 2.2 * math.sqrt(max(0.0, 1.0 - radius))
+    # Very low-amplitude, broad cloth relaxation keeps the crown from looking molded.
+    crease_envelope = radius ** 2.0 * math.sqrt(max(0.0, 1.0 - radius))
     fine_relaxation = (
-        .0016 * math.sin(22.0 * x + side * .7)
-        + .0011 * math.sin(19.0 * z - 7.0 * x + side * .35)
+        .0018 * math.sin(15.0 * x + side * .55)
+        + .0013 * math.sin(13.0 * z - 5.0 * x + side * .3)
     ) * crease_envelope
     return PILLOW_EDGE_TOP + crown + fine_relaxation
 
 for side in (-1, 1):
     # These centres match the previous bed layout exactly.
-    pillow_center = np.array([side*.49, 1.095, -1.115], dtype=float)
+    pillow_center = np.array([side*.50, 1.105, -.86], dtype=float)
+    # Rotate around the lower rear edge so each pillow rests on the mattress
+    # while its top leans naturally back into the upholstered headboard.
     pillow_rotation = trimesh.transformations.rotation_matrix(
-        PILLOW_REAR_TILT, (1.0, 0.0, 0.0)
+        -PILLOW_REAR_TILT, (1.0, 0.0, 0.0)
     )
 
     def pillow_world(x, y, z):
         local = np.array([x, y, z], dtype=float)
-        return pillow_rotation[:3, :3] @ local + pillow_center
+        return (
+            pillow_rotation[:3, :3] @ (local - PILLOW_REST_PIVOT)
+            + PILLOW_REST_PIVOT + pillow_center
+        )
 
     # Soft domed top, built from concentric rounded-rectangle rings.
     top_vertices = [pillow_world(0.0, pillow_crown_height(0.0, 0.0, side), 0.0)]
@@ -99,7 +108,7 @@ for side in (-1, 1):
     for row in range(gusset_rows + 1):
         t = row / gusset_rows
         y = PILLOW_EDGE_BOTTOM + (PILLOW_EDGE_TOP - PILLOW_EDGE_BOTTOM) * t
-        belly = .012 * math.sin(math.pi * t)
+        belly = .016 * math.sin(math.pi * t)
         for segment in range(PILLOW_RING_SEGMENTS):
             angle = 2.0 * math.pi * segment / PILLOW_RING_SEGMENTS
             ox, oz = pillow_outline(angle, 1.0 + belly)
@@ -185,35 +194,10 @@ for side in (-1, 1):
                 points.append(pillow_top_world(x, z, .0018))
             curve_tube(
                 f'Sleep_pillow_corner_fold_{side}_{corner_x}_{corner_z}',
-                points, .0015, 'pillow', sides=6
+                points, .0010, 'linen', sides=6
             )
 
-# Two compact graphite accents sit just forward of the sleeping pillows.
-# Their footprints are deliberately separated, so they read as two cushions
-# instead of intersecting with each other or merging into a central bolster.
-for side in (-1, 1):
-    x = side * .235
-    superellipsoid(
-        f'Slate_accent_cushion_{side}', (x, 1.14, -.66),
-        (.205, .105, .145), 'pillow', .58, 80, 52, taper=.18
-    )
-    curve_tube(
-        f'Slate_accent_piping_{side}',
-        [(x-.16, 1.17, -.79), (x, 1.205, -.805), (x+.16, 1.17, -.79)],
-        .0015, 'throw', sides=6
-    )
-
-# Keep a small centre lumbar accent as a separate front layer; it no longer
-# intersects the main sleeping pillows or the two graphite accent cushions.
-superellipsoid(
-    'Lumbar_cushion', (0, 1.03, -.34),
-    (.18, .065, .085), 'throw', .60, 72, 48, taper=.16
-)
-curve_tube(
-    'Lumbar_cushion_seam',
-    [(-.13, 1.065, -.414), (0, 1.085, -.42), (.13, 1.065, -.414)],
-    .0012, 'pillow', sides=6
-)
+# Exactly two full-size sleep pillows are used; no accent or lumbar cushions.
 
 # ----------------------- BRAMBLEY-STYLE HEADBOARD -----------------------
 # Keep the existing bed platform, rails, legs, foot end, mattress and bedding.
