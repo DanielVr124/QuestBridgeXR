@@ -3079,16 +3079,16 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // separate pillows, tailored headboard, bedside storage and practical lamps.
     // Geometry stays inside the existing room bounds and is fully walkable around.
     // -------------------------------------------------------------------------
-    const float bedX=halfW-2.0f+.20f;
-    const float bedZ=backZ+2.10f;
+    const float bedX=halfW-2.0f, bedZ=-halfD+2.10f;
+    const float bedRenderX=bedX+.20f;
     const auto bedBase=rgb(.018f,.024f,.043f);
     const auto bedMetal=rgb(.16f,.20f,.30f);
 
     // The complete bed is a custom, textured multi-part GLB built for this exact
     // bedroom anchor. The bedside cabinets and their controls remain native room props.
-    drawGroundShadow(pv.data(),bedX,floorY+.004f,bedZ,3.20f,4.05f,.42f);
+    drawGroundShadow(pv.data(),bedRenderX,floorY+.004f,bedZ,3.20f,4.05f,.42f);
     const float bedPlacement[16] = {
-        1,0,0,0, 0,1,0,0, 0,0,1,0, bedX,floorY,bedZ,1
+        1,0,0,0, 0,1,0,0, 0,0,1,0, bedRenderX,floorY,bedZ,1
     };
     const std::array<float,4> bedExposure{{.64f,.66f,.76f,1.0f}};
     bedModel_.draw(pv.data(),bedPlacement,locMvp_,locModel_,locColor_,locTextured_,
@@ -3097,23 +3097,23 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // padded frame lips. Keep its colour bounce active, but reveal the narrow
     // LED channel only when the headset is aimed almost straight at the headboard.
     const float emitterZ=bedZ-1.270f;
-    const float toLedX=bedX-cameraX;
+    const float toLedX=bedRenderX-cameraX;
     const float toLedY=floorY+1.180f-cameraY;
     const float toLedZ=emitterZ-cameraZ;
     const float toLedLength=std::max(std::sqrt(toLedX*toLedX+toLedY*toLedY+toLedZ*toLedZ),0.001f);
     const float viewForwardX=-camera[8],viewForwardY=-camera[9],viewForwardZ=-camera[10];
     const float straightOn=(viewForwardX*toLedX+viewForwardY*toLedY+viewForwardZ*toLedZ)/toLedLength;
     if(ledZones_[0].enabled&&straightOn>0.985f) {
-        drawGradientBar(0,bedX,floorY+.405f,emitterZ,2.49f,.014f,.012f,40);
-        drawGradientBar(0,bedX,floorY+1.955f,emitterZ,2.49f,.014f,.012f,40);
+        drawGradientBar(0,bedX+.20f,floorY+.405f,emitterZ,2.49f,.014f,.012f,40);
+        drawGradientBar(0,bedX+.20f,floorY+1.955f,emitterZ,2.49f,.014f,.012f,40);
         for(int edge=0;edge<2;++edge) {
-            const float x=bedX+(edge==0?-1.235f:1.235f);
+            const float x=bedRenderX+(edge==0?-1.235f:1.235f);
             drawGradientBarY(0,x,floorY+1.180f,emitterZ,.014f,1.57f,.012f,32);
         }
     }
     // Floating bedside tables with drawer fronts, recessed pulls and warm-free RGB task lamps.
     for(int side : {-1,1}) {
-        const float nx=bedX+side*1.53f, nz=bedZ-.94f;
+        const float nx=bedRenderX+side*1.53f, nz=bedZ-.94f;
         drawRoundedBox(pv.data(),nx,floorY+.405f,nz,.52f,.60f,.56f,bedBase,0.0f,5);
         drawRoundedBox(pv.data(),nx,floorY+.68f,nz,.56f,.055f,.60f,bedMetal,0.0f,4);
         for(int drawer=0;drawer<2;++drawer) {
@@ -3348,7 +3348,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // User-supplied tall-stand TV replaces the former procedural screen and console.
     // The imported display faces back toward the bed and retains PC stream routing.
     if(settings_.showTv) {
-        const float tvX=bedX, tvZ=bedZ+3.18f;
+        const float tvX=bedRenderX, tvZ=bedZ+3.18f;
         const bool tvStream=settings_.screenDestination=="tv"||settings_.screenDestination=="both";
         const GLuint tvTex=(tvStream&&hasVideo)?videoTexture:env;
         if(tvModel_.loaded()) {
