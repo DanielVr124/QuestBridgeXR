@@ -1,5 +1,16 @@
 # QuestBridge Studio — customization reference
 
+## Explorable City
+
+Select **Explorable City** in the Room Environment selector to enter the separate walkable downtown world. It is not one of the panoramic window scenes. The city is generated from a deterministic 84-metre street-block grid, so the same blocks reappear when revisited and exploration can continue indefinitely.
+
+The Quest client keeps a 5×5 neighborhood around the player: the inner 3×3 blocks use detailed facade windows and street props, while the outer ring uses reduced-detail building geometry. Each block is combined into a small number of GPU meshes instead of issuing a draw call for every window, tree, car, or streetlight. When the player crosses a block boundary, blocks outside the active neighborhood are released and new blocks are generated around the player.
+
+Movement uses the existing left-stick locomotion and right-stick snap/smooth turning settings. Building footprints block movement; streets, sidewalks, pedestrian cut-throughs, and the central plaza remain walkable. The world uses a warm late-afternoon directional sun, sky-fill ambient shading, view-dependent glass highlights, procedural concrete/asphalt/brick/glass/foliage surface detail, lit windows and practical fixtures, and distance fog. This first pass creates material detail procedurally in the shader; it does not yet use scanned PBR texture sets or baked lightmaps. Expensive real-time shadow maps, screen-space ambient occlusion, and global illumination are intentionally avoided on Quest to protect frame time.
+
+To leave the city, press the three-line menu button to return directly to the main gaming room, or use the right-stick-click environment cycle to move to another scene. The bedroom scene and its camera transform are rendered through their original path. The bedroom scene and its camera transform are rendered through their original path.
+
+
 QuestBridge Studio is a Python/Tkinter desktop control panel. Launch `QuestBridgeStudio.bat` on Windows or run `py -3 tools/questbridge_studio.py`. Hover every control for a longer tooltip describing its behavior, supported range, performance trade-offs, and limits. The tabs are scrollable.
 
 ## Profiles

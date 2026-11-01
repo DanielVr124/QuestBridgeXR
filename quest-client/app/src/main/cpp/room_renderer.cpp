@@ -29,7 +29,7 @@ constexpr int kFontCharacterCount = 96;
 GLuint gFontAtlasTexture = 0;
 std::array<stbtt_bakedchar, kFontCharacterCount> gFontCharacters{};
 bool gFontAtlasReady = false;
-constexpr std::array<const char*, 208> kEnvironmentNames = {
+constexpr std::array<const char*, 209> kEnvironmentNames = {
 
 
     "blossom",
@@ -240,6 +240,7 @@ constexpr std::array<const char*, 208> kEnvironmentNames = {
     "ancient_sky_ruins",
     "midnight_blossom_grove",
     "aurora_lagoon",
+    "explorable_city",
 };
 
 
@@ -595,6 +596,16 @@ Mat4 makeProjection(const XrFovf& fov) {
     const float l=std::tan(fov.angleLeft), r=std::tan(fov.angleRight);
     const float d=std::tan(fov.angleDown), u=std::tan(fov.angleUp);
     constexpr float n=0.05f, f=100.0f;
+    Mat4 p{};
+    p[0]=2.0f/(r-l); p[5]=2.0f/(u-d);
+    p[8]=(r+l)/(r-l); p[9]=(u+d)/(u-d);
+    p[10]=-(f+n)/(f-n); p[11]=-1.0f; p[14]=-(2.0f*f*n)/(f-n);
+    return p;
+}
+Mat4 makeCityProjection(const XrFovf& fov) {
+    const float l=std::tan(fov.angleLeft), r=std::tan(fov.angleRight);
+    const float d=std::tan(fov.angleDown), u=std::tan(fov.angleUp);
+    constexpr float n=0.05f, f=330.0f;
     Mat4 p{};
     p[0]=2.0f/(r-l); p[5]=2.0f/(u-d);
     p[8]=(r+l)/(r-l); p[9]=(u+d)/(u-d);
@@ -1251,6 +1262,13 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
 bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings) {
     if(initialized_) return true;
     settings_=settings;
+    if(settings_.environment=="explorable_city") {
+        cityReturnValid_=true;
+        roomReturnMoveX_=moveX_;
+        roomReturnMoveZ_=moveZ_;
+        roomReturnYaw_=virtualYaw_;
+        citySpawnPending_=true;
+    }
     if(!ledDefaultsSeeded_) {
         ledZones_[0].primary={.04f,.48f,1.0f}; ledZones_[0].secondary={.58f,.12f,1.0f};
         ledZones_[1].primary={.36f,.10f,1.0f}; ledZones_[1].secondary={.04f,.56f,1.0f};
@@ -1378,7 +1396,11 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,shadowSize,shadowSize,0,GL_RGBA,GL_UNSIGNED_BYTE,shadowPixels.data());
     glBindTexture(GL_TEXTURE_2D,0);
-    initialized_=true; chooseEnvironment(); LOGI("cozy room renderer initialized"); return true;
+    if(!cityWorld_.initialize()) {
+        LOGE("explorable city renderer failed to initialize");
+        if(settings_.environment=="explorable_city") settings_.environment="skyline_penthouse";
+    }
+    initialized_=true; chooseEnvironment(); LOGI("cozy room / city renderer initialized"); return true;
 }
 
 void RoomRenderer::createGeometry() {
@@ -1624,7 +1646,17 @@ void RoomRenderer::createGeometry() {
     glBindVertexArray(0);
 }
 
-void RoomRenderer::setSettings(const RoomSettings& settings) { settings_=settings; chooseEnvironment(); }
+void RoomRenderer::setSettings(const RoomSettings& settings) {
+    const std::string previousEnvironment=settings_.environment;
+    settings_=settings;
+    if(previousEnvironment!=settings.environment) {
+        const std::string requestedEnvironment=settings.environment;
+        settings_.environment=previousEnvironment;
+        applyEnvironment(requestedEnvironment);
+    } else {
+        chooseEnvironment();
+    }
+}
 
 std::array<float,3> RoomRenderer::ledZoneColor(int zone,float position) const {
     if(zone<0||zone>=static_cast<int>(ledZones_.size())) return {0.0f,0.0f,0.0f};
@@ -1651,13 +1683,39 @@ void RoomRenderer::chooseEnvironment() {
         environmentTextures_[previousIndex] = 0;
     }
     activeEnvironmentIndex_ = selectedIndex;
-    if (activeEnvironmentIndex_ >= 3 && initialized_ && !environmentTextures_[activeEnvironmentIndex_]) {
+    if (activeEnvironmentIndex_ >= 3 && activeEnvironmentIndex_ < static_cast<int>(environmentTextures_.size()) &&
+        initialized_ && !environmentTextures_[activeEnvironmentIndex_]) {
         environmentTextures_[activeEnvironmentIndex_] = createProceduralEnvironment(activeEnvironmentIndex_);
         if (!environmentTextures_[activeEnvironmentIndex_]) {
             LOGW("Could not generate scenery %s; the room window will use its fallback.", settings_.environment.c_str());
         }
     }
 }
+void RoomRenderer::applyEnvironment(const std::string& environment) {
+    const bool leavingCity=settings_.environment=="explorable_city" && environment!="explorable_city";
+    const bool enteringCity=settings_.environment!="explorable_city" && environment=="explorable_city";
+    if(enteringCity) {
+        roomReturnMoveX_=moveX_;
+        roomReturnMoveZ_=moveZ_;
+        roomReturnYaw_=virtualYaw_;
+        cityReturnValid_=true;
+        citySpawnPending_=true;
+    } else if(leavingCity) {
+        if(cityReturnValid_) {
+            moveX_=roomReturnMoveX_;
+            moveZ_=roomReturnMoveZ_;
+            virtualYaw_=roomReturnYaw_;
+        }
+        cityReturnValid_=false;
+        citySpawnPending_=false;
+        snapCooldown_=0.0f;
+        previousTurnRight_=false;
+        previousTurnLeft_=false;
+    }
+    settings_.environment=environment;
+    chooseEnvironment();
+}
+
 void RoomRenderer::cycleScreenDestination() {
     if (!settings_.roomControlsEnabled) return;
     if (settings_.screenDestination == "monitor") settings_.screenDestination = "tv";
@@ -1668,12 +1726,19 @@ void RoomRenderer::cycleScreenDestination() {
 void RoomRenderer::cycleEnvironment() {
     if (!settings_.roomControlsEnabled) return;
     const int nextIndex = (activeEnvironmentIndex_ + 1) % static_cast<int>(kEnvironmentNames.size());
-    settings_.environment = kEnvironmentNames[nextIndex];
-    chooseEnvironment();
+    applyEnvironment(kEnvironmentNames[nextIndex]);
     LOGI("Room scenery changed to %s", settings_.environment.c_str());
 }
 
 void RoomRenderer::toggleMenu() {
+    if(settings_.environment=="explorable_city") {
+        // The city has no bedroom monitor to host the desktop menu; the menu button
+        // is therefore a deliberate, immediate return-to-room control.
+        applyEnvironment("skyline_penthouse");
+        menuVisible_=false;
+        LOGI("returned from explorable city to the room");
+        return;
+    }
     menuVisible_ = !menuVisible_;
     previousMenuNavigation_ = false;
     previousMenuHorizontal_ = false;
@@ -1743,8 +1808,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
                 environmentDropdownIndex_=(environmentDropdownIndex_+
                     (direction>0?1:static_cast<int>(kEnvironmentNames.size())-1))%
                     static_cast<int>(kEnvironmentNames.size());
-                settings_.environment=kEnvironmentNames[environmentDropdownIndex_];
-                chooseEnvironment();
+                applyEnvironment(kEnvironmentNames[environmentDropdownIndex_]);
             } else if(menuSelection_==1) {
                 const char* sizes[]={"small","medium","large"};
                 const int index=settings_.roomSize=="small"?0:(settings_.roomSize=="large"?2:1);
@@ -1793,8 +1857,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
 
     if(selectPressed) {
         if(environmentDropdownOpen_) {
-            settings_.environment=kEnvironmentNames[environmentDropdownIndex_];
-            chooseEnvironment();
+            applyEnvironment(kEnvironmentNames[environmentDropdownIndex_]);
             environmentDropdownOpen_=false;
         } else if(menuPage_==0) {
             reconnectRequested_=true;
@@ -2150,6 +2213,39 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     const float yaw=headYaw(headPose)+virtualYaw_;
     const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
 
+    if(settings_.environment=="explorable_city") {
+        if(citySpawnPending_) {
+            moveX_=42.0f-headPose.position.x;
+            moveZ_=26.0f-headPose.position.z;
+            citySpawnPending_=false;
+        }
+        const float forwardX=-std::sin(yaw), forwardZ=-std::cos(yaw);
+        const float rightX=std::cos(yaw), rightZ=-std::sin(yaw);
+        const float stepX=settings_.roomMovementEnabled?(rightX*leftX+forwardX*leftY)*speed*dt:0.0f;
+        const float stepZ=settings_.roomMovementEnabled?(rightZ*leftX+forwardZ*leftY)*speed*dt:0.0f;
+        const float playerX=headPose.position.x+moveX_;
+        const float playerZ=headPose.position.z+moveZ_;
+        float targetX=playerX+stepX;
+        float targetZ=playerZ+stepZ;
+        if(cityWorld_.collides(targetX,playerZ) && !cityWorld_.collides(playerX,playerZ)) targetX=playerX;
+        if(cityWorld_.collides(targetX,targetZ) && !cityWorld_.collides(targetX,playerZ)) targetZ=playerZ;
+        moveX_=targetX-headPose.position.x;
+        moveZ_=targetZ-headPose.position.z;
+        snapCooldown_=std::max(0.0f,snapCooldown_-dt);
+        if(settings_.smoothTurn) {
+            virtualYaw_-=std::clamp(rightStickX,-1.0f,1.0f)*std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;
+        } else {
+            const bool right=rightStickX>0.7f,left=rightStickX < -0.7f;
+            if(snapCooldown_<=0.0f && right && !previousTurnRight_) {
+                virtualYaw_-=settings_.snapTurnDegrees*kPi/180.0f; snapCooldown_=0.24f;
+            } else if(snapCooldown_<=0.0f && left && !previousTurnLeft_) {
+                virtualYaw_+=settings_.snapTurnDegrees*kPi/180.0f; snapCooldown_=0.24f;
+            }
+            previousTurnRight_=right; previousTurnLeft_=left;
+        }
+        return;
+    }
+
     float halfW=3.0f,halfD=3.8f;
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}
     else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
@@ -2402,6 +2498,24 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float cameraX=-(camera[0]*camera[12]+camera[1]*camera[13]+camera[2]*camera[14]);
     const float cameraY=-(camera[4]*camera[12]+camera[5]*camera[13]+camera[6]*camera[14]);
     const float cameraZ=-(camera[8]*camera[12]+camera[9]*camera[13]+camera[10]*camera[14]);
+    if(settings_.environment=="explorable_city") {
+        Mat4 cityProjection=makeCityProjection(view.fov);
+        Mat4 cityPv=mul(cityProjection,camera);
+        cityWorld_.render(cityPv.data(),cameraX,cameraY,cameraZ);
+        if(settings_.comfortVignette && vignetteProgram_) {
+            glDisable(GL_DEPTH_TEST);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+            glUseProgram(vignetteProgram_);
+            glBindVertexArray(planeTexture_);
+            glDrawArrays(GL_TRIANGLES,0,6);
+            glBindVertexArray(0);
+            glUseProgram(0);
+            glDisable(GL_BLEND);
+            glEnable(GL_DEPTH_TEST);
+        }
+        return;
+    }
     const auto& env=environmentTextures_[activeEnvironmentIndex_];
     const auto ledHeadboard=ledZoneAverageColor(0);
     const auto ledCeiling=ledZoneAverageColor(1);
@@ -3141,6 +3255,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
 }
 
 void RoomRenderer::release() {
+    cityWorld_.release();
     bedModel_.release(); deskModel_.release(); monitorModel_.release();
     tvModel_.release(); chairModel_.release(); mouseModel_.release();
     if(gFontAtlasTexture){glDeleteTextures(1,&gFontAtlasTexture);gFontAtlasTexture=0;gFontAtlasReady=false;}
