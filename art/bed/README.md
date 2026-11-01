@@ -13,11 +13,11 @@ The headboard is rebuilt around the visual structure of the Brambley Bed w/ LED 
 
 ## Pillow refinement
 
-The two main sleep pillows are built as editable named mesh parts rather than primitive ellipsoids. Their softly squared rounded-rectangle footprint keeps a clear pillow silhouette, while a restrained domed crown, continuous side gusset and closed underside give them real filling depth. A narrow welt and low-amplitude corner creases add fabric detail without excessive quilting or balloon-like puffiness. The pair has a visible centre gap; two smaller graphite accents sit separately in front, with a smaller, separate lumbar accent in front.
+Exactly two full-size sleep pillows remain on the bed, one on each side with a small gap between them. Both are propped back against the headboard: the lower rear edge is the support pivot, so the upper edge leans into the upholstery instead of lying flat. Each pillow is an editable rounded-rectangle mesh with a fuller, softly domed crown, rounded corners, a deep continuous box gusset and closed underside. Fine welt stitching and barely visible cloth relaxation keep the casing soft without making it look quilted or over-decorated. There are no accent cushions or lumbar pillow.
 
 ## What stays unchanged
 - Original bed platform, rails, legs, foot end, mattress, fitted sheet, duvet and throw.
-- Original bed position, platform, bedding, headboard, and room layout. The redesigned pillow set has two separated soft sleep pillows and a pair of smaller graphite accents; the small centre lumbar accent is retained as a separate front layer.
+- Original bed position, platform, bedding, headboard and room layout. Exactly two sleep pillows are present; both are propped against the headboard, with no extra accent or lumbar cushions.
 - Bed position, scale, renderer anchor and collision footprint.
 - Bedside cabinets, lights, TV, desk, monitor, windows and all other room geometry.
 - Camera transforms, head tracking, turning, locomotion, controller bindings and room menus.
