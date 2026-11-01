@@ -2740,26 +2740,30 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
     }
 }
 
-XrPosef RoomRenderer::projectionPose(const XrPosef& viewPose) const {
-    XrPosef adjusted=viewPose;
-    const XrQuaternionf virtualTurn{0.0f,std::sin(virtualYaw_*.5f),0.0f,std::cos(virtualYaw_*.5f)};
-    adjusted.orientation=quatMul(virtualTurn,viewPose.orientation);
-    adjusted.position.x+=moveX_;
-    adjusted.position.y-=.42f*seatedBlend_;
-    adjusted.position.z+=moveZ_;
-    return adjusted;
-}
-
-void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,GLuint videoTexture,bool hasVideo) {
+void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& view,
+                             const XrPosef& headCenterPose,GLuint videoTexture,bool hasVideo) {
     if(!initialized_)return;
     float halfW=3.0f,halfD=3.8f;
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}else if(settings_.roomSize=="medium"){halfW=4.2f;halfD=5.4f;}
     (void)eyeIndex; (void)width; (void)height;
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
     Mat4 projection=makeProjection(view.fov);
-    XrPosef renderedPose=view.pose;
-    renderedPose.position.y-=.42f*seatedBlend_;
-    Mat4 camera=makeView(renderedPose,moveX_,moveZ_,virtualYaw_);
+
+    // Keep the eye camera on its real OpenXR pose. Virtual turning and room
+    // locomotion are represented as one world transform shared by both eyes.
+    // This prevents the compositor from interpreting a virtual turn as physical
+    // head motion, while keeping stereo separation centred on the tracked head.
+    const Mat4 physicalView=makeView(view.pose,0.0f,0.0f,0.0f);
+    const float pivotX=headCenterPose.position.x;
+    const float pivotY=headCenterPose.position.y;
+    const float pivotZ=headCenterPose.position.z;
+    const Mat4 inverseVirtualRotation=mul(
+        translation(pivotX,pivotY,pivotZ),
+        mul(rotateY(-virtualYaw_),translation(-pivotX,-pivotY,-pivotZ)));
+    const Mat4 inverseVirtualTranslation=
+        translation(-moveX_,.42f*seatedBlend_,-moveZ_);
+    const Mat4 inverseVirtualWorld=mul(inverseVirtualRotation,inverseVirtualTranslation);
+    Mat4 camera=mul(physicalView,inverseVirtualWorld);
     Mat4 pv=mul(projection,camera);
     // Recover the camera position from the exact view matrix already used for this eye.
     // This only feeds material view-dependent highlights; it does not alter the view transform.
