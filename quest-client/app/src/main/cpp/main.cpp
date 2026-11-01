@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 
 #include <array>
@@ -64,6 +65,8 @@ struct ClientConfig {
     std::string hostIp = "192.168.1.100";
     uint16_t hostPort = qbx::kDefaultPort;
     uint16_t localPort = qbx::kDefaultPort;
+    uint16_t usbPort = 9946;
+    std::string transportMode = "udp";
     bool trackingEnabled = true;
     bool controllersEnabled = true;
     bool invertThumbstickX = false;
@@ -184,7 +187,9 @@ ClientConfig loadConfig(android_app* app) {
         if (split == std::string::npos) continue;
         const std::string key = trim(line.substr(0, split));
         const std::string value = trim(line.substr(split + 1));
-        if (key == "host_ip" && !value.empty()) cfg.hostIp = value;
+        if (key == "transport_mode" && (value == "udp" || value == "usb")) cfg.transportMode = value;
+        else if (key == "usb_port") { const int v = std::atoi(value.c_str()); if (v > 0 && v <= 65535) cfg.usbPort = static_cast<uint16_t>(v); }
+        else if (key == "host_ip" && !value.empty()) cfg.hostIp = value;
         else if (key == "host_port") {
             const int v = std::atoi(value.c_str());
             if (v > 0 && v <= 65535) cfg.hostPort = static_cast<uint16_t>(v);
@@ -283,6 +288,18 @@ public:
         config_ = config;
         maxFrameBytes_ = static_cast<size_t>(config.maxFrameMiB) * 1024u * 1024u;
         incompleteFrameTimeoutMs_ = config.incompleteFrameTimeoutMs;
+        if (config_.transportMode == "usb") {
+            nextHello_ = Clock::now();
+            nextHeartbeat_ = Clock::now() + std::chrono::seconds(1);
+            if (connectUsb()) {
+                sendHello();
+                nextHello_ = Clock::now() + std::chrono::seconds(1);
+            } else {
+                nextHello_ = Clock::now() + std::chrono::seconds(1);
+            }
+            LOGI("USB streaming transport selected; ADB reverse TCP port=%u (no Wi-Fi transport will be used)", config_.usbPort);
+            return true;
+        }
         socket_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (socket_ < 0) {
             LOGE("UDP socket() failed: %d", errno);
@@ -323,15 +340,19 @@ public:
     }
 
     ~NetworkClient() {
-        if (socket_ >= 0) {
-            if (connected_) sendPacket(qbx::PacketType::Goodbye, nullptr, 0);
-            close(socket_);
-        }
+        if (connected_) sendPacket(qbx::PacketType::Goodbye, nullptr, 0);
+        if (socket_ >= 0) close(socket_);
+        if (tcpSocket_ >= 0) close(tcpSocket_);
     }
 
     bool connected() const { return connected_; }
 
     void requestReconnect() {
+        if (config_.transportMode == "usb") {
+            disconnectUsb("manual reconnect");
+            nextHello_ = Clock::now();
+            return;
+        }
         if (socket_ < 0) return;
         connected_ = false;
         sendHello();
@@ -340,6 +361,12 @@ public:
 
     void tick(VideoDecoder& video) {
         const auto now = Clock::now();
+        if (config_.transportMode == "usb") {
+            tickUsb(video, now);
+            expireAssembly();
+            video.pumpOutput();
+            return;
+        }
         if (!connected_ && now >= nextHello_) {
             sendHello();
             nextHello_ = now + std::chrono::seconds(1);
@@ -409,6 +436,7 @@ public:
 
 private:
     bool sendPacket(qbx::PacketType type, const void* payload, uint32_t size) {
+        if (config_.transportMode == "usb") return sendTcpPacket(type, payload, size);
         if (socket_ < 0 || size + sizeof(qbx::PacketHeader) > qbx::kMaxUdpPayload) return false;
         std::array<uint8_t, qbx::kMaxUdpPayload> packet{};
         qbx::PacketHeader header{};
@@ -430,6 +458,146 @@ private:
         hello.capabilities = kCapabilitiesTracking | kCapabilitiesControllers | kCapabilitiesH264 | kCapabilitiesHevc;
         std::snprintf(hello.deviceName, sizeof(hello.deviceName), "Meta Quest OpenXR");
         sendPacket(qbx::PacketType::Hello, &hello, sizeof(hello));
+    }
+
+    bool connectUsb() {
+        if (tcpSocket_ >= 0) return true;
+        tcpSocket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (tcpSocket_ < 0) {
+            LOGW("USB TCP socket() failed: %d", errno);
+            return false;
+        }
+        int noDelay = 1;
+        setsockopt(tcpSocket_, IPPROTO_TCP, TCP_NODELAY, &noDelay, sizeof(noDelay));
+        sockaddr_in endpoint{};
+        endpoint.sin_family = AF_INET;
+        endpoint.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        endpoint.sin_port = htons(config_.usbPort);
+        if (connect(tcpSocket_, reinterpret_cast<sockaddr*>(&endpoint), sizeof(endpoint)) != 0) {
+            const int error = errno;
+            close(tcpSocket_);
+            tcpSocket_ = -1;
+            LOGI("USB tunnel not ready yet on 127.0.0.1:%u (errno=%d); will retry", config_.usbPort, error);
+            return false;
+        }
+        LOGI("USB ADB TCP tunnel connected to 127.0.0.1:%u", config_.usbPort);
+        return true;
+    }
+
+    void disconnectUsb(const char* reason) {
+        if (tcpSocket_ >= 0) close(tcpSocket_);
+        tcpSocket_ = -1;
+        tcpRx_.clear();
+        connected_ = false;
+        nextHello_ = Clock::now() + std::chrono::seconds(1);
+        LOGW("USB stream disconnected (%s); retrying through ADB reverse", reason ? reason : "connection lost");
+    }
+
+    bool sendAllTcp(const uint8_t* bytes, size_t count) {
+        size_t sent = 0;
+        while (sent < count && tcpSocket_ >= 0) {
+            const ssize_t result = send(tcpSocket_, bytes + sent, count - sent, MSG_NOSIGNAL);
+            if (result > 0) {
+                sent += static_cast<size_t>(result);
+                continue;
+            }
+            if (result < 0 && errno == EINTR) continue;
+            disconnectUsb("TCP send failed");
+            return false;
+        }
+        return sent == count;
+    }
+
+    bool sendTcpPacket(qbx::PacketType type, const void* payload, uint32_t size) {
+        if (tcpSocket_ < 0 || size + sizeof(qbx::PacketHeader) > qbx::kMaxUdpPayload) return false;
+        std::array<uint8_t, qbx::kMaxUdpPayload + sizeof(uint32_t)> framed{};
+        qbx::PacketHeader header{};
+        header.magic = qbx::kMagic;
+        header.version = qbx::kProtocolVersion;
+        header.type = static_cast<uint16_t>(type);
+        header.sequence = sequence_++;
+        header.payloadBytes = size;
+        const uint32_t packetBytes = static_cast<uint32_t>(sizeof(header) + size);
+        std::memcpy(framed.data(), &packetBytes, sizeof(packetBytes));
+        std::memcpy(framed.data() + sizeof(packetBytes), &header, sizeof(header));
+        if (size && payload) std::memcpy(framed.data() + sizeof(packetBytes) + sizeof(header), payload, size);
+        return sendAllTcp(framed.data(), sizeof(packetBytes) + packetBytes);
+    }
+
+    void tickUsb(VideoDecoder& video, Clock::time_point now) {
+        if (tcpSocket_ < 0 && now >= nextHello_) {
+            if (connectUsb()) {
+                sendHello();
+                nextHello_ = now + std::chrono::seconds(1);
+            } else {
+                nextHello_ = now + std::chrono::seconds(1);
+            }
+        }
+        if (tcpSocket_ >= 0 && !connected_ && now >= nextHello_) {
+            sendHello();
+            nextHello_ = now + std::chrono::seconds(1);
+        }
+        if (tcpSocket_ >= 0 && connected_ && now >= nextHeartbeat_) {
+            qbx::HeartbeatPayload hb{};
+            hb.timestampNs = nowNs();
+            sendPacket(qbx::PacketType::Heartbeat, &hb, sizeof(hb));
+            nextHeartbeat_ = now + std::chrono::seconds(1);
+        }
+        if (tcpSocket_ < 0) return;
+
+        std::array<uint8_t, 65536> incoming{};
+        for (int reads = 0; reads < 64; ++reads) {
+            const ssize_t received = recv(tcpSocket_, incoming.data(), incoming.size(), MSG_DONTWAIT);
+            if (received > 0) {
+                tcpRx_.insert(tcpRx_.end(), incoming.begin(), incoming.begin() + received);
+                continue;
+            }
+            if (received == 0) {
+                disconnectUsb("peer closed TCP connection");
+                return;
+            }
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) break;
+            disconnectUsb("TCP receive failed");
+            return;
+        }
+
+        while (tcpSocket_ >= 0 && tcpRx_.size() >= sizeof(uint32_t)) {
+            uint32_t packetBytes = 0;
+            std::memcpy(&packetBytes, tcpRx_.data(), sizeof(packetBytes));
+            if (packetBytes < sizeof(qbx::PacketHeader) || packetBytes > qbx::kMaxUdpPayload) {
+                disconnectUsb("invalid TCP frame length");
+                return;
+            }
+            const size_t framedBytes = sizeof(uint32_t) + static_cast<size_t>(packetBytes);
+            if (tcpRx_.size() < framedBytes) break;
+            const uint8_t* packet = tcpRx_.data() + sizeof(uint32_t);
+            qbx::PacketHeader header{};
+            std::memcpy(&header, packet, sizeof(header));
+            if (header.magic == qbx::kMagic && header.version == qbx::kProtocolVersion &&
+                header.payloadBytes == packetBytes - sizeof(qbx::PacketHeader)) {
+                const uint8_t* payload = packet + sizeof(qbx::PacketHeader);
+                switch (static_cast<qbx::PacketType>(header.type)) {
+                case qbx::PacketType::HelloAck:
+                    if (header.payloadBytes == sizeof(qbx::HelloAckPayload)) {
+                        qbx::HelloAckPayload ack{};
+                        std::memcpy(&ack, payload, sizeof(ack));
+                        connected_ = true;
+                        LOGI("Wired USB stream handshake accepted (protocol=%u capabilities=0x%08x)",
+                             ack.serverVersion, ack.acceptedCapabilities);
+                    }
+                    break;
+                case qbx::PacketType::VideoConfig:
+                    handleVideoConfig(payload, header.payloadBytes, video);
+                    break;
+                case qbx::PacketType::FrameChunk:
+                    handleFrameChunk(payload, header.payloadBytes, video);
+                    break;
+                default:
+                    break;
+                }
+            }
+            tcpRx_.erase(tcpRx_.begin(), tcpRx_.begin() + static_cast<std::ptrdiff_t>(framedBytes));
+        }
     }
 
     void handleVideoConfig(const uint8_t* payload, uint32_t bytes, VideoDecoder& video) {
@@ -521,6 +689,8 @@ private:
 
     ClientConfig config_{};
     int socket_ = -1;
+    int tcpSocket_ = -1;
+    std::vector<uint8_t> tcpRx_;
     sockaddr_in host_{};
     uint32_t sequence_ = 1;
     bool connected_ = false;
