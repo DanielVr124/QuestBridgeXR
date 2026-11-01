@@ -24,16 +24,17 @@ _RENDER_RESOLUTION = re.compile(
     r"scene\.render\.resolution_percentage\s*=\s*\d+\s*$"
 )
 
-# The imported glTF rotates Y-up into Blender Z-up. The bed's length becomes
-# Blender Y: the headboard is on +Y and the footboard is on -Y.
+# The imported glTF rotates Y-up into Blender Z-up. The headboard is on +Y;
+# its upholstered face looks toward the mattress/foot side (-Y). These are
+# offline Blender review cameras only; runtime VR camera/tracking is untouched.
 # Keep camera names stable: the source-packaging job expects exact render filenames.
 NEW_VIEWS = """review_views = [
     # Wide three-quarter framing of the full platform, mattress and headboard.
     ('bed_three_quarter', (5.5,-4.3,4.0), (0,0,1.0), 42),
-    # Headboard-facing view from its +Y side, with the tufting kept near eye level.
-    ('bed_headboard', (0.0,4.7,2.15), (0,1.22,1.30), 48),
-    # Near-frontal detail of the diamond upholstery, crystal tuft buttons and RGB border.
-    ('bed_headboard_detail', (1.10,4.45,1.90), (0,1.25,1.32), 62),
+    # Front view from the mattress/foot side, looking toward the upholstered headboard.
+    ('bed_headboard', (0.0,-3.70,2.10), (0,1.22,1.48), 48),
+    # Closer front detail of the diamond insert, mirror bevels and crystal hardware.
+    ('bed_headboard_detail', (0.35,-2.65,1.92), (0,1.22,1.52), 62),
     # Side silhouette view shows pillow depth, mattress height and frame trim.
     ('bed_side_profile', (6.5,0.0,2.65), (0,0,1.0), 48),
     # Footboard detail from the -Y side.
