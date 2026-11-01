@@ -78,7 +78,7 @@ class NativeSourceContractTests(unittest.TestCase):
             "Headboard_mount_", "Sleep_pillow_top_",
             "Sleep_pillow_box_gusset_", "Sleep_pillow_underside_",
             "Sleep_pillow_top_welt_", "Sleep_pillow_lower_gusset_seam_",
-            "Sleep_pillow_corner_fold_", "PILLOW_REST_PIVOT"
+            "pillow_corner_tucks", "pillow_cotton", "pillow_gusset", "pillow_thread", "PILLOW_REST_PIVOT"
         ):
             with self.subTest(bed_detail=design_marker):
                 self.assertIn(design_marker, bed_design)
