@@ -127,6 +127,31 @@ def torus(name, location, major, minor, mat, rotation=None):
         obj.rotation_euler = rotation
     return finish_mesh(obj, mat, 0.0, True)
 
+def loft_y(name, rings, mat, segments=40):
+    """Smooth tapered grip body. rings are (y, center_z, radius_x, radius_z)."""
+    vertices = []
+    for y, center_z, radius_x, radius_z in rings:
+        for index in range(segments):
+            angle = (2.0 * math.pi * index) / segments
+            vertices.append((radius_x * math.cos(angle), y,
+                             center_z + radius_z * math.sin(angle)))
+    faces = []
+    for ring_index in range(len(rings) - 1):
+        first = ring_index * segments
+        second = (ring_index + 1) * segments
+        for index in range(segments):
+            nxt = (index + 1) % segments
+            faces.append((first + index, first + nxt, second + nxt, second + index))
+    faces.append(tuple(range(segments - 1, -1, -1)))
+    last = (len(rings) - 1) * segments
+    faces.append(tuple(last + index for index in range(segments)))
+    mesh = bpy.data.meshes.new(name + "Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    return finish_mesh(obj, mat, 0.0, True)
+
 def label(name, body, location, size, mat, align="CENTER"):
     curve = bpy.data.curves.new(name, type="FONT")
     curve.body = body
@@ -179,73 +204,86 @@ def build_controller(side):
     def text(name, body, loc, size):
         return register(label(name, body, loc, size, GLYPH))
 
-    # Ring-free tracked puck: rounded upper housing, inset graphite face and
-    # a sculpted handle. The overall proportions are authored in metres.
-    box("PuckShell", (0.0, 0.003, 0.002), (0.071, 0.024, 0.080), SHELL, 0.011)
-    box("PuckShoulder", (0.0, -0.001, 0.010), (0.067, 0.018, 0.064), SHELL_LIGHT, 0.009)
-    box("FaceplateInset", (0.0, -0.001, -0.014), (0.062, 0.010, 0.069), FACE, 0.010)
-    box("FaceplateLowerSweep", (0.0, -0.010, -0.006), (0.053, 0.006, 0.030), BUTTON, 0.008)
+    # Organic ring-free tracked puck: smooth white outer shell, a dark inset
+    # control face and an ergonomic handle with a tapered palm swell.
+    sph("PuckShell", (0.0, 0.003, 0.002), (0.036, 0.014, 0.042), SHELL, 40, 24)
+    sph("PuckShoulder", (0.0, 0.006, 0.001), (0.0335, 0.011, 0.038), SHELL_LIGHT, 40, 24)
+    sph("FaceplateInset", (0.0, 0.004, -0.026), (0.0305, 0.0065, 0.035), FACE, 40, 24)
+    sph("FaceplateLowerSweep", (0.0, -0.004, -0.042), (0.022, 0.0045, 0.020), BUTTON, 32, 20)
 
-    # Slightly swept palm grip and the moulded lower battery/strap housing.
-    box("ErgonomicHandle", (0.0, -0.055, 0.021), (0.028, 0.084, 0.034),
-        SHELL, 0.009, (math.radians(-9.0), 0.0, 0.0))
-    box("RearGripPanel", (0.0, -0.060, 0.040), (0.023, 0.060, 0.004),
-        RUBBER, 0.005, (math.radians(-9.0), 0.0, 0.0))
-    box("BatteryDoorSeam", (0.0, -0.070, 0.043), (0.024, 0.0013, 0.004),
+    # Smooth lofted handle avoids the blocky rectangular grip of the prototype.
+    loft_y("ErgonomicHandle", [
+        (0.006, 0.020, 0.0140, 0.0170),
+        (-0.012, 0.022, 0.0155, 0.0175),
+        (-0.032, 0.024, 0.0145, 0.0165),
+        (-0.056, 0.025, 0.0138, 0.0160),
+        (-0.080, 0.024, 0.0145, 0.0175),
+        (-0.099, 0.022, 0.0135, 0.0160),
+        (-0.108, 0.021, 0.0105, 0.0130),
+    ], SHELL, 40)
+    loft_y("RearGripPanel", [
+        (-0.020, 0.040, 0.0032, 0.0025),
+        (-0.044, 0.040, 0.0040, 0.0026),
+        (-0.074, 0.041, 0.0044, 0.0028),
+        (-0.094, 0.039, 0.0035, 0.0024),
+    ], RUBBER, 24)
+    box("BatteryDoorSeam", (0.0, -0.080, 0.043), (0.018, 0.0012, 0.0020),
         METAL, 0.0005)
-    for rib in range(6):
-        y = -0.037 - rib * 0.009
-        box("PalmGripRidge", (0.0, y, 0.043), (0.018, 0.0016, 0.0013),
-            RUBBER, 0.0005)
+    for rib in range(5):
+        y = -0.047 - rib * 0.008
+        box("PalmGripRidge", (0.0, y, 0.043), (0.010, 0.0012, 0.0010),
+            RUBBER, 0.0004)
 
-    # Trigger blade and rear safety/grip switch are deliberately distinct.
-    box("IndexTrigger", (0.0, 0.022, 0.046), (0.030, 0.009, 0.036),
+    # High-travel index trigger and its hinge/pivot hardware on the upper rear edge.
+    cyl("TriggerHinge", (0.0, 0.023, 0.043), 0.0042, 0.035, METAL, 24,
+        (0.0, math.radians(90.0), 0.0))
+    box("IndexTrigger", (0.0, 0.020, 0.056), (0.027, 0.008, 0.032),
         RUBBER, 0.004, (math.radians(-18.0), 0.0, 0.0))
-    box("TriggerContact", (0.0, 0.026, 0.031), (0.022, 0.004, 0.021),
-        BUTTON, 0.003)
+    box("TriggerContact", (0.0, 0.025, 0.041), (0.020, 0.0035, 0.014),
+        BUTTON, 0.0025)
     outer = -1.0 if is_left else 1.0
-    box("GripPaddle", (outer * 0.037, -0.027, 0.023), (0.005, 0.034, 0.029),
+    box("GripPaddle", (outer * 0.036, -0.027, 0.023), (0.005, 0.034, 0.026),
         RUBBER, 0.002, (math.radians(-8.0), 0.0, 0.0))
-    box("GripPaddleEdge", (outer * 0.0395, -0.026, 0.023), (0.0013, 0.024, 0.020),
-        BUTTON_EDGE, 0.0006)
+    box("GripPaddleEdge", (outer * 0.0385, -0.026, 0.023), (0.0012, 0.024, 0.018),
+        BUTTON_EDGE, 0.0005)
 
-    # Tracking windows and small manufactured seams around the outer puck.
-    for x, y, z in [(-0.029, 0.013, -0.005), (0.029, 0.013, -0.005),
-                    (-0.030, -0.004, 0.020), (0.030, -0.004, 0.020)]:
-        sph("OpticalWindow", (x, y, z), (0.0022, 0.0024, 0.0015), RUBBER)
-    sph("StatusLED", (0.0, 0.016, -0.021), (0.0016, 0.0016, 0.0008), LED)
-    box("PuckSideSeam", (outer * 0.0348, 0.003, 0.004), (0.0011, 0.014, 0.047),
+    # Small tracking apertures and manufacturing seams around the outer housing.
+    for x, y, z in [(-0.029, 0.012, -0.010), (0.029, 0.012, -0.010),
+                    (-0.030, -0.003, 0.018), (0.030, -0.003, 0.018)]:
+        sph("OpticalWindow", (x, y, z), (0.0020, 0.0022, 0.0014), RUBBER)
+    sph("StatusLED", (0.0, 0.016, -0.055), (0.0015, 0.0015, 0.0008), LED)
+    box("PuckSideSeam", (outer * 0.0342, 0.003, 0.004), (0.0010, 0.012, 0.040),
         BUTTON_EDGE, 0.0004)
 
-    # Analogue stick module, circular thumb cap and textured grip crown.
-    stick_x = -0.017 if is_left else -0.017
+    # Mirrored thumbsticks: outer edge on both hands, with a recessed bezel and cap.
+    stick_x = -0.017 if is_left else 0.017
     stick_y = 0.014
-    cyl("ThumbstickBaseRing", (stick_x, stick_y, -0.0225), 0.0103, 0.0040, BUTTON_EDGE)
-    cyl("ThumbstickSocket", (stick_x, stick_y, -0.0250), 0.0084, 0.0032, RUBBER)
-    cyl("ThumbstickStem", (stick_x, stick_y, -0.0290), 0.0041, 0.0060, METAL)
-    sph("ThumbstickCap", (stick_x, stick_y, -0.0325), (0.0081, 0.0045, 0.0081), BUTTON)
-    sph("ThumbstickTouchInset", (stick_x, stick_y - 0.0010, -0.0390),
-        (0.0031, 0.0008, 0.0031), RUBBER)
+    cyl("ThumbstickBaseRing", (stick_x, stick_y, -0.0590), 0.0100, 0.0038, BUTTON_EDGE)
+    cyl("ThumbstickSocket", (stick_x, stick_y, -0.0612), 0.0081, 0.0030, RUBBER)
+    cyl("ThumbstickStem", (stick_x, stick_y, -0.0645), 0.0039, 0.0060, METAL)
+    sph("ThumbstickCap", (stick_x, stick_y, -0.0685), (0.0078, 0.0042, 0.0078), BUTTON)
+    sph("ThumbstickTouchInset", (stick_x, stick_y - 0.0010, -0.0730),
+        (0.0030, 0.0008, 0.0030), RUBBER)
 
     if is_left:
-        # Left hand: X/Y cluster and three-line menu button.
-        buttons = [("X", -0.001, 0.018, "X"), ("Y", 0.018, 0.018, "Y")]
-        menu_x = 0.026
-        box("MenuButton", (menu_x, 0.026, -0.022), (0.010, 0.009, 0.0028), BUTTON, 0.003)
+        # Left hand: X/Y cluster and recessed three-line menu button.
+        buttons = [("X", 0.006, 0.018, "X"), ("Y", 0.022, 0.018, "Y")]
+        menu_x = 0.027
+        box("MenuButton", (menu_x, 0.026, -0.060), (0.0095, 0.0085, 0.0026), BUTTON, 0.0025)
         for line in range(3):
-            box("MenuGlyphLine", (menu_x, 0.027 + line * 0.0024, -0.0240),
-                (0.0058, 0.0007, 0.0005), GLYPH, 0.0002)
+            box("MenuGlyphLine", (menu_x, 0.027 + line * 0.0022, -0.0620),
+                (0.0052, 0.00055, 0.0004), GLYPH, 0.00015)
     else:
-        # Right hand: A/B cluster and Meta system/infinity mark.
-        buttons = [("A", 0.018, 0.018, "A"), ("B", 0.018, -0.003, "B")]
-        meta_x = 0.026
-        box("MetaButton", (meta_x, 0.027, -0.022), (0.010, 0.009, 0.0028), BUTTON, 0.003)
-        text("MetaInfinityMark", "∞", (meta_x, 0.027, -0.0240), 0.008)
+        # Right hand mirrors the thumbstick and A/B cluster; Meta key is inward.
+        buttons = [("A", -0.006, 0.018, "A"), ("B", -0.022, 0.018, "B")]
+        meta_x = -0.027
+        box("MetaButton", (meta_x, 0.027, -0.060), (0.0095, 0.0085, 0.0026), BUTTON, 0.0025)
+        text("MetaInfinityMark", "∞", (meta_x, 0.027, -0.0620), 0.0075)
 
     for name, x, y, glyph in buttons:
-        cyl(name + "ButtonBezel", (x, y, -0.0220), 0.0058, 0.0025, BUTTON_EDGE)
-        sph(name + "Button", (x, y, -0.0240), (0.0048, 0.0048, 0.0012), BUTTON)
-        text(name + "Legend", glyph, (x, y, -0.0252), 0.0047)
+        cyl(name + "ButtonBezel", (x, y, -0.0605), 0.0056, 0.0022, BUTTON_EDGE)
+        sph(name + "Button", (x, y, -0.0625), (0.0046, 0.0046, 0.0011), BUTTON)
+        text(name + "Legend", glyph, (x, y, -0.0637), 0.0044)
 
     # Discreet function/pairing key and lanyard hardware under the heel.
     cyl("PairingKey", (outer * 0.025, -0.047, -0.014), 0.0036, 0.0020, BUTTON_EDGE)
@@ -355,9 +393,9 @@ for filename, camera_pos, target, scale in gallery:
 # Store a manifest with dimensions, source provenance, and generated deliverables.
 manifest = {
     "model": "Meta Quest 3 Touch Plus",
-    "type": "high-detail Blender reference recreation",
-    "provenance": "Authored in Blender from Meta Touch Plus public product/reference imagery; not Meta's proprietary FBX source mesh.",
-    "dimensions_m": {"body_width": 0.071, "head_height": 0.024, "grip_length": 0.084},
+    "type": "high-detail Blender Touch Plus reference reconstruction",
+    "provenance": "Authored in Blender from Meta's published Touch Plus product/reference imagery and public hardware-art documentation; not Meta's proprietary FBX source mesh.",
+    "dimensions_m": {"body_width": 0.072, "head_height": 0.028, "grip_length": 0.114},
     "left_glb": "quest-client/app/src/main/assets/models/meta_touch_plus_left.glb",
     "right_glb": "quest-client/app/src/main/assets/models/meta_touch_plus_right.glb",
     "editable_source": "art/controllers/meta_touch_plus_controllers.blend",
