@@ -1,10 +1,7 @@
 name: Build Blender Bed Model
 
 on:
-  workflow_run:
-    workflows: ["QuestBridge XR Build"]
-    types: [completed]
-    branches: [main]
+  # Render once per main commit; the main build has its own workflow.
   push:
     branches: [main]
   workflow_dispatch:
@@ -18,7 +15,7 @@ concurrency:
 
 jobs:
   build-bed-source:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     name: Blender 4.5.15 bed project + Cycles renders
     runs-on: ubuntu-22.04
     steps:
