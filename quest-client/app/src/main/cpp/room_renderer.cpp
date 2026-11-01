@@ -1423,7 +1423,7 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     environmentTextures_[0]=loadRgbAsset(assets,"environments/blossom.rgb");
     environmentTextures_[1]=loadRgbAsset(assets,"environments/night_city.rgb");
     environmentTextures_[2]=loadRgbAsset(assets,"environments/golden_city.rgb");
-    mainRoomPanoramaTexture_=loadPanoramaAsset(assets,"environments/main_room_city_panorama.jpg");
+    mainRoomPanoramaTexture_=loadPanoramaAsset(assets,"environments/wmremove-transformed.jpeg");
     if(!mainRoomPanoramaTexture_) {
         LOGW("main-room city panorama is not bundled; the selected environment remains the window fallback");
     }
