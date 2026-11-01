@@ -27,6 +27,9 @@ struct RoomSettings {
     float movementSpeed = 1.35f;
     float turnSpeed = 1.8f;
     float snapTurnDegrees = 30.0f;
+    float chairRollSpeed = 1.15f;
+    float chairSpinSpeed = 1.55f;
+    float chairFriction = 2.8f;
     float floorOffsetY = -1.60f;
 };
 
@@ -37,7 +40,9 @@ public:
     void setSettings(const RoomSettings& settings);
     void updateLocomotion(float leftX, float leftY, float rightX, float dt,
                           const XrPosef& headPose);
-    void handleRoomInteraction(const XrPosef& controllerPose, bool triggerPressed);
+    void handleRoomInteraction(const XrPosef& controllerAimPose, const XrPosef& headPose, bool triggerPressed);
+    void setTrackedControllerPoses(const std::array<XrPosef,2>& poses,
+                                   const std::array<bool,2>& valid);
     bool consumeMousePayload(qbx::MousePayload& payload);
     void cycleScreenDestination();
     void cycleEnvironment();
@@ -60,6 +65,7 @@ private:
     void createGeometry();
     void chooseEnvironment();
     void applyEnvironment(const std::string& environment);
+    void selectRoomScene(int sceneIndex);
     void updateMousePayload(std::uint16_t buttons);
     std::array<float,3> ledZoneColor(int zone, float position) const;
     std::array<float,3> ledZoneAverageColor(int zone) const;
@@ -114,6 +120,10 @@ private:
     GlbModel tvModel_;
     GlbModel chairModel_;
     GlbModel mouseModel_;
+    GlbModel leftControllerModel_;
+    GlbModel rightControllerModel_;
+    std::array<XrPosef,2> controllerPoses_{};
+    std::array<bool,2> controllerPoseValid_{{false,false}};
     CityWorld cityWorld_;
     bool citySpawnPending_ = true;
     bool cityReturnValid_ = false;
@@ -196,6 +206,13 @@ private:
     float moveZ_ = 0.0f;
     float virtualYaw_ = 0.0f;
     float snapCooldown_ = 0.0f;
+    float chairOffsetX_ = 0.0f;
+    float chairOffsetZ_ = 0.0f;
+    float chairYaw_ = 0.0f;
+    float chairVelocityX_ = 0.0f;
+    float chairVelocityZ_ = 0.0f;
+    float chairAngularVelocity_ = 0.0f;
+    float chairWheelRoll_ = 0.0f;
     bool previousTurnRight_ = false;
     bool previousTurnLeft_ = false;
     bool menuVisible_ = false;
