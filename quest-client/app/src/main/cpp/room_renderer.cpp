@@ -2511,10 +2511,12 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
         // Left stick applies drive force; right stick steers the chair's caster swivel.
         const float driveX=rightX*leftX+forwardX*leftY;
         const float driveZ=rightZ*leftX+forwardZ*leftY;
-        const float acceleration=3.0f*std::clamp(settings_.chairRollSpeed,.30f,2.60f);
+        const float acceleration=2.8f*std::clamp(settings_.chairRollSpeed,.30f,2.60f);
         chairVelocityX_+=driveX*acceleration*dt;
         chairVelocityZ_+=driveZ*acceleration*dt;
-        const float damping=std::exp(-std::clamp(settings_.chairFriction,.50f,6.0f)*dt);
+        // Rolling resistance lets the casters coast naturally after stick release.
+        const float rollingDrag=.22f+.28f*std::clamp(settings_.chairFriction,.50f,6.0f);
+        const float damping=std::exp(-rollingDrag*dt);
         chairVelocityX_*=damping;
         chairVelocityZ_*=damping;
         const float speedNow=std::sqrt(chairVelocityX_*chairVelocityX_+chairVelocityZ_*chairVelocityZ_);
@@ -2531,11 +2533,13 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
             chairOffsetX_=nextChairX-deskX;
             chairOffsetZ_=nextChairZ-(deskZ+1.12f);
         }
-        const float spinTarget=std::clamp(rightStickX,-1.0f,1.0f)*
-                               std::clamp(settings_.chairSpinSpeed,.30f,3.50f);
-        chairAngularVelocity_+=(spinTarget-chairAngularVelocity_)*
-                               std::clamp(dt*8.0f,0.0f,1.0f);
-        chairAngularVelocity_*=std::exp(-std::clamp(settings_.chairFriction,.50f,6.0f)*.35f*dt);
+        // Right stick applies a torque; when released, the chair coasts on angular
+        // momentum and slowly settles under swivel friction rather than stopping instantly.
+        const float spinAcceleration=2.8f*std::clamp(settings_.chairSpinSpeed,.30f,3.50f);
+        chairAngularVelocity_+=std::clamp(rightStickX,-1.0f,1.0f)*spinAcceleration*dt;
+        const float swivelDrag=.10f+.12f*std::clamp(settings_.chairFriction,.50f,6.0f);
+        chairAngularVelocity_*=std::exp(-swivelDrag*dt);
+        chairAngularVelocity_=std::clamp(chairAngularVelocity_,-4.5f,4.5f);
         chairYaw_+=chairAngularVelocity_*dt;
         if(speedNow>.035f) {
             const float travelHeading=std::atan2(-chairVelocityX_,-chairVelocityZ_);
