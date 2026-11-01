@@ -378,7 +378,7 @@ class QuestBridgeStudio(tk.Tk):
             row=0, column=0, sticky="w")
         ttk.Label(
             network,
-            text="After USB is authorized, set the PC and Quest Wi-Fi addresses, then start the Windows host and video sender.",
+            text="For Wi-Fi mode, set the PC and Quest LAN addresses, then start the UDP host and sender. For a cable-only stream, use Start Wired USB Streaming above; it routes tracking and video over the ADB USB tunnel.",
             wraplength=800, justify="left",
         ).grid(row=1, column=0, sticky="w", pady=(5, 10))
         row = ttk.Frame(network)
