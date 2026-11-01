@@ -17,7 +17,6 @@ class UsbConnectionTests(unittest.TestCase):
     def test_parse_adb_devices_classifies_usb_network_and_emulator(self):
         output = """List of devices attached
 1WMHH123456789 device product:eureka model:Quest_3 transport_id:7
-            (0, "Windows host accepted connection (protocol=1 capabilities=0x0000000f)\\nReceived video config 1920x1080 @72 codec=1 layout=0\\nVideo decoder configured: video/avc 1920x1080\\n"),
 192.168.1.22:5555 device product:eureka model:Quest_3 transport_id:8
 emulator-5554 device product:sdk_gphone64_x86_64 transport_id:9
 """
@@ -66,9 +65,9 @@ emulator-5554 device product:sdk_gphone64_x86_64 transport_id:9
     @mock.patch("usb_connection.subprocess.run")
     def test_non_quest_android_device_is_not_reported_as_quest_ready(self, run):
         outputs = [
-            (0, "List of devices attached\\nR58M123456 device product:generic model:Android_Phone transport_id:7\\n"),
-            (0, "Android Phone\\n"),
-            (0, "14\\n"),
+            (0, "List of devices attached\nR58M123456 device product:generic model:Android_Phone transport_id:7\n"),
+            (0, "Android Phone\n"),
+            (0, "14\n"),
         ]
         run.side_effect = [
             mock.Mock(returncode=code, stdout=stdout, stderr="")
@@ -88,6 +87,7 @@ emulator-5554 device product:sdk_gphone64_x86_64 transport_id:9
             (0, "14\n"),
             (0, "package:/data/app/com.questbridge.xr/base.apk\n"),
             (0, "12345\n"),
+            (0, "Windows host accepted connection (protocol=1 capabilities=0x0000000f)\nReceived video config 1920x1080 @72 codec=1 layout=0\nVideo decoder configured: video/avc 1920x1080\n"),
         ]
         run.side_effect = [
             mock.Mock(returncode=code, stdout=stdout, stderr="")
