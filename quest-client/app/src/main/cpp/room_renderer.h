@@ -95,7 +95,7 @@ private:
     void drawGroundShadow(const float* projectionView, float x, float y, float z,
                           float width, float depth, float opacity);
     void drawEnvironmentWindow(const float* projectionView, float wallX, float centerZ, float floorY,
-                               float windowW, float windowH, float yaw);
+                               GLuint fallbackTexture, float windowW, float windowH, float yaw);
     void drawPanoramaSkybox(const float* projectionView, float cameraX, float cameraY, float cameraZ,
                             GLuint panoramaTexture);
 

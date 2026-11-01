@@ -2285,7 +2285,7 @@ void RoomRenderer::drawGroundShadow(const float* pv,float x,float y,float z,
     glBindTexture(GL_TEXTURE_2D,0);
 }
 void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float centerZ,float floorY,
-                                         float windowW,float windowH,float yaw) {
+                                         GLuint fallbackTexture,float windowW,float windowH,float yaw) {
     const float windowY=floorY+2.4f;
     auto point=[&](float localX,float localY,float localZ) {
         const float co=std::cos(yaw),si=std::sin(yaw);
@@ -2302,16 +2302,21 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float cente
         const auto p=point(lx,ly,lz);
         drawRoundedBox(pv,p[0],p[1],p[2],sx,sy,sz,color,yaw,material);
     };
-    // A genuine opening in the wall reveals the distant panorama. The glass itself
-    // contributes only a faint cool tint, so the room beyond remains clearly visible.
+    // With the panorama installed, the pane is a faint translucent surface over
+    // the real opening. Until then, retain the original still-image window view.
     const auto glass=point(0,windowY,0.035f);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    glDepthMask(GL_FALSE);
-    drawPlane(pv,glass[0],glass[1],glass[2],windowW,windowH,0,
-              rgb(.72f,.82f,.96f,.045f),yaw);
-    glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
+    if(mainRoomPanoramaTexture_) {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
+        drawPlane(pv,glass[0],glass[1],glass[2],windowW,windowH,0,
+                  rgb(.72f,.82f,.96f,.045f),yaw);
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
+    } else {
+        drawPlane(pv,glass[0],glass[1],glass[2],windowW,windowH,
+                  fallbackTexture,rgb(1,1,1),yaw);
+    }
     const auto frame=rgb(.018f,.025f,.045f);
     const float t=0.062f;
     box(0,windowY+windowH*.5f+t*.5f,0.015f,windowW+2*t,t,0.12f,frame);
@@ -2773,8 +2778,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform1i(locRoughnessAtlas_,3);
     glUniform1i(locHasRoughnessAtlas_,roughnessAtlasTexture_?1:0);
     glActiveTexture(GL_TEXTURE0);
-    const GLuint roomSkyboxTexture=mainRoomPanoramaTexture_?mainRoomPanoramaTexture_:env;
-    drawPanoramaSkybox(pv.data(),cameraX,cameraY,cameraZ,roomSkyboxTexture);
+    if(mainRoomPanoramaTexture_) {
+        drawPanoramaSkybox(pv.data(),cameraX,cameraY,cameraZ,mainRoomPanoramaTexture_);
+    }
     const float roomLightScale=roomLightsOn_?1.0f:0.0f;
     glUniform1f(locRoomAmbientIntensity_,roomLightsOn_?1.0f:0.075f);
     glUniform3f(locCeilingLightPosition_,0.0f,ceilingY-0.14f,0.0f);
@@ -2911,7 +2917,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // Frame the single transparent opening beside the bed.
     const float windowWallX=halfW-.015f;
     const float windowYaw=-kPi*.5f;
-    drawEnvironmentWindow(pv.data(),windowWallX,windowCenterZ,floorY,
+    drawEnvironmentWindow(pv.data(),windowWallX,windowCenterZ,floorY,env,
                           roomWindowWidth,roomWindowHeight,windowYaw);
 
     // Curtains follow the same rotated plane and frame the bed-side window.
