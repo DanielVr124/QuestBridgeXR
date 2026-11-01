@@ -2568,7 +2568,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerPose, bool tri
                                 break;
                             }
                         } else if(environmentDropdownOpen_&&hitX>bodyX-.115f&&hitX<bodyX+.205f) {
-                            for(int item=0;item<4;++item) {
+                            for(int item=0;item<2;++item) {
                                 const float rowY=menuY-.012f-item*.031f;
                                 if(std::fabs(hitY-rowY)<.017f) {
                                     environmentDropdownIndex_=(environmentDropdownIndex_+item)%
@@ -3507,7 +3507,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             if(environmentDropdownOpen_) {
                 panel(bodyX+.050f,menuY-.044f,.298f,.158f,rgb(.014f,.024f,.044f,1.0f));
                 label("CHOOSE ENVIRONMENT",bodyX-.080f,menuY+.020f,.00148f,cyan);
-                for(int item=0;item<4;++item) {
+                for(int item=0;item<2;++item) {
                     const int index=(environmentDropdownIndex_+item)%
                         static_cast<int>(kDropdownEnvironmentNames.size());
                     const float yy=menuY-.012f-item*.031f;
