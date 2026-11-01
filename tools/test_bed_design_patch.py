@@ -83,7 +83,7 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertEqual(self.patched.count("f'Sleep_pillow_top_{side}'"), 1)
         self.assertIn("PILLOW_RING_ROWS = 32", self.patched)
         self.assertIn("PILLOW_RING_SEGMENTS = 128", self.patched)
-        self.assertIn("corner_tucks", self.patched)
+        self.assertIn("pillow_corner_tucks", self.patched)
         self.assertIn("fill_lobes", self.patched)
         self.assertNotIn("Sleep_pillow_corner_fold_", self.patched)
         self.assertNotIn("Slate_accent", self.patched)
@@ -98,9 +98,10 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertIn("for side in (-1, 1):", self.patched)
         self.assertNotIn("Slate_accent", self.patched)
         self.assertNotIn("Lumbar_cushion", self.patched)
-        for token in ("pillow_cotton", "pillow_gusset", "pillow_thread"):
-            with self.subTest(material=token):
-                self.assertIn("materials['" + token + "']", self.patched)
+        self.assertIn("materials['pillow_cotton']", self.patched)
+        self.assertNotIn("materials['pillow_gusset']", self.patched)
+        self.assertNotIn("materials['pillow_thread']", self.patched)
+        self.assertIn("top_welt, .0022, 'linen'", self.patched)
 
     def test_headboard_is_not_the_failed_plain_slab_or_vertical_ribs(self):
         for obsolete in (
