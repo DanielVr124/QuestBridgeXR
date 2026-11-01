@@ -253,7 +253,10 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("drawPlane(pv.data(),tvX", renderer)
         self.assertNotIn("DESK CHAIR", renderer)
         self.assertIn("kEnvironmentNames[environmentDropdownIndex_]", renderer)
-        self.assertIn("Mat4 camera=makeView(renderedPose,moveX_,moveZ_,virtualYaw_)", renderer)
+        self.assertIn("Mat4 physicalView=makeView(view.pose,0.0f,0.0f,0.0f)", renderer)
+        self.assertIn("const float pivotX=headCenterPose.position.x", renderer)
+        self.assertIn("const Mat4 inverseVirtualWorld=mul(inverseVirtualRotation,inverseVirtualTranslation)", renderer)
+        self.assertIn("Mat4 camera=mul(physicalView,inverseVirtualWorld)", renderer)
         # Virtual yaw is rendered by the room view matrix; OpenXR receives the raw tracked pose
         # so late compositor reprojection never treats a virtual turn as physical head motion.
         self.assertIn("projectionViews_[eye].pose = views_[eye].pose", source)
@@ -304,8 +307,9 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK", host)
         self.assertIn("MOUSEEVENTF_LEFTDOWN", host)
         self.assertIn("MOUSEEVENTF_LEFTUP", host)
-        # The seat ease alters only room offsets; the established camera path stays stable.
-        self.assertIn("Mat4 camera=makeView(renderedPose,moveX_,moveZ_,virtualYaw_)", renderer)
+        # Seating remains a room-space offset inside the shared stereo world transform.
+        self.assertIn("const Mat4 inverseVirtualTranslation=", renderer)
+        self.assertIn("Mat4 camera=mul(physicalView,inverseVirtualWorld)", renderer)
 
     def test_room_light_switch_and_environment_led_controls_are_real(self):
         renderer = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
