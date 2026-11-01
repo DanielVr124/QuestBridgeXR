@@ -107,14 +107,14 @@ emulator-5554 device product:sdk_gphone64_x86_64 transport_id:9
     @mock.patch("usb_connection.subprocess.run")
     def test_usb_quest_reports_wired_tcp_handshake(self, run):
         outputs = [
-            (0, "List of devices attached\\n1WMHH123 device product:eureka model:Quest_3 transport_id:7\\n"),
-            (0, "Quest 3\\n"),
-            (0, "14\\n"),
-            (0, "package:/data/app/com.questbridge.xr/base.apk\\n"),
-            (0, "12345\\n"),
-            (0, "Wired USB stream handshake accepted (protocol=1 capabilities=0x0000000f)\\n"
-                "Received video config 1920x1080 @72 codec=1 layout=0\\n"
-                "Video decoder configured: video/avc 1920x1080\\n"),
+            (0, "List of devices attached\n1WMHH123 device product:eureka model:Quest_3 transport_id:7\n"),
+            (0, "Quest 3\n"),
+            (0, "14\n"),
+            (0, "package:/data/app/com.questbridge.xr/base.apk\n"),
+            (0, "12345\n"),
+            (0, "Wired USB stream handshake accepted (protocol=1 capabilities=0x0000000f)\n"
+                "Received video config 1920x1080 @72 codec=1 layout=0\n"
+                "Video decoder configured: video/avc 1920x1080\n"),
         ]
         run.side_effect = [
             mock.Mock(returncode=code, stdout=stdout, stderr="")
