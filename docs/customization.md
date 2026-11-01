@@ -8,7 +8,7 @@ The Quest client keeps a 5×5 neighborhood around the player: the inner 3×3 blo
 
 Movement uses the existing left-stick locomotion and right-stick snap/smooth turning settings. Building footprints block movement; streets, sidewalks, pedestrian cut-throughs, and the central plaza remain walkable. The world uses a warm late-afternoon directional light, sky fill, procedural concrete/asphalt/brick/glass/foliage surface detail, lit windows and practical fixtures, and distance fog. Expensive real-time shadow maps, screen-space ambient occlusion, and global illumination are intentionally avoided on Quest; the renderer uses inexpensive static shading and contact/ambient approximations instead.
 
-To leave the city, use the existing right-stick-click environment cycle to return to another room environment, or select a different room environment in QuestBridge Studio before launching the client. The bedroom scene and its camera transform are rendered through their original path.
+To leave the city, press the three-line menu button to return directly to the main gaming room, or use the right-stick-click environment cycle to move to another scene. The bedroom scene and its camera transform are rendered through their original path. The bedroom scene and its camera transform are rendered through their original path.
 
 
 QuestBridge Studio is a Python/Tkinter desktop control panel. Launch `QuestBridgeStudio.bat` on Windows or run `py -3 tools/questbridge_studio.py`. Hover every control for a longer tooltip describing its behavior, supported range, performance trade-offs, and limits. The tabs are scrollable.
