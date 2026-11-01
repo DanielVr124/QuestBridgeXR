@@ -14,6 +14,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include <array>
@@ -549,7 +550,13 @@ private:
         for (int reads = 0; reads < 64; ++reads) {
             const ssize_t received = recv(tcpSocket_, incoming.data(), incoming.size(), MSG_DONTWAIT);
             if (received > 0) {
-                tcpRx_.insert(tcpRx_.end(), incoming.begin(), incoming.begin() + received);
+                constexpr size_t kMaxTcpReceiveBacklog = 4u * 1024u * 1024u;
+                if (tcpRx_.size() + static_cast<size_t>(received) > kMaxTcpReceiveBacklog) {
+                    disconnectUsb("TCP receive backlog exceeded 4 MiB");
+                    return;
+                }
+                tcpRx_.insert(tcpRx_.end(), incoming.begin(),
+                              incoming.begin() + static_cast<std::ptrdiff_t>(received));
                 continue;
             }
             if (received == 0) {
