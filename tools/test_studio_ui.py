@@ -64,11 +64,13 @@ class StudioUiTests(unittest.TestCase):
         self.assertIn("Test USB Connection", buttons)
         self.assertIn("Locate adb.exe…", buttons)
         self.assertIn("Send Settings to Quest", buttons)
+        self.assertIn("Start Wired USB Streaming", buttons)
 
-    def test_usb_explanation_does_not_claim_usb_video_transport(self):
+    def test_usb_explanation_describes_bidirectional_wired_video_and_tracking(self):
         note = self.app.usb_transport_note.cget("text").casefold()
-        self.assertIn("not a wired video-stream test", note)
-        self.assertIn("udp", note)
+        self.assertIn("bidirectional tcp stream", note)
+        self.assertIn("video returns to the quest over the usb cable", note)
+        self.assertIn("does not use wi-fi", note)
 
     def test_virtual_room_exposes_new_scenery_choices(self):
         combo_values = []
