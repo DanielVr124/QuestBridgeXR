@@ -2172,7 +2172,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     if(settings_.environment=="explorable_city") {
         if(citySpawnPending_) {
             moveX_=42.0f-headPose.position.x;
-            moveZ_=42.0f-headPose.position.z;
+            moveZ_=26.0f-headPose.position.z;
             citySpawnPending_=false;
         }
         const float forwardX=-std::sin(yaw), forwardZ=-std::cos(yaw);
