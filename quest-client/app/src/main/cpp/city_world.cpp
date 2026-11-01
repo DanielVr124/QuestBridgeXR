@@ -380,9 +380,8 @@ void CityWorld::addCylinderZ(std::vector<Vertex>& out, float x, float y, float z
         const float frontB[3]={x+std::cos(a1)*radius,y+std::sin(a1)*radius,z1};
         const float backA[3]={x+std::cos(a0)*radius,y+std::sin(a0)*radius,z0};
         const float backB[3]={x+std::cos(a1)*radius,y+std::sin(a1)*radius,z0};
-        addQuad(out,centerFront,frontB,frontA,frontA,color,material);
-        addQuad(out,centerBack,backA,backB,backB,color,material);
-        (void)centerFront; (void)centerBack;
+        addQuad(out,centerFront,frontA,frontB,frontB,color,material);
+        addQuad(out,centerBack,backB,backA,backA,color,material);
     }
 }
 
@@ -651,8 +650,11 @@ void CityWorld::buildChunk(int chunkX, int chunkZ, int lod) {
             addBox(vertices,cx,.13f,cz,6.7f,.18f,2.32f,dark,4);
             addBox(vertices,cx,.88f,cz,3.6f,.78f,1.82f,
                    (hash(seed+0x41u)&1u)?dark:white,2);
-            for (int wheel : {-1,1}) for (int axle : {-1,1})
-                addBox(vertices,cx+axle*2.05f,.36f,cz+wheel*1.0f,.72f,.72f,.25f,rubber,4);
+            const float rimColor[3]={0.42f,0.45f,0.46f};
+            for (int wheel : {-1,1}) for (int axle : {-1,1}) {
+                addCylinderZ(vertices,cx+axle*2.05f,.36f,cz+wheel*1.0f,.38f,.26f,rubber,10,10);
+                addCylinderZ(vertices,cx+axle*2.05f,.36f,cz+wheel*1.0f,.19f,.275f,rimColor,4,10);
+            }
             const float lamp[3]={0.96f,0.84f,0.62f};
             addBox(vertices,cx+3.18f,.76f,cz-.70f,.06f,.23f,.30f,lamp,7);
             addBox(vertices,cx+3.18f,.76f,cz+.70f,.06f,.23f,.30f,lamp,7);
