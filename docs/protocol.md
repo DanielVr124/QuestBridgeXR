@@ -12,6 +12,7 @@ All multibyte fields are little-endian. Windows x64 and Quest ARM64 are little-e
 | FRAME_CHUNK | 6 | `FrameChunkPrefix` + encoded bytes | One chunk from an encoded video access unit |
 | GOODBYE | 7 | empty | Graceful disconnect |
 | VIDEO_CONFIG | 8 | `VideoConfigPayload` | Encoded dimensions, rate, codec and mono/SBS layout |
+| MOUSE | 9 | `MousePayload` | Authenticated normalized Windows pointer position and left-button state |
 
 ## HELLO capability bits
 
@@ -41,6 +42,10 @@ The current host echoes the capability mask; production negotiation must interse
 - The Windows host can optionally forward accepted TRACKING and CONTROLLER datagrams to `127.0.0.1:<telemetry_port>` (default 9945; set to 0 to disable). Only packets from the most recent HELLO peer endpoint are forwarded. This localhost feed is consumed by the experimental Windows OpenXR runtime to provide HMD/controller poses and input actions.
 - Tracking flags: bit 0 position valid, bit 1 orientation valid.
 - Controller tracking flags use the same bit assignment.
+
+## Mouse pointer
+
+The Quest sends normalized virtual-desktop coordinates in a 16-byte MousePayload. The right-controller ray intersects the desk top; holding its trigger while over the white mouse moves the model only within the desk bounds and sends left-button-down plus pointer updates. Releasing the trigger sends left-button-up. The Windows host accepts MOUSE only from the endpoint that most recently completed HELLO and uses ordinary SendInput absolute pointer events with MOUSEEVENTF_VIRTUALDESK; it does not inject into or inspect the target application. The host releases a held button on client disconnect, peer replacement, or a stale pointer timeout.
 
 ## Video config
 
