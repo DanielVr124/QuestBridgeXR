@@ -403,6 +403,10 @@ public:
         if (connected_) sendPacket(qbx::PacketType::Controller, &payload, sizeof(payload));
     }
 
+    void sendMouse(const qbx::MousePayload& payload) {
+        if (connected_) sendPacket(qbx::PacketType::Mouse, &payload, sizeof(payload));
+    }
+
 private:
     bool sendPacket(qbx::PacketType type, const void* payload, uint32_t size) {
         if (socket_ < 0 || size + sizeof(qbx::PacketHeader) > qbx::kMaxUdpPayload) return false;
@@ -1003,6 +1007,11 @@ private:
         const bool roomTriggerPressed=roomPointerValid &&
             floatAction(hands_[1].trigger,hands_[1].handPath)>.72f;
         room_.handleRoomInteraction(roomPointerPose,roomTriggerPressed);
+        qbx::MousePayload mouse{};
+        if (room_.consumeMousePayload(mouse)) {
+            mouse.timestampNs = nowNs();
+            network_.sendMouse(mouse);
+        }
 
         if (!config_.controllersEnabled) return;
         for (int handIndex = 0; handIndex < 2; ++handIndex) {
