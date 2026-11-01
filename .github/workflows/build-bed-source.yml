@@ -5,6 +5,8 @@ on:
     workflows: ["QuestBridge XR Build"]
     types: [completed]
     branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,7 +18,7 @@ concurrency:
 
 jobs:
   build-bed-source:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     name: Blender 4.5.15 bed project + Cycles renders
     runs-on: ubuntu-22.04
     steps:
