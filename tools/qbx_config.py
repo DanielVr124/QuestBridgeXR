@@ -502,10 +502,6 @@ def load_config(path: str | pathlib.Path | None = None) -> dict[str, Any]:
 
 def save_config(cfg: dict[str, Any], path: str | pathlib.Path | None = None) -> pathlib.Path:
     validate_config(cfg)
-    if transport_mode not in ("udp", "usb"):
-        raise ValueError("transport_mode must be udp or usb")
-    if not 1 <= int(usb_port) <= 65535:
-        raise ValueError("usb_port must be in 1..65535")
     target = pathlib.Path(path) if path else DEFAULT_CONFIG_PATH
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
