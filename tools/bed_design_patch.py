@@ -54,35 +54,125 @@ curve_tube(
     .0015,'pillow',sides=6
 )
 
-# ----------------------- RESTORED BED + HEADBOARD CORRECTION -----------------------
-# Keep the original bed platform and a broad, continuous upholstered headboard.
-# Original mattress, fitted sheet, duvet and throw untouched.
-boxsoft(
-    'Headboard_back_shell',(0,1.185,-1.575),
-    (1.29,.925,.115),'charcoal2',.16
+# ----------------------- BRAMBLEY-STYLE HEADBOARD -----------------------
+# Keep the existing bed platform, rails, legs, foot end, mattress and bedding.
+# The headboard is rebuilt as the Brambley reference: silver crystal-tufted
+# faux-leather insert, beveled mirror frame, embossed outer bands and hidden LED channel.
+superellipsoid(
+    'Headboard_structural_backing',(0,1.185,-1.575),
+    (1.29,.925,.115),'charcoal2',.38,112,72
 )
 
-# One single filled cushion replaces the five tall pieces that created a ribbed look.
-# It stays rectangular, with only a restrained soft radius on the edges.
-boxsoft(
-    'Headboard_single_soft_panel',(0,1.185,-1.435),
-    (1.12,.675,.112),'charcoal',.18
+# Silver alligator-embossed outer bands. The small raised scales are a restrained
+# surface treatment, not separate vertical cushions or ribs.
+for side in (-1,1):
+    superellipsoid(
+        f'Headboard_alligator_side_band_{side}',
+        (side*1.205,1.185,-1.445),
+        (.078,.79,.045),'sheet',.34,88,48,taper=.04
+    )
+for name,y in (('top',2.005),('bottom',.365)):
+    superellipsoid(
+        f'Headboard_alligator_{name}_band',
+        (0,y,-1.445),
+        (1.18,.078,.045),'sheet',.34,96,40,taper=.04
+    )
+
+# Embossed faux-alligator scales follow the outer frame bands.
+for side in (-1,1):
+    for index,y in enumerate((.59,.84,1.09,1.34,1.59,1.84)):
+        superellipsoid(
+            f'Headboard_alligator_scale_side_{side}_{index}',
+            (side*1.205,y,-1.392),
+            (.042,.064,.010),'pillow',.30,24,16
+        )
+for edge,y in (('top',2.005),('bottom',.365)):
+    for index,x in enumerate(np.linspace(-.93,.93,9)):
+        superellipsoid(
+            f'Headboard_alligator_scale_{edge}_{index}',
+            (float(x),y,-1.392),
+            (.061,.039,.010),'pillow',.30,24,16
+        )
+
+# Beveled silver frame with a dark shadow line so the inner mirror edge reads
+# as a separate polished bevel instead of a flat painted border.
+for name,y in (('top',1.925),('bottom',.445)):
+    superellipsoid(
+        f'Headboard_mirror_bevel_{name}',
+        (0,y,-1.382),
+        (1.165,.038,.025),'pillow',.28,96,32
+    )
+for side in (-1,1):
+    superellipsoid(
+        f'Headboard_mirror_bevel_side_{side}',
+        (side*1.165,1.185,-1.382),
+        (.038,.74,.025),'pillow',.28,72,32
+    )
+# Fine inner dark reveal follows the silver bevel around the upholstered insert.
+curve_tube(
+    'Headboard_inner_shadow_reveal',
+    [(-1.105,.525,-1.335),(-1.105,1.845,-1.335),
+     (1.105,1.845,-1.335),(1.105,.525,-1.335)],
+    .008,'charcoal2',sides=8
 )
 
-# A slim upholstered perimeter lip shades the recessed RGB channel.
-# The compositor reveals the emitter only when the headset points nearly straight on.
+# LED channel is recessed behind the mirror frame at the existing compositor
+# perimeter coordinates. The diffuser itself remains hidden from a reclined view.
+for name,y in (('top',1.955),('bottom',.405)):
+    boxsoft(
+        f'Headboard_recessed_LED_channel_{name}',
+        (0,y,-1.485),(2.47,.025,.032),'charcoal2',.22
+    )
 for side in (-1,1):
     boxsoft(
-        f'Headboard_outer_lip_side_{side}',
-        (side*1.355,1.185,-1.205),
-        (.018,.835,.034),'charcoal2',.18
+        f'Headboard_recessed_LED_channel_side_{side}',
+        (side*1.235,1.185,-1.485),(.025,1.55,.032),'charcoal2',.22
     )
-for name,y in (('top',2.115),('bottom',.255)):
-    boxsoft(
-        f'Headboard_outer_lip_edge_{name}',
-        (0,y,-1.205),
-        (1.355,.018,.034),'charcoal2',.18
-    )
+
+# One full-width softly crowned silver faux-leather insert.
+superellipsoid(
+    'Headboard_crystal_tufted_silver_insert',
+    (0,1.185,-1.415),
+    (1.055,.685,.128),'sheet',.48,144,88,taper=.025
+)
+
+# Crystal-button tufting: four even rows of five clear, faceted-looking studs.
+# Each stud has a small shadowed setting under a bright raised crystal.
+tuft_x = (-.82,-.41,0,.41,.82)
+tuft_y = (1.705,1.355,1.015,.665)
+for row,y in enumerate(tuft_y):
+    for col,x in enumerate(tuft_x):
+        superellipsoid(
+            f'Headboard_crystal_button_setting_{row}_{col}',
+            (x,y,-1.286),(.043,.043,.014),'charcoal2',.38,24,16
+        )
+        superellipsoid(
+            f'Headboard_crystal_tuft_button_{row}_{col}',
+            (x,y,-1.266),(.029,.029,.018),'pillow',.28,32,20
+        )
+
+# Soft diagonal seams create the diamond-tufted upholstery between the buttons.
+for row in range(3):
+    for col in range(5):
+        x=tuft_x[col]
+        if col < 4:
+            nx=tuft_x[col+1]
+            curve_tube(
+                f'Headboard_tuft_seam_down_right_{row}_{col}',
+                [(x,tuft_y[row],-1.291),
+                 ((x+nx)*.5, (tuft_y[row]+tuft_y[row+1])*.5,-1.296),
+                 (nx,tuft_y[row+1],-1.291)],
+                .0020,'pillow',sides=6
+            )
+        if col > 0:
+            nx=tuft_x[col-1]
+            curve_tube(
+                f'Headboard_tuft_seam_down_left_{row}_{col}',
+                [(x,tuft_y[row],-1.291),
+                 ((x+nx)*.5, (tuft_y[row]+tuft_y[row+1])*.5,-1.296),
+                 (nx,tuft_y[row+1],-1.291)],
+                .0020,'pillow',sides=6
+            )
 
 # Original mounting brackets are retained exactly.
 for side in (-1,1):
@@ -118,7 +208,7 @@ def patch_bed_geometry(source: str) -> str:
     )
 
     old_design = "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',"
-    new_design = "'design':'Original bed platform, frame, mattress and bedding retained; one broad continuous charcoal upholstered headboard cushion with gently eased rectangular edges and a slim recessed RGB perimeter lip',"
+    new_design = "'design':'Original bed platform and bedding retained; Brambley-style silver faux-leather crystal-button diamond-tufted headboard insert, beveled mirror frame, subtly embossed silver outer bands and recessed perimeter RGB backlight',"
     if source.count(old_design) != 1:
         raise RuntimeError("Bed metadata design marker changed; update the design patch.")
     source = source.replace(old_design, new_design, 1)
