@@ -37,18 +37,25 @@ class BedDesignPatchTests(unittest.TestCase):
 
         self.assertIn("(1.075,.685,.135),'headboard_leather'", self.patched)
         self.assertIn("materials['headboard_chrome']", self.patched)
-        self.assertIn("materials['headboard_crystal']", self.patched)
+        self.assertIn("materials['headboard_crystal']",
+        "materials['headboard_seam']",
+        "materials['headboard_led_diffuser']",
+         self.patched)
         self.assertIn("materials['headboard_emboss_horizontal']", self.patched)
         self.assertIn("materials['headboard_emboss_vertical']", self.patched)
         self.assertIn("headboard_alligator_horizontal", self.patched)
         self.assertIn("tuft_rows = (", self.patched)
         self.assertIn("(-.615,-.205,.205,.615)", self.patched)
+        self.assertIn("tuft_y = (1.70,1.43,1.16,.89,.62)", self.patched)
+        self.assertIn("def _add_brambley_quilt_diamond", self.patched)
+        self.assertIn("Headboard_quilt_diamond_", self.patched)
+        self.assertIn("puff=.085,rings=18,segments=72", self.patched)
+        self.assertIn("z_edge + puff*((1.0-radius*radius)**2.0)", self.patched)
         self.assertIn("f'Headboard_tuft_seam_{row}_{col}_{next_col}'", self.patched)
-        self.assertIn("tuft_y = (1.705,1.355,1.015,.665)", self.patched)
         self.assertIn("<= .206", self.patched)
-        self.assertIn(".0034,'charcoal2',sides=8", self.patched)
-        self.assertIn("tuft_y[row],-1.270", self.patched)
-        self.assertIn("*.5,-1.278", self.patched)
+        self.assertIn(".0018,'headboard_seam',sides=8", self.patched)
+        self.assertIn("Headboard_crystal_tuft_button_", self.patched)
+        self.assertIn("headboard_led_diffuser", self.patched)
         self.assertIn("recessed perimeter RGB backlight", self.patched)
         self.assertEqual(self.patched.count("Headboard_crystal_tufted_silver_insert"), 1)
 
@@ -72,7 +79,7 @@ class BedDesignPatchTests(unittest.TestCase):
             "    merged.vertex_normals  # include normals in optimized runtime batches\n", "", 1
         )
         restored = restored.replace(
-            "'design':'Original bed platform and bedding retained; Brambley-style pearl-silver faux-leather diamond-tufted insert with staggered crystal buttons, polished mirror chrome bevels, embossed silver alligator panels and recessed perimeter RGB backlight',",
+            "'design':'Original bed platform and bedding retained; Brambley-style pearl-silver faux-leather with ten raised diamond-quilt cells, 23 crystal tuft points, mirror-chrome bevels, embossed silver alligator bands and recessed perimeter RGB backlight',",
             "'design':'Charcoal channel-upholstered headboard, padded upholstered rails, silver cotton bedding, graphite duvet, midnight ribbed throw',",
             1
         )
