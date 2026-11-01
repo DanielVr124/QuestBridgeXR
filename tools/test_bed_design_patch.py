@@ -72,8 +72,8 @@ class BedDesignPatchTests(unittest.TestCase):
             "Sleep_pillow_top_welt_",
             "Sleep_pillow_lower_gusset_seam_",
             "Sleep_pillow_corner_fold_",
-            "PILLOW_CROWN_HEIGHT = .145",
-            "PILLOW_CORNER_EXPONENT = 3.5",
+            "PILLOW_CROWN_HEIGHT = .175",
+            "PILLOW_CORNER_EXPONENT = 3.1",
             "def pillow_crown_height",
         ):
             with self.subTest(token=token):
