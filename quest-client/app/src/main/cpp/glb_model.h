@@ -13,7 +13,8 @@ public:
               GLint locTextured, GLint locTexture, GLint locMaterial,
               GLint locRounded, GLint locUvScale,
               const std::array<float,4>* emissiveOverrideColor = nullptr,
-              const char* emissiveNodeMarker = nullptr) const;
+              const char* emissiveNodeMarker = nullptr,
+              const std::array<float,4>* albedoTint = nullptr) const;
     void release();
     bool loaded() const { return !primitives_.empty(); }
 private:

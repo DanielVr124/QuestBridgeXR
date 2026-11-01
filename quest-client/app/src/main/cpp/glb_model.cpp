@@ -180,11 +180,15 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
 
 void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint locModel,GLint locColor,
                     GLint locTextured,GLint locTexture,GLint locMaterial,GLint locRounded,GLint locUvScale,
-                    const std::array<float,4>* emissiveOverrideColor,const char* emissiveNodeMarker) const {
+                    const std::array<float,4>* emissiveOverrideColor,const char* emissiveNodeMarker,
+                    const std::array<float,4>* albedoTint) const {
     for(const Primitive& p:primitives_) {
         const bool emissiveOverride=emissiveOverrideColor&&emissiveNodeMarker&&
             p.nodeName.find(emissiveNodeMarker)!=std::string::npos;
-        const auto& color=emissiveOverride?*emissiveOverrideColor:p.color;
+        std::array<float,4> color=emissiveOverride?*emissiveOverrideColor:p.color;
+        if(albedoTint&&!emissiveOverride) {
+            for(size_t channel=0;channel<4;++channel) color[channel]*=(*albedoTint)[channel];
+        }
         float model[16],mvp[16]; multiply(placement,p.nodeMatrix.data(),model); multiply(pv,model,mvp);
         glUniformMatrix4fv(locMvp,1,GL_FALSE,mvp); glUniformMatrix4fv(locModel,1,GL_FALSE,model);
         glUniform4fv(locColor,1,color.data());
