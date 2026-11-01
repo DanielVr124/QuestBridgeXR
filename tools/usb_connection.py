@@ -77,7 +77,7 @@ def parse_adb_devices(output: str) -> list[AdbDevice]:
         details = " ".join(fields[2:])
         if serial.startswith("emulator-"):
             transport = "emulator"
-        elif ":" in serial or "product:" in details and "model:" not in details:
+        elif ":" in serial:
             transport = "network"
         else:
             # ADB's standard USB serials do not contain a host:port separator.
