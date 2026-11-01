@@ -134,6 +134,7 @@ def label(name, body, location, size, mat, align="CENTER"):
     # Printed legends face the controller's front (-Z).
     obj.rotation_euler = (math.pi, 0.0, 0.0)
     obj.data.materials.append(mat)
+    bpy.ops.object.select_all(action="DESELECT")
     bpy.context.view_layer.objects.active = obj
     obj.select_set(True)
     bpy.ops.object.convert(target="MESH")
