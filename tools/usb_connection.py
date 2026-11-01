@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Read-only Quest USB/ADB detection for QuestBridge Studio.
+"""Quest USB/ADB detection and live transport diagnostics for QuestBridge Studio.
 
-USB ADB is used for setup, diagnostics, APK installation and settings transfer.
-It does not turn the current UDP video/tracking transport into a wired stream.
+ADB manages wired sessions; the Quest app and Windows sender carry stream packets
+through a bidirectional TCP connection created by ADB reverse.
 """
 from __future__ import annotations
 
@@ -252,7 +252,8 @@ def probe_usb_connection(
             )
             if log_result.returncode == 0:
                 quest_log = log_result.stdout.casefold()
-                host_seen = "windows host accepted connection" in quest_log
+                host_seen = ("windows host accepted connection" in quest_log
+                             or "wired usb stream handshake accepted" in quest_log)
                 video_seen = (
                     "received video config" in quest_log
                     or "video decoder configured:" in quest_log
