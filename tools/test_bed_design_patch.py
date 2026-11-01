@@ -81,7 +81,7 @@ class BedDesignPatchTests(unittest.TestCase):
         self.assertNotIn("superellipsoid(f'Sleep_pillow_", self.patched)
         self.assertIn("np.array([side*.49, 1.095, -1.115]", self.patched)
         self.assertIn("f'Slate_accent_cushion_{side}'", self.patched)
-        self.assertIn("'Lumbar_cushion'", self.patched)
+        self.assertNotIn("'Lumbar_cushion'", self.patched)
 
     def test_pillow_pair_does_not_overlap_and_accents_do_not_form_a_bolster(self):
         self.assertIn("PILLOW_HALF_WIDTH = .46", self.patched)
