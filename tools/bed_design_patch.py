@@ -15,8 +15,8 @@ NEW_GEOMETRY = """
 # Preserve the two main pillow centres and the original accent/lumbar layout.
 # Replace only the primitive sleep-pillow ellipsoids with tailored, softly
 # squared cotton shells: gently puffed crowns, rounded corners, and real gussets.
-PILLOW_HALF_WIDTH = .535
-PILLOW_HALF_DEPTH = .335
+PILLOW_HALF_WIDTH = .46
+PILLOW_HALF_DEPTH = .31
 PILLOW_EDGE_TOP = .025
 PILLOW_EDGE_BOTTOM = -.105
 PILLOW_CROWN_HEIGHT = .145
@@ -188,29 +188,20 @@ for side in (-1, 1):
                 points, .0015, 'pillow', sides=6
             )
 
-# Keep the smaller graphite accent cushions and lumbar cushion at their
-# established positions, but ease their profiles and retain fine sewn seams.
+# Two compact graphite accents sit just forward of the sleeping pillows.
+# Their footprints are deliberately separated, so they read as two cushions
+# instead of intersecting with each other or merging into a central bolster.
 for side in (-1, 1):
-    x = side * .285
+    x = side * .235
     superellipsoid(
-        f'Slate_accent_cushion_{side}', (x, 1.215, -.795),
-        (.355, .145, .235), 'pillow', .56, 80, 52, taper=.22
+        f'Slate_accent_cushion_{side}', (x, 1.14, -.66),
+        (.205, .105, .145), 'pillow', .58, 80, 52, taper=.18
     )
     curve_tube(
         f'Slate_accent_piping_{side}',
-        [(x-.285, 1.245, -.985), (x, 1.278, -1.015), (x+.285, 1.245, -.985)],
-        .0017, 'throw', sides=6
+        [(x-.16, 1.17, -.79), (x, 1.205, -.805), (x+.16, 1.17, -.79)],
+        .0015, 'throw', sides=6
     )
-
-superellipsoid(
-    'Lumbar_cushion', (0, 1.245, -.57),
-    (.445, .125, .145), 'throw', .56, 80, 48, taper=.20
-)
-curve_tube(
-    'Lumbar_cushion_seam',
-    [(-.36, 1.292, -.638), (0, 1.315, -.642), (.36, 1.292, -.638)],
-    .0015, 'pillow', sides=6
-)
 
 # ----------------------- BRAMBLEY-STYLE HEADBOARD -----------------------
 # Keep the existing bed platform, rails, legs, foot end, mattress and bedding.

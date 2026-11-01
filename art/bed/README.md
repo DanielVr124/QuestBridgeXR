@@ -13,11 +13,11 @@ The headboard is rebuilt around the visual structure of the Brambley Bed w/ LED 
 
 ## Pillow refinement
 
-The two main sleep pillows are built as editable named mesh parts rather than primitive ellipsoids. Their softly squared rounded-rectangle footprint keeps a clear pillow silhouette, while a restrained domed crown, continuous side gusset and closed underside give them real filling depth. A narrow welt and low-amplitude corner creases add fabric detail without excessive quilting or balloon-like puffiness. Their original centres, dimensions, propped angle and layering are preserved.
+The two main sleep pillows are built as editable named mesh parts rather than primitive ellipsoids. Their softly squared rounded-rectangle footprint keeps a clear pillow silhouette, while a restrained domed crown, continuous side gusset and closed underside give them real filling depth. A narrow welt and low-amplitude corner creases add fabric detail without excessive quilting or balloon-like puffiness. The pair has a visible centre gap; two smaller graphite accents sit separately in front, with the intersecting lumbar bolster removed.
 
 ## What stays unchanged
 - Original bed platform, rails, legs, foot end, mattress, fitted sheet, duvet and throw.
-- Existing pillow centres and overall layout; the two main sleep pillows use separate softly crowned top shells, full-depth box gussets, undersides, narrow welt seams and restrained corner creases. The smaller accent and lumbar cushions retain their positions and receive gently eased profiles.
+- Original bed position, platform, bedding, headboard, and room layout. The redesigned pillow set has two separated soft sleep pillows and a pair of smaller graphite accents; it removes the overlapping centre bolster.
 - Bed position, scale, renderer anchor and collision footprint.
 - Bedside cabinets, lights, TV, desk, monitor, windows and all other room geometry.
 - Camera transforms, head tracking, turning, locomotion, controller bindings and room menus.
