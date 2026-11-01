@@ -16,6 +16,8 @@ import struct
 import subprocess
 import sys
 import time
+import select
+import threading
 from typing import Iterator, Optional
 
 try:
@@ -104,6 +106,67 @@ def make_packet(packet_type: int, sequence: int, payload: bytes) -> bytes:
 def send_packet(sock: socket.socket, target: tuple[str, int], packet_type: int,
                 sequence: int, payload: bytes) -> int:
     return sock.sendto(make_packet(packet_type, sequence, payload), target)
+
+
+TCP_LENGTH = struct.Struct('<I')
+
+
+def frame_tcp_packet(packet: bytes) -> bytes:
+    """Prefix one existing QBX packet with its little-endian TCP stream length."""
+    if len(packet) < HEADER.size or len(packet) > MAX_DATAGRAM:
+        raise ValueError(f"QBX TCP packet length outside {HEADER.size}..{MAX_DATAGRAM}")
+    return TCP_LENGTH.pack(len(packet)) + packet
+
+
+def pop_tcp_packets(buffer: bytearray) -> list[bytes]:
+    """Extract complete length-prefixed QBX packets while retaining partial data."""
+    packets: list[bytes] = []
+    while len(buffer) >= TCP_LENGTH.size:
+        (packet_bytes,) = TCP_LENGTH.unpack_from(buffer)
+        if packet_bytes < HEADER.size or packet_bytes > MAX_DATAGRAM:
+            raise ValueError(f"invalid QBX TCP frame length: {packet_bytes}")
+        framed_bytes = TCP_LENGTH.size + packet_bytes
+        if len(buffer) < framed_bytes:
+            break
+        packets.append(bytes(buffer[TCP_LENGTH.size:framed_bytes]))
+        del buffer[:framed_bytes]
+    return packets
+
+
+def send_tcp_packet(client: socket.socket, packet: bytes, lock: threading.Lock) -> None:
+    framed = frame_tcp_packet(packet)
+    with lock:
+        client.sendall(framed)
+
+
+def usb_control_relay(
+    client: socket.socket,
+    relay_socket: socket.socket,
+    host_target: tuple[str, int],
+    send_lock: threading.Lock,
+    stop_event: threading.Event,
+) -> None:
+    """Relay Quest control packets to the existing UDP host and its replies back over USB."""
+    pending = bytearray()
+    try:
+        while not stop_event.is_set():
+            readable, _, _ = select.select([client, relay_socket], [], [], 0.05)
+            if client in readable:
+                chunk = client.recv(65536)
+                if not chunk:
+                    break
+                pending.extend(chunk)
+                for packet in pop_tcp_packets(pending):
+                    relay_socket.sendto(packet, host_target)
+            if relay_socket in readable:
+                response, _peer = relay_socket.recvfrom(65507)
+                if response:
+                    send_tcp_packet(client, response, send_lock)
+    except (OSError, ValueError) as exc:
+        if not stop_event.is_set():
+            print(f"USB control relay stopped: {exc}", file=sys.stderr, flush=True)
+    finally:
+        stop_event.set()
 
 
 def parse_bitrate(value: str) -> int:
@@ -207,6 +270,10 @@ def main() -> int:
     parser.add_argument('--config', default=str(DEFAULT_CONFIG_PATH),
                         help='JSON settings file (defaults to config/questbridge.json)')
     parser.add_argument('--quest-ip', help='Quest headset Wi-Fi IPv4 address (overrides config)')
+    parser.add_argument('--transport', choices=('udp', 'usb'), default='udp', help='UDP over LAN or framed TCP over an ADB reverse USB tunnel')
+    parser.add_argument('--usb-bind', default='127.0.0.1', help='USB TCP listener address; keep this on loopback')
+    parser.add_argument('--usb-port', type=int, default=9946, help='ADB reverse TCP port used by the Quest client')
+    parser.add_argument('--host-port', type=int, help='local UDP port used to relay Quest tracking into QuestBridgeHost')
     parser.add_argument('--source', choices=('test', 'desktop', 'mirror'), help='test pattern, Windows desktop, or QuestBridge compositor stereo mirror (overrides config)')
     parser.add_argument('--port', type=int, help='Quest UDP receive port (overrides config)')
     parser.add_argument('--width', type=int, help='encoded frame width (overrides config)')
@@ -245,6 +312,7 @@ def main() -> int:
     stream = cfg['stream']
     args.quest_ip = args.quest_ip or net['quest_ip']
     args.port = args.port or net['quest_local_port']
+    args.host_port = args.host_port or net['host_port']
     args.source = args.source or stream['source']
     args.width = args.width or stream['width']
     args.height = args.height or stream['height']
@@ -292,29 +360,71 @@ def main() -> int:
     if not 64 <= args.udp_send_buffer_kib <= 16384:
         parser.error('--udp-send-buffer-kib must be in 64..16384')
 
-    try:
-        ipaddress.IPv4Address(args.quest_ip)
-    except ipaddress.AddressValueError:
-        parser.error('--quest-ip must be an IPv4 address')
+    if args.transport == 'udp':
+        try:
+            ipaddress.IPv4Address(args.quest_ip)
+        except ipaddress.AddressValueError:
+            parser.error('--quest-ip must be an IPv4 address')
+        if args.port < 1 or args.port > 65535:
+            parser.error('--port must be in 1..65535')
+    else:
+        if args.usb_bind != '127.0.0.1':
+            parser.error('--usb-bind must remain 127.0.0.1 so the USB listener is not exposed to the LAN')
+        if not 1 <= args.usb_port <= 65535 or not 1 <= args.host_port <= 65535:
+            parser.error('--usb-port and --host-port must be in 1..65535')
     target = (args.quest_ip, args.port)
     layout = LAYOUT_SBS if args.layout == 'sbs' else LAYOUT_MONO
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, args.udp_send_buffer_kib * 1024)
+    usb_listener = None
+    usb_client = None
+    usb_relay_thread = None
+    usb_stop_event = threading.Event()
+    usb_send_lock = threading.Lock()
     sequence = 1
     frame_id = 1
+
+    if args.transport == 'usb':
+        usb_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        usb_listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        usb_listener.bind((args.usb_bind, args.usb_port))
+        usb_listener.listen(1)
+        print(f'USB stream server listening on {args.usb_bind}:{args.usb_port}; waiting for Quest over ADB reverse…', flush=True)
+        usb_client, usb_peer = usb_listener.accept()
+        usb_client.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        sock.bind(('127.0.0.1', 0))
+        sock.setblocking(False)
+        usb_relay_thread = threading.Thread(
+            target=usb_control_relay,
+            args=(usb_client, sock, ('127.0.0.1', args.host_port), usb_send_lock, usb_stop_event),
+            name='QBXUsbControlRelay', daemon=True,
+        )
+        usb_relay_thread.start()
+        print(f'Quest connected through USB ({usb_peer[0]}:{usb_peer[1]}); relaying tracking to UDP localhost:{args.host_port}', flush=True)
+
+    def emit(packet_type: int, payload: bytes) -> None:
+        nonlocal sequence
+        packet = make_packet(packet_type, sequence, payload)
+        sequence = (sequence + 1) & 0xFFFFFFFF
+        if args.transport == 'usb':
+            if usb_client is None:
+                raise OSError('USB client is not connected')
+            send_tcp_packet(usb_client, packet, usb_send_lock)
+        else:
+            sock.sendto(packet, target)
     try:
         bitrate_bps = parse_bitrate(args.bitrate)
     except ValueError as exc:
         parser.error(str(exc))
     config_payload = VIDEO_CONFIG.pack(args.width, args.height, args.fps, bitrate_bps, CODEC_H264, layout)
     for _ in range(3):
-        send_packet(sock, target, TYPE_VIDEO_CONFIG, sequence, config_payload)
-        sequence += 1
+        emit(TYPE_VIDEO_CONFIG, config_payload)
         time.sleep(0.06)
     label = 'Windows desktop preview' if args.source == 'desktop' else 'test pattern'
-    print(f'Sending {label} to {target[0]}:{target[1]} ({args.width}x{args.height} @ {args.fps}, layout={args.layout}, '
+    destination = f'USB ADB tunnel 127.0.0.1:{args.usb_port}' if args.transport == 'usb' else f'{target[0]}:{target[1]}'
+    print(f'Sending {label} to {destination} ({args.width}x{args.height} @ {args.fps}, layout={args.layout}, '
           f'bitrate={args.bitrate}, {args.rate_control}, preset={args.preset}, tune={args.tune}, '
-          f'UDP send buffer={args.udp_send_buffer_kib} KiB)', flush=True)
+          f'transport={args.transport})', flush=True)
 
     process: Optional[subprocess.Popen] = None
     sent_bytes = 0
@@ -337,14 +447,12 @@ def main() -> int:
             for index in range(count):
                 part = encoded[index * CHUNK_BYTES:(index + 1) * CHUNK_BYTES]
                 prefix = FRAME_PREFIX.pack(pts_ns, frame_id, len(encoded), index, count, CODEC_H264, flags)
-                send_packet(sock, target, TYPE_FRAME_CHUNK, sequence, prefix + part)
-                sequence += 1
+                emit(TYPE_FRAME_CHUNK, prefix + part)
                 sent_bytes += len(part)
             sent_frames += 1
             now = time.monotonic()
             if now - last_config >= args.config_repeat_seconds:
-                send_packet(sock, target, TYPE_VIDEO_CONFIG, sequence, config_payload)
-                sequence += 1
+                emit(TYPE_VIDEO_CONFIG, config_payload)
                 last_config = now
             if now - last_report >= 1.0:
                 print(f'frames={sent_frames}  last={len(encoded)} bytes  rate≈{sent_bytes * 8 / max(now - last_report, 0.001) / 1e6:.1f} Mb/s', flush=True)
@@ -367,6 +475,17 @@ def main() -> int:
                 process.wait(timeout=2)
             except subprocess.TimeoutExpired:
                 process.kill()
+        usb_stop_event.set()
+        if usb_client:
+            try:
+                usb_client.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            usb_client.close()
+        if usb_listener:
+            usb_listener.close()
+        if usb_relay_thread:
+            usb_relay_thread.join(timeout=1)
         sock.close()
     return 0
 
