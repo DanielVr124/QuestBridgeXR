@@ -1418,7 +1418,7 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     if(vvs)glDeleteShader(vvs);if(vfs)glDeleteShader(vfs);
     createGeometry();
     if (!loadRoomFontAtlas()) LOGE("QuestBridge menu will not render text without a system font");
-    const bool bedLoaded=bedModel_.load(assets,"models/arc_upholstered_bed.glb");
+    const bool bedLoaded=bedModel_.load(assets,"models/gaming_bed.glb");
     const bool deskLoaded=deskModel_.load(assets,"models/arc_gaming_desk.glb");
     const bool monitorLoaded=monitorModel_.load(assets,"models/arc27_curved_monitor.glb");
     const bool tvLoaded=tvModel_.load(assets,"models/user_tv.glb.gz");
