@@ -1350,6 +1350,9 @@ GLuint RoomRenderer::createProceduralEnvironment(int sceneIndex) {
 bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings) {
     if(initialized_) return true;
     settings_=settings;
+    // The public scene selector intentionally offers only these two supported scenes.
+    settings_.environment=settings_.environment=="explorable_city"?"explorable_city":"skyline_penthouse";
+    environmentDropdownIndex_=settings_.environment=="explorable_city"?1:0;
     if(settings_.environment=="explorable_city") {
         cityReturnValid_=true;
         roomReturnMoveX_=moveX_;
@@ -1417,9 +1420,11 @@ bool RoomRenderer::initialize(AAssetManager* assets,const RoomSettings& settings
     const bool tvLoaded=tvModel_.load(assets,"models/tv_on_2_mattress_tall_stand.glb");
     const bool chairLoaded=chairModel_.load(assets,"models/white_gaming_chair.glb");
     const bool mouseLoaded=mouseModel_.load(assets,"models/onitoon_cw902_white_mouse_no_cable.glb");
-    LOGI("custom furniture GLB status: bed=%d desk=%d monitor=%d tv=%d chair=%d mouse=%d",
-         bedLoaded?1:0,deskLoaded?1:0,monitorLoaded?1:0,
-         tvLoaded?1:0,chairLoaded?1:0,mouseLoaded?1:0);
+    const bool leftControllerLoaded=leftControllerModel_.load(assets,"models/meta_touch_plus_left.glb");
+    const bool rightControllerLoaded=rightControllerModel_.load(assets,"models/meta_touch_plus_right.glb");
+    LOGI("furniture/controller GLB status: bed=%d desk=%d monitor=%d tv=%d chair=%d mouse=%d leftCtrl=%d rightCtrl=%d",
+         bedLoaded?1:0,deskLoaded?1:0,monitorLoaded?1:0,tvLoaded?1:0,
+         chairLoaded?1:0,mouseLoaded?1:0,leftControllerLoaded?1:0,rightControllerLoaded?1:0);
     environmentTextures_[0]=loadRgbAsset(assets,"environments/blossom.rgb");
     environmentTextures_[1]=loadRgbAsset(assets,"environments/night_city.rgb");
     environmentTextures_[2]=loadRgbAsset(assets,"environments/golden_city.rgb");
@@ -1783,9 +1788,14 @@ void RoomRenderer::chooseEnvironment() {
         }
     }
 }
+void RoomRenderer::selectRoomScene(int sceneIndex) {
+    environmentDropdownIndex_=std::clamp(sceneIndex,0,1);
+    applyEnvironment(environmentDropdownIndex_==1?"explorable_city":"skyline_penthouse");
+}
 void RoomRenderer::applyEnvironment(const std::string& environment) {
-    const bool leavingCity=settings_.environment=="explorable_city" && environment!="explorable_city";
-    const bool enteringCity=settings_.environment!="explorable_city" && environment=="explorable_city";
+    const std::string selectedScene=environment=="explorable_city"?"explorable_city":"skyline_penthouse";
+    const bool leavingCity=settings_.environment=="explorable_city" && selectedScene!="explorable_city";
+    const bool enteringCity=settings_.environment!="explorable_city" && selectedScene=="explorable_city";
     if(enteringCity) {
         roomReturnMoveX_=moveX_;
         roomReturnMoveZ_=moveZ_;
@@ -1804,7 +1814,8 @@ void RoomRenderer::applyEnvironment(const std::string& environment) {
         previousTurnRight_=false;
         previousTurnLeft_=false;
     }
-    settings_.environment=environment;
+    settings_.environment=selectedScene;
+    environmentDropdownIndex_=selectedScene=="explorable_city"?1:0;
     chooseEnvironment();
 }
 
@@ -1817,8 +1828,7 @@ void RoomRenderer::cycleScreenDestination() {
 }
 void RoomRenderer::cycleEnvironment() {
     if (!settings_.roomControlsEnabled) return;
-    const int nextIndex = (activeEnvironmentIndex_ + 1) % static_cast<int>(kEnvironmentNames.size());
-    applyEnvironment(kEnvironmentNames[nextIndex]);
+    selectRoomScene(settings_.environment=="explorable_city"?0:1);
     LOGI("Room scenery changed to %s", settings_.environment.c_str());
 }
 
@@ -2173,7 +2183,7 @@ void RoomRenderer::drawPanoramaSkybox(const float* pv,float cameraX,float camera
     glUniformMatrix4fv(locMvp_,1,GL_FALSE,mvp.data());
     glUniformMatrix4fv(locModel_,1,GL_FALSE,model.data());
     // Keep the photographic city panorama at its intended night exposure.
-    glUniform4f(locColor_,0.60f,0.63f,0.70f,1.0f);
+    glUniform4f(locColor_,0.40f,0.44f,0.52f,1.0f);
     glUniform1i(locTextured_,1);
     glUniform1i(locMaterial_,-1);
     glUniform1i(locRounded_,0);
