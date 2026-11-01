@@ -7,9 +7,11 @@ from mathutils import Vector, Matrix
 
 PI=math.pi
 HW,HD,RH=4.2,5.4,4.4
-BED_X,BED_Z=HW-2.0,-HD+2.10
-DESK_X,DESK_Z=-HW+1.32,-HD+.43
-DESK_Y,MON_Z=.75,(-HD+.43)-.31
+# Match the native runtime's final room anchors: bed +20 cm right, desk
+# +4 cm right and +13 cm forward, with its monitor at the rear edge.
+BED_X,BED_Z=HW-2.0+.20,-HD+2.10
+DESK_X,DESK_Z=-HW+1.32+.04,-HD+.56
+DESK_Y,MON_Z=.75,DESK_Z-.31
 TV_Z,WIN_Z=BED_Z+3.18,-HD+2.10
 LED_MATS,LED_LIGHTS,MONITOR_RIGS={},{},[]
 

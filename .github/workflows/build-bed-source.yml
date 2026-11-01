@@ -232,3 +232,12 @@ jobs:
           files: |
             dist/QuestBridgeXR-Bed-Model-Blender-Source.zip
             dist/QuestBridgeXR-Bed-Model-Blender-Source.zip.sha256
+            dist/QuestBridgeXR-Room-Showcase-Renders.zip
+            art/room-showcase/gallery_room_tour.png
+            art/room-showcase/gallery_led_variants.png
+            art/room-showcase/gallery_complete.png
+            art/bed/renders/bed_three_quarter.png
+            art/bed/renders/bed_headboard.png
+            art/bed/renders/bed_headboard_detail.png
+            art/bed/renders/bed_side_profile.png
+            art/bed/renders/bed_foot_three_quarter.png
