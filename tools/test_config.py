@@ -87,6 +87,8 @@ class ConfigTests(unittest.TestCase):
             qbx_config.save_quest_ini(cfg, path)
             text = path.read_text(encoding="utf-8")
         self.assertIn("host_ip=10.0.0.5", text)
+        self.assertIn("transport_mode=udp", text)
+        self.assertIn("usb_port=9946", text)
         self.assertIn("tracking_hz=72", text)
         self.assertIn("thumbstick_deadzone=0.120", text)
         self.assertIn("invert_thumbstick_x=false", text)
@@ -99,6 +101,24 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("aspect_mode=stretch", text)
         self.assertIn("trigger_curve=1.000", text)
         self.assertIn("quest_receive_buffer_kib=4096", text)
+
+    def test_quest_ini_can_enable_usb_transport(self):
+        cfg = qbx_config.apply_profile("Balanced")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "config.ini"
+            qbx_config.save_quest_ini(cfg, path, transport_mode="usb", usb_port=9946)
+            text = path.read_text(encoding="utf-8")
+        self.assertIn("transport_mode=usb", text)
+        self.assertIn("usb_port=9946", text)
+
+    def test_quest_ini_rejects_invalid_transport_and_usb_port(self):
+        cfg = qbx_config.apply_profile("Balanced")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "config.ini"
+            with self.assertRaisesRegex(ValueError, "transport_mode"):
+                qbx_config.save_quest_ini(cfg, path, transport_mode="magic")
+            with self.assertRaisesRegex(ValueError, "usb_port"):
+                qbx_config.save_quest_ini(cfg, path, transport_mode="usb", usb_port=70000)
 
     def test_advanced_profiles_validate_and_apply_tunings(self):
         names = qbx_config.profile_names()

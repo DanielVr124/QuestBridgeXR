@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import ipaddress
 import re
-import shutil
 import socket
 import subprocess
+
+from usb_connection import find_adb_executable, parse_adb_devices
 
 
 _IPV4_TOKEN = re.compile(r"\b(?:inet|src)\s+(\d{1,3}(?:\.\d{1,3}){3})(?:/\d+)?\b")
@@ -62,15 +63,15 @@ def discover_pc_ipv4() -> str | None:
                 candidates[0] if candidates else None)
 
 
-def discover_quest_ipv4() -> tuple[str | None, str]:
+def discover_quest_ipv4(adb_path: str | None = None) -> tuple[str | None, str]:
     """Read the Wi-Fi IPv4 from one authorized ADB device; never selects among multiple devices."""
-    adb = shutil.which("adb")
+    adb = adb_path or find_adb_executable()
     if not adb:
         return None, "ADB was not found. Install Android platform-tools and put adb on PATH."
 
     try:
         devices_result = subprocess.run(
-            [adb, "devices"], capture_output=True, text=True, timeout=8, check=False
+            [adb, "devices", "-l"], capture_output=True, text=True, timeout=8, check=False
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return None, f"Could not query ADB devices: {exc}"
@@ -78,21 +79,17 @@ def discover_quest_ipv4() -> tuple[str | None, str]:
         detail = devices_result.stderr.strip() or devices_result.stdout.strip()
         return None, f"ADB device query failed: {detail or 'unknown error'}"
 
-    online = []
-    states = []
-    for line in devices_result.stdout.splitlines()[1:]:
-        fields = line.split()
-        if len(fields) >= 2:
-            states.append(f"{fields[0]} ({fields[1]})")
-            if fields[1] == "device":
-                online.append(fields[0])
-    if len(online) != 1:
-        if not online:
+    devices = parse_adb_devices(devices_result.stdout)
+    states = [f"{device.serial} ({device.state}, {device.transport})" for device in devices]
+    online_usb = [device.serial for device in devices
+                  if device.transport == "usb" and device.state == "device"]
+    if len(online_usb) != 1:
+        if not online_usb:
             state_detail = "; detected: " + ", ".join(states) if states else ""
-            return None, "No authorized ADB device was found" + state_detail + ". Connect the Quest by USB and allow debugging."
-        return None, f"Found {len(online)} authorized ADB devices. Leave only the intended Quest connected to avoid choosing the wrong device."
+            return None, "No authorized Quest was found over USB" + state_detail + ". Connect a data-capable cable and allow USB debugging."
+        return None, f"Found {len(online_usb)} authorized USB Android devices. Leave only the intended Quest connected to avoid choosing the wrong device."
 
-    serial = online[0]
+    serial = online_usb[0]
     commands = (
         [adb, "-s", serial, "shell", "ip", "-4", "addr", "show", "wlan0"],
         [adb, "-s", serial, "shell", "ip", "addr", "show", "wlan0"],

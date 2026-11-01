@@ -2349,6 +2349,9 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float cente
 
 void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
     if(dt<0.0f||dt>0.1f)dt=0.0f;
+    // Turn triggers are based on deadzone-normalized thumbstick values.
+    // 0.70 required near-full deflection on some Quest Touch controllers.
+    constexpr float kSnapTurnThreshold = 0.45f;
     const float yaw=headYaw(headPose)+virtualYaw_;
     const float speed=std::clamp(settings_.movementSpeed,0.1f,4.0f);
 
@@ -2374,7 +2377,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
         if(settings_.smoothTurn) {
             virtualYaw_-=std::clamp(rightStickX,-1.0f,1.0f)*std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;
         } else {
-            const bool right=rightStickX>0.7f,left=rightStickX < -0.7f;
+            const bool right=rightStickX>kSnapTurnThreshold,left=rightStickX < -kSnapTurnThreshold;
             if(snapCooldown_<=0.0f && right && !previousTurnRight_) {
                 virtualYaw_-=settings_.snapTurnDegrees*kPi/180.0f; snapCooldown_=0.24f;
             } else if(snapCooldown_<=0.0f && left && !previousTurnLeft_) {
@@ -2448,7 +2451,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
         virtualYaw_-=std::clamp(rightStickX,-1.0f,1.0f)*
                      std::clamp(settings_.turnSpeed,0.2f,3.5f)*dt;
     } else {
-        const bool right=rightStickX>0.7f,left=rightStickX < -0.7f;
+        const bool right=rightStickX>kSnapTurnThreshold,left=rightStickX < -kSnapTurnThreshold;
         if(snapCooldown_<=0.0f && right && !previousTurnRight_){
             virtualYaw_-=settings_.snapTurnDegrees*kPi/180.0f;
             snapCooldown_=0.24f;

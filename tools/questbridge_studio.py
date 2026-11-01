@@ -5,14 +5,17 @@ from __future__ import annotations
 from qbx_paths import project_root
 from openxr_runtime import discover_runtimes, launch_with_runtime, resolve_runtime_manifest
 from network_setup import discover_pc_ipv4, discover_quest_ipv4
+from usb_connection import find_adb_executable, parse_adb_devices, probe_usb_connection
 
 import copy
+import threading
 import json
 import os
 import pathlib
 import shutil
 import subprocess
 import sys
+import time
 import tkinter as tk
 import webbrowser
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -22,6 +25,7 @@ from typing import Any
 ROOT = project_root(__file__)
 TOOLS = ROOT / "tools"
 GENERATED = ROOT / ".generated"
+USB_STREAM_PORT = 9946
 
 # Hover text is deliberately specific: each control explains its effect, trade-offs,
 # supported range, and whether it changes the current streaming/client path.
@@ -166,18 +170,22 @@ except ModuleNotFoundError:
 class QuestBridgeStudio(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("QuestBridge Studio")
-        self.geometry("1180x860")
-        self.minsize(980, 720)
+        self.title("QuestBridge XR")
+        self.geometry("1120x820")
+        self.minsize(900, 660)
         self._setup_visual_theme()
         self.config_data = load_config()
         self.vars: dict[str, tk.Variable] = {}
         self.host_process: subprocess.Popen | None = None
         self.stream_process: subprocess.Popen | None = None
         self.telemetry_process: subprocess.Popen | None = None
+        self.adb_path: str | None = find_adb_executable(ROOT)
+        self._usb_probe_running = False
+        self.usb_stream_mode = False
         self._build_ui()
         self._load_form(self.config_data)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.after(500, self._refresh_usb_status)
 
     def _setup_visual_theme(self) -> None:
         """Apply a cohesive dark, blue-violet Studio theme without changing settings behavior."""
@@ -233,33 +241,40 @@ class QuestBridgeStudio(tk.Tk):
                         arrowcolor=p["muted"], bordercolor=p["bg"])
 
     def _build_ui(self) -> None:
+        """Create a compact home-first layout; detailed settings stay in their own tabs."""
         self.columnconfigure(0, weight=1)
         self.rowconfigure(2, weight=1)
 
-        header = ttk.Frame(self, padding=(24, 20, 24, 14))
+        header = ttk.Frame(self, padding=(24, 18, 24, 10))
         header.grid(row=0, column=0, sticky="ew")
         header.columnconfigure(0, weight=1)
-        ttk.Label(header, text="QUESTBRIDGE  /  XR CONTROL CENTER", style="Eyebrow.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(header, text="QuestBridge Studio", style="Hero.TLabel").grid(row=1, column=0, sticky="w", pady=(3, 1))
-        ttk.Label(header, text="Your space. Your stream. Your settings.", style="Muted.TLabel").grid(row=2, column=0, sticky="w")
-        self.status_var = tk.StringVar(value="●  READY     Settings are saved to config/questbridge.json.")
-        ttk.Label(header, textvariable=self.status_var, wraplength=930,
-                  foreground=self.palette["cyan"]).grid(row=3, column=0, sticky="w", pady=(12, 0))
-        tk.Frame(self, height=2, background=self.palette["accent"]).grid(
-            row=0, column=0, sticky="new", padx=24, pady=(0, 0))
+        ttk.Label(header, text="QUESTBRIDGE  /  XR CONTROL CENTER", style="Eyebrow.TLabel").grid(
+            row=0, column=0, sticky="w")
+        ttk.Label(header, text="QuestBridge XR", style="Hero.TLabel").grid(
+            row=1, column=0, sticky="w", pady=(2, 0))
+        ttk.Label(header, text="Connect your Quest. Configure your space. Start streaming.",
+                  style="Muted.TLabel").grid(row=2, column=0, sticky="w")
+        self.status_var = tk.StringVar(value="READY  •  Checking connection tools…")
+        ttk.Label(header, textvariable=self.status_var, wraplength=900,
+                  foreground=self.palette["cyan"]).grid(row=3, column=0, sticky="w", pady=(8, 0))
 
-        top = ttk.Frame(self, padding=(24, 8, 24, 12))
-        top.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
+        top = ttk.Frame(self, padding=(24, 8, 24, 10))
+        top.grid(row=1, column=0, sticky="ew", padx=8)
         top.columnconfigure(0, weight=1)
         self.profile_var = tk.StringVar(value="Balanced")
         ttk.Label(top, text="Profile").grid(row=0, column=1, padx=(0, 6))
-        self.profile_box = ttk.Combobox(top, textvariable=self.profile_var, values=profile_names(), state="readonly", width=18)
-        self.profile_box.grid(row=0, column=2, padx=(0, 6))
+        self.profile_box = ttk.Combobox(
+            top, textvariable=self.profile_var, values=profile_names(), state="readonly", width=17
+        )
+        self.profile_box.grid(row=0, column=2, padx=(0, 8))
         self.profile_box.bind("<<ComboboxSelected>>", self._on_profile_selected)
-        ttk.Button(top, text="Save Profile As…", command=self._save_profile_as).grid(row=0, column=3)
+        ttk.Button(top, text="Save Settings", style="Accent.TButton",
+                   command=self._save_settings).grid(row=0, column=3, padx=(0, 8))
+        ttk.Button(top, text="Save Profile As…", command=self._save_profile_as).grid(row=0, column=4)
 
         notebook = ttk.Notebook(self)
-        notebook.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 12))
+        notebook.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 8))
+        self._add_connect_tab(notebook)
         self._add_network_tab(notebook)
         self._add_video_tab(notebook)
         self._add_tracking_tab(notebook)
@@ -269,44 +284,233 @@ class QuestBridgeStudio(tk.Tk):
         self._add_fake_vr_tab(notebook)
         self._add_play_modes_tab(notebook)
 
-        actions = ttk.Frame(self, padding=(24, 10, 24, 20))
+        # Keep secondary file/config actions in one slim footer instead of three
+        # competing rows of controls at the bottom of the window.
+        actions = ttk.Frame(self, padding=(24, 8, 24, 14))
         actions.grid(row=3, column=0, sticky="ew")
-        actions.columnconfigure(0, weight=1)
-        row1 = ttk.Frame(actions)
-        row1.grid(row=0, column=0, sticky="ew")
-        for col in range(6):
-            row1.columnconfigure(col, weight=1)
-        ttk.Button(row1, text="Save Settings", style="Accent.TButton", command=self._save_settings).grid(row=0, column=0, padx=(0, 6), sticky="ew")
-        ttk.Button(row1, text="Import JSON…", command=self._import_config).grid(row=0, column=1, padx=6, sticky="ew")
-        ttk.Button(row1, text="Export Quest INI…", command=self._export_quest_ini).grid(row=0, column=2, padx=6, sticky="ew")
-        ttk.Button(row1, text="Install Quest INI via ADB", command=self._install_quest_ini).grid(row=0, column=3, padx=6, sticky="ew")
-        ttk.Button(row1, text="Open Config Folder", command=self._open_config_folder).grid(row=0, column=4, padx=6, sticky="ew")
-        reset_button = ttk.Button(row1, text="Restore Defaults", command=self._restore_defaults)
-        reset_button.grid(row=0, column=5, padx=(6, 0), sticky="ew")
-        Tooltip(reset_button, "Restore the built-in Balanced settings to the active config file. This does not delete or overwrite your saved named profiles.")
-        row2 = ttk.Frame(actions)
-        row2.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        for col in range(4):
+            actions.columnconfigure(col, weight=1)
+        ttk.Button(actions, text="Import Settings…", command=self._import_config).grid(
+            row=0, column=0, padx=(0, 6), sticky="ew")
+        ttk.Button(actions, text="Export Quest Config…", command=self._export_quest_ini).grid(
+            row=0, column=1, padx=6, sticky="ew")
+        ttk.Button(actions, text="Open Config Folder", command=self._open_config_folder).grid(
+            row=0, column=2, padx=6, sticky="ew")
+        reset_button = ttk.Button(actions, text="Restore Defaults", command=self._restore_defaults)
+        reset_button.grid(row=0, column=3, padx=(6, 0), sticky="ew")
+        Tooltip(reset_button, "Restore the built-in Balanced settings to the active config file. Saved named profiles are preserved.")
+
+    def _add_connect_tab(self, notebook: ttk.Notebook) -> None:
+        """First-run home page with explicit USB checks and clear network-stream status."""
+        f = self._tab(notebook, "Connect")
+        f.columnconfigure(0, weight=1)
+
+        ttk.Label(f, text="Connect your Quest 3", font=("Segoe UI", 18, "bold")).grid(
+            row=0, column=0, sticky="w", pady=(0, 4))
+        ttk.Label(
+            f,
+            text="Start here. USB checks tell you whether Windows can see and communicate with the headset.",
+            style="Muted.TLabel", wraplength=820,
+        ).grid(row=1, column=0, sticky="w", pady=(0, 14))
+
+        usb = ttk.Frame(f, padding=18, style="Card.TFrame")
+        usb.grid(row=2, column=0, sticky="ew", pady=(0, 14))
+        usb.columnconfigure(0, weight=1)
+        ttk.Label(usb, text="USB CONNECTION TEST", style="Eyebrow.TLabel").grid(
+            row=0, column=0, sticky="w")
+        self.usb_status_var = tk.StringVar(value="Not checked yet")
+        ttk.Label(usb, textvariable=self.usb_status_var,
+                  font=("Segoe UI", 15, "bold"), wraplength=760).grid(
+            row=1, column=0, sticky="w", pady=(5, 4))
+        self.adb_path_var = tk.StringVar(
+            value=self.adb_path or "ADB not found — locate adb.exe or install Android Platform-Tools"
+        )
+        ttk.Label(usb, textvariable=self.adb_path_var, style="Muted.TLabel",
+                  wraplength=820).grid(row=2, column=0, sticky="w", pady=(0, 4))
+        self.stream_probe_var = tk.StringVar(
+            value="Quest-to-PC and video setup checks appear here when the Quest app is installed."
+        )
+        ttk.Label(usb, textvariable=self.stream_probe_var, style="Muted.TLabel",
+                  wraplength=820).grid(row=3, column=0, sticky="w", pady=(0, 10))
+
+        self.usb_details = ScrolledText(
+            usb, height=7, wrap="word", font=("Segoe UI", 9),
+            background=self.palette["surface2"], foreground=self.palette["text"],
+            insertbackground=self.palette["text"], relief="flat", borderwidth=0,
+        )
+        self.usb_details.grid(row=4, column=0, sticky="ew", pady=(0, 10))
+        self.usb_details.insert(
+            "1.0",
+            "Connect the Quest with a data-capable USB cable, unlock the headset, and accept the USB debugging prompt.\n"
+            "Run the test to check ADB, authorization, headset response, and QuestBridge app status."
+        )
+        self.usb_details.configure(state="disabled")
+
+        usb_actions = ttk.Frame(usb)
+        usb_actions.grid(row=5, column=0, sticky="ew")
+        self.usb_refresh_button = ttk.Button(
+            usb_actions, text="Test USB Connection", style="Accent.TButton",
+            command=self._refresh_usb_status
+        )
+        self.usb_refresh_button.grid(row=0, column=0, padx=(0, 7))
+        ttk.Button(usb_actions, text="Locate adb.exe…",
+                   command=self._locate_adb).grid(row=0, column=1, padx=7)
+        ttk.Button(usb_actions, text="Install / Launch Quest App",
+                   command=self._install_quest_app).grid(row=0, column=2, padx=7)
+        ttk.Button(usb_actions, text="Send Settings to Quest",
+                   command=self._install_quest_ini).grid(row=0, column=3, padx=7)
+        ttk.Button(usb_actions, text="Start Wired USB Streaming", style="Accent.TButton",
+                   command=self._start_usb_streaming).grid(row=0, column=4, padx=(7, 0))
+
+        self.usb_transport_note = ttk.Label(
+            f,
+            text=("Wired mode uses ADB reverse plus a bidirectional TCP stream: headset/controller data travels to the PC "
+                  "and encoded video returns to the Quest over the USB cable. Click Start Wired USB Streaming with exactly "
+                  "one authorized Quest connected. This mode does not use Wi-Fi for the stream; normal UDP/LAN mode remains available."),
+            wraplength=840, justify="left",
+        )
+        self.usb_transport_note.grid(row=3, column=0, sticky="w", pady=(0, 16))
+
+        network = ttk.Frame(f, padding=18, style="Card.TFrame")
+        network.grid(row=4, column=0, sticky="ew", pady=(0, 14))
+        network.columnconfigure(0, weight=1)
+        ttk.Label(network, text="START THE CONNECTION", style="Eyebrow.TLabel").grid(
+            row=0, column=0, sticky="w")
+        ttk.Label(
+            network,
+            text="For Wi-Fi mode, set the PC and Quest LAN addresses, then start the UDP host and sender. For a cable-only stream, use Start Wired USB Streaming above; it routes tracking and video over the ADB USB tunnel.",
+            wraplength=800, justify="left",
+        ).grid(row=1, column=0, sticky="w", pady=(5, 10))
+        row = ttk.Frame(network)
+        row.grid(row=2, column=0, sticky="ew")
+        for col in range(3):
+            row.columnconfigure(col, weight=1)
+        ttk.Button(row, text="Quick Network Setup…",
+                   command=self._quick_network_setup).grid(row=0, column=0, padx=(0, 6), sticky="ew")
+        ttk.Button(row, text="Open Network Settings",
+                   command=lambda: self._select_tab_by_title(notebook, "Connection")).grid(
+            row=0, column=1, padx=6, sticky="ew")
+        ttk.Button(row, text="Run Diagnostics",
+                   command=lambda: self._run_diagnostics(False)).grid(
+            row=0, column=2, padx=(6, 0), sticky="ew")
+
+        tools = ttk.Frame(f, padding=18, style="Card.TFrame")
+        tools.grid(row=5, column=0, sticky="ew")
+        tools.columnconfigure(0, weight=1)
+        ttk.Label(tools, text="WINDOWS STREAMING TOOLS", style="Eyebrow.TLabel").grid(
+            row=0, column=0, sticky="w")
+        ttk.Label(
+            tools,
+            text="These actions start and inspect the Windows-side transport. A successful PC host probe alone does not prove the Quest has connected.",
+            wraplength=800, justify="left",
+        ).grid(row=1, column=0, sticky="w", pady=(5, 10))
+        row2 = ttk.Frame(tools)
+        row2.grid(row=2, column=0, sticky="ew")
         for col in range(4):
             row2.columnconfigure(col, weight=1)
-        ttk.Button(row2, text="Start Windows Host", command=self._start_host).grid(row=0, column=0, padx=(0, 6), sticky="ew")
-        ttk.Button(row2, text="Start Video Stream", command=self._start_stream).grid(row=0, column=1, padx=6, sticky="ew")
-        ttk.Button(row2, text="Monitor Telemetry", command=self._start_telemetry_monitor).grid(row=0, column=2, padx=6, sticky="ew")
-        ttk.Button(row2, text="Stop Dev Processes", command=self._stop_processes).grid(row=0, column=3, padx=(6, 0), sticky="ew")
-        row3 = ttk.Frame(actions)
-        row3.grid(row=2, column=0, sticky="ew", pady=(8, 0))
-        row3.columnconfigure(0, weight=1)
-        row3.columnconfigure(1, weight=1)
-        row3.columnconfigure(2, weight=1)
-        ttk.Button(row3, text="Run Setup Diagnostics", command=lambda: self._run_diagnostics(False)).grid(row=0, column=0, padx=(0, 6), sticky="ew")
-        ttk.Button(row3, text="Test PC Host Connection", command=lambda: self._run_diagnostics(True)).grid(row=0, column=1, padx=6, sticky="ew")
-        ttk.Button(row3, text="Quick Network Setup…", command=self._quick_network_setup).grid(row=0, column=2, padx=(6, 0), sticky="ew")
+        ttk.Button(row2, text="Start Windows Host",
+                   command=self._start_host).grid(row=0, column=0, padx=(0, 5), sticky="ew")
+        ttk.Button(row2, text="Start Video Stream",
+                   command=self._start_stream).grid(row=0, column=1, padx=5, sticky="ew")
+        ttk.Button(row2, text="Monitor Telemetry",
+                   command=self._start_telemetry_monitor).grid(row=0, column=2, padx=5, sticky="ew")
+        ttk.Button(row2, text="Stop Dev Processes",
+                   command=self._stop_processes).grid(row=0, column=3, padx=(5, 0), sticky="ew")
+        ttk.Button(tools, text="Test PC Host Handshake",
+                   command=lambda: self._run_diagnostics(True)).grid(
+            row=3, column=0, sticky="w", pady=(9, 0))
+
+    def _resolve_adb(self) -> str | None:
+        """Use a manually selected ADB executable or discover a bundled/SDK copy."""
+        if self.adb_path and pathlib.Path(self.adb_path).is_file():
+            return self.adb_path
+        self.adb_path = find_adb_executable(ROOT)
+        if hasattr(self, "adb_path_var"):
+            self.adb_path_var.set(
+                self.adb_path or "ADB not found — locate adb.exe or install Android Platform-Tools"
+            )
+        return self.adb_path
+
+    def _locate_adb(self) -> None:
+        selected = filedialog.askopenfilename(
+            parent=self, title="Locate Android Debug Bridge",
+            filetypes=(("ADB executable", "adb.exe"), ("All files", "*.*")),
+        )
+        if not selected:
+            return
+        path = pathlib.Path(selected)
+        if path.name.casefold() not in ("adb.exe", "adb"):
+            messagebox.showerror("Invalid ADB executable", "Choose adb.exe from the Android SDK platform-tools folder.", parent=self)
+            return
+        self.adb_path = str(path.resolve())
+        self.adb_path_var.set(self.adb_path)
+        self._refresh_usb_status()
+
+    def _refresh_usb_status(self) -> None:
+        """Run ADB probes off the UI thread so a slow USB device cannot freeze Studio."""
+        if self._usb_probe_running:
+            return
+        self._usb_probe_running = True
+        if hasattr(self, "usb_refresh_button"):
+            self.usb_refresh_button.configure(state="disabled")
+        self.usb_status_var.set("Checking ADB and USB headset…")
+        self.status_var.set("Checking USB connection. Unlock the Quest if it is asleep.")
+
+        adb = self._resolve_adb()
+
+        def worker() -> None:
+            try:
+                report = probe_usb_connection(adb_path=adb, project_root=ROOT)
+            except Exception as exc:
+                report = {
+                    "ok": False,
+                    "summary": f"USB check failed: {exc}",
+                    "adb_path": adb,
+                    "checks": [{"level": "FAIL", "label": "USB diagnostics", "detail": str(exc)}],
+                }
+            try:
+                self.after(0, lambda result=report: self._display_usb_report(result))
+            except tk.TclError:
+                pass
+
+        threading.Thread(target=worker, name="QuestBridgeUsbProbe", daemon=True).start()
+
+    def _display_usb_report(self, report: dict[str, Any]) -> None:
+        self._usb_probe_running = False
+        if hasattr(self, "usb_refresh_button"):
+            self.usb_refresh_button.configure(state="normal")
+        self.usb_status_var.set(str(report.get("summary", "USB check finished.")))
+        self.adb_path_var.set(report.get("adb_path") or "ADB not found — use Locate adb.exe…")
+        host_seen = report.get("host_handshake_seen")
+        video_seen = report.get("video_config_seen")
+        if host_seen is None and video_seen is None:
+            stream_summary = "Quest-to-PC stream / video: not checked (install and launch QuestBridge XR first)."
+        else:
+            host_text = "handshake seen in Quest logs" if host_seen else "handshake not seen in latest Quest logs"
+            video_text = "video setup seen in Quest logs" if video_seen else "video setup not seen in latest Quest logs"
+            stream_summary = f"Quest → PC: {host_text}   •   Video setup: {video_text}"
+        self.stream_probe_var.set(stream_summary)
+        lines = []
+        for check in report.get("checks", []):
+            lines.append(f"[{check.get('level', 'INFO')}] {check.get('label', 'Check')}: {check.get('detail', '')}")
+        if report.get("serial"):
+            lines.append(f"USB serial: {report['serial']}")
+        if report.get("model"):
+            lines.append(f"Headset model: {report['model']}")
+        if report.get("android_version"):
+            lines.append(f"Android version: {report['android_version']}")
+        self.usb_details.configure(state="normal")
+        self.usb_details.delete("1.0", "end")
+        self.usb_details.insert("1.0", "\n".join(lines) or "No diagnostic details were returned.")
+        self.usb_details.configure(state="disabled")
+        self.status_var.set(str(report.get("summary", "USB check complete.")))
 
     def _quick_network_setup(self) -> None:
         """Detect PC/Quest LAN addresses and let the user selectively apply them."""
         self.status_var.set("Checking the PC network route and looking for one authorized Quest via ADB…")
         self.update_idletasks()
         pc_ip = discover_pc_ipv4()
-        quest_ip, quest_note = discover_quest_ipv4()
+        quest_ip, quest_note = discover_quest_ipv4(self._resolve_adb())
 
         window = tk.Toplevel(self)
         window.title("Quick Network Setup")
@@ -660,12 +864,12 @@ class QuestBridgeStudio(tk.Tk):
 
     def _install_quest_app(self) -> None:
         """Install the packaged debug APK on exactly one connected Quest via ADB."""
-        adb = shutil.which("adb")
+        adb = self._resolve_adb()
         if not adb:
             messagebox.showinfo(
                 "Android Debug Bridge not found",
-                "Install Android platform-tools, enable Developer Mode and USB debugging on the Quest, then put adb on PATH. "
-                "The Quest APK is included in the combined CI portable ZIP under QuestClient/.",
+                "Install Android Platform-Tools, or use Locate adb.exe on the Connect tab. "
+                "Enable Developer Mode and USB debugging on the Quest. The Quest APK is included in the combined CI portable ZIP under QuestClient/.",
                 parent=self,
             )
             return
@@ -683,11 +887,15 @@ class QuestBridgeStudio(tk.Tk):
             )
             return
         try:
-            result = subprocess.run([adb, "devices"], capture_output=True, text=True, timeout=15, check=True)
-            online = [line.split()[0] for line in result.stdout.splitlines()[1:]
-                      if len(line.split()) >= 2 and line.split()[1] == "device"]
+            result = subprocess.run([adb, "devices", "-l"], capture_output=True, text=True, timeout=15, check=True)
+            online = [device.serial for device in parse_adb_devices(result.stdout)
+                      if device.transport == "usb" and device.state == "device"]
             if len(online) != 1:
-                raise RuntimeError(f"Expected exactly one authorized Android/Quest device, found {len(online)}.\n{result.stdout}")
+                raise RuntimeError(
+                    f"Expected exactly one authorized Quest over USB, found {len(online)}. "
+                    "Disconnect other USB Android devices and approve the debugging prompt.\n"
+                    + result.stdout
+                )
             install = subprocess.run([adb, "-s", online[0], "install", "-r", str(apk)],
                                      capture_output=True, text=True, timeout=120)
             if install.returncode != 0:
@@ -697,6 +905,7 @@ class QuestBridgeStudio(tk.Tk):
             if launch.returncode != 0:
                 raise RuntimeError("APK installed, but automatic launch failed: " + (launch.stderr.strip() or launch.stdout.strip()))
             self.status_var.set(f"Installed and launched QuestBridge XR on device {online[0]}.")
+            self._refresh_usb_status()
             messagebox.showinfo("QuestBridge XR installed",
                                 "Installed and asked Android to launch QuestBridge XR.\n\n"
                                 "Set the PC's LAN IP in Studio and export/install config.ini if this is the first run.",
@@ -953,6 +1162,154 @@ class QuestBridgeStudio(tk.Tk):
         save_quest_ini(cfg, path)
         self.status_var.set(f"Exported Quest client config: {path}")
 
+    def _start_usb_streaming(self) -> None:
+        """Arm the ADB reverse tunnel, host relay, TCP video sender, and Quest USB client."""
+        if not self._save_settings():
+            return
+        adb = self._resolve_adb()
+        if not adb:
+            messagebox.showerror(
+                "ADB not found",
+                "Locate adb.exe or install Android Platform-Tools before starting wired streaming.",
+                parent=self,
+            )
+            return
+        if self.stream_process and self.stream_process.poll() is None:
+            messagebox.showwarning(
+                "Video streamer already running",
+                "Stop the current UDP/video streamer first, then start wired USB streaming.",
+                parent=self,
+            )
+            return
+
+        serial = None
+        try:
+            devices_result = subprocess.run(
+                [adb, "devices", "-l"], capture_output=True, text=True, timeout=15, check=True
+            )
+            online = [
+                device.serial for device in parse_adb_devices(devices_result.stdout)
+                if device.transport == "usb" and device.state == "device"
+            ]
+            if len(online) != 1:
+                raise RuntimeError(
+                    f"Expected exactly one authorized USB headset, found {len(online)}. "
+                    "Connect one Quest, unlock it, and approve USB debugging."
+                )
+            serial = online[0]
+
+            # Always put the matching APK on the headset; an older installed client
+            # will not understand the new USB-only TCP transport setting.
+            apk_candidates = [
+                ROOT / "QuestClient" / "QuestBridgeXR-Quest-debug.apk",
+                ROOT / "quest-client" / "app" / "build" / "outputs" / "apk" / "debug" / "app-debug.apk",
+            ]
+            apk = next((item for item in apk_candidates if item.is_file()), None)
+            if apk is None:
+                raise RuntimeError(
+                    "The matching Quest APK is missing. Use the combined portable ZIP, "
+                    "which includes QuestClient/QuestBridgeXR-Quest-debug.apk."
+                )
+            install = subprocess.run(
+                [adb, "-s", serial, "install", "-r", str(apk)],
+                capture_output=True, text=True, timeout=120, check=False,
+            )
+            if install.returncode != 0:
+                raise RuntimeError(install.stderr.strip() or install.stdout.strip() or "Could not install the matching Quest USB client APK.")
+
+            reverse = subprocess.run(
+                [adb, "-s", serial, "reverse", f"tcp:{USB_STREAM_PORT}", f"tcp:{USB_STREAM_PORT}"],
+                capture_output=True, text=True, timeout=15, check=False,
+            )
+            if reverse.returncode != 0:
+                raise RuntimeError(reverse.stderr.strip() or reverse.stdout.strip() or "Could not create the ADB reverse USB tunnel.")
+
+            GENERATED.mkdir(parents=True, exist_ok=True)
+            local_ini = save_quest_ini(
+                self.config_data,
+                GENERATED / "quest-client-usb-config.ini",
+                transport_mode="usb",
+                usb_port=USB_STREAM_PORT,
+            )
+            target_dir = "/sdcard/Android/data/com.questbridge.xr/files"
+            mkdir_result = subprocess.run(
+                [adb, "-s", serial, "shell", "mkdir", "-p", target_dir],
+                capture_output=True, text=True, timeout=15, check=False,
+            )
+            if mkdir_result.returncode != 0:
+                raise RuntimeError(mkdir_result.stderr.strip() or "Could not prepare the QuestBridge settings folder.")
+            push_result = subprocess.run(
+                [adb, "-s", serial, "push", str(local_ini), target_dir + "/config.ini"],
+                capture_output=True, text=True, timeout=30, check=False,
+            )
+            if push_result.returncode != 0:
+                raise RuntimeError(push_result.stderr.strip() or push_result.stdout.strip() or "Could not send USB transport settings to the Quest.")
+
+            if not self.host_process or self.host_process.poll() is not None:
+                self._start_host()
+                if not self.host_process or self.host_process.poll() is not None:
+                    raise RuntimeError("The Windows QuestBridge host could not be started. Check that QuestBridgeHost.exe is included in this build.")
+
+            command = self._tool_command(
+                "stream_test_video.py",
+                "--config", str(DEFAULT_CONFIG_PATH),
+                "--transport", "usb",
+                "--usb-port", str(USB_STREAM_PORT),
+                "--host-port", str(self.config_data["network"]["host_port"]),
+            )
+            self.stream_process = subprocess.Popen(command, cwd=str(ROOT))
+            # Give the loopback listener time to bind before the Quest app reconnects.
+            time.sleep(0.35)
+            if self.stream_process.poll() is not None:
+                raise RuntimeError("The wired video server exited during startup. Check FFmpeg and the USB port.")
+
+            subprocess.run(
+                [adb, "-s", serial, "shell", "am", "force-stop", "com.questbridge.xr"],
+                capture_output=True, text=True, timeout=15, check=False,
+            )
+            launch = subprocess.run(
+                [adb, "-s", serial, "shell", "monkey", "-p", "com.questbridge.xr", "1"],
+                capture_output=True, text=True, timeout=20, check=False,
+            )
+            if launch.returncode != 0:
+                raise RuntimeError("The USB tunnel is ready, but QuestBridge XR did not launch: " +
+                                   (launch.stderr.strip() or launch.stdout.strip()))
+
+            self.usb_stream_mode = True
+            self.status_var.set(
+                f"Wired USB session armed for {serial}: ADB reverse TCP {USB_STREAM_PORT}; video and tracking use the cable."
+            )
+            self.stream_probe_var.set("Wired USB transport selected. Waiting for Quest handshake and decoded video.")
+            self._refresh_usb_status()
+            messagebox.showinfo(
+                "Wired USB streaming started",
+                "QuestBridge XR was restarted in USB-only transport mode. Keep the USB cable connected. "
+                "The stream server is waiting for the Quest handshake; Wi-Fi is not used for video or tracking.",
+                parent=self,
+            )
+        except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as exc:
+            if self.stream_process and self.stream_process.poll() is None:
+                self.stream_process.terminate()
+                self.stream_process = None
+            # Roll back the pushed USB mode so a failed attempt cannot strand the Quest
+            # in a USB-only configuration after the tunnel has been removed.
+            if adb and serial:
+                try:
+                    rollback_ini = save_quest_ini(self.config_data, GENERATED / "quest-client-udp-config.ini")
+                    subprocess.run(
+                        [adb, "-s", serial, "push", str(rollback_ini),
+                         "/sdcard/Android/data/com.questbridge.xr/files/config.ini"],
+                        capture_output=True, text=True, timeout=30, check=False,
+                    )
+                    subprocess.run(
+                        [adb, "-s", serial, "reverse", "--remove", f"tcp:{USB_STREAM_PORT}"],
+                        capture_output=True, text=True, timeout=15, check=False,
+                    )
+                except (OSError, subprocess.SubprocessError, ValueError):
+                    pass
+            self.usb_stream_mode = False
+            messagebox.showerror("Could not start wired streaming", str(exc), parent=self)
+
     def _install_quest_ini(self) -> None:
         if not self._save_settings():
             return
@@ -963,21 +1320,33 @@ class QuestBridgeStudio(tk.Tk):
         except (ValueError, OSError) as exc:
             messagebox.showerror("Invalid settings", str(exc), parent=self)
             return
-        adb = shutil.which("adb")
+        adb = self._resolve_adb()
         if not adb:
-            messagebox.showerror("ADB not found", "Install Android platform-tools and put adb.exe on PATH, or use Export Quest INI and push it manually.", parent=self)
+            messagebox.showerror(
+                "ADB not found",
+                "Install Android Platform-Tools, or use Locate adb.exe on the Connect tab. You can still export the Quest INI and transfer it manually.",
+                parent=self,
+            )
             return
         try:
-            devices = subprocess.run([adb, "devices"], capture_output=True, text=True, timeout=10, check=True).stdout.splitlines()
-            online = [line.split()[0] for line in devices[1:] if line.strip() and len(line.split()) >= 2 and line.split()[1] == "device"]
+            devices_output = subprocess.run(
+                [adb, "devices", "-l"], capture_output=True, text=True, timeout=10, check=True
+            ).stdout
+            online = [device.serial for device in parse_adb_devices(devices_output)
+                      if device.transport == "usb" and device.state == "device"]
             if len(online) != 1:
-                raise RuntimeError(f"Expected exactly one online ADB device; found {len(online)}. Output:\n" + "\n".join(devices))
+                raise RuntimeError(
+                    f"Expected exactly one authorized Quest over USB; found {len(online)}. "
+                    "Disconnect other USB Android devices and approve the debugging prompt.\n"
+                    + devices_output
+                )
             target_dir = "/sdcard/Android/data/com.questbridge.xr/files"
             subprocess.run([adb, "-s", online[0], "shell", "mkdir", "-p", target_dir], capture_output=True, text=True, timeout=10, check=True)
             result = subprocess.run([adb, "-s", online[0], "push", str(local_ini), target_dir + "/config.ini"], capture_output=True, text=True, timeout=30)
             if result.returncode != 0:
                 raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "adb push failed")
             self.status_var.set(f"Installed config.ini to Quest device {online[0]}. Restart QuestBridge XR to apply changes.")
+            self._refresh_usb_status()
         except (subprocess.SubprocessError, OSError, RuntimeError) as exc:
             messagebox.showerror("ADB install failed", str(exc), parent=self)
 
@@ -1097,6 +1466,45 @@ class QuestBridgeStudio(tk.Tk):
                 except subprocess.TimeoutExpired:
                     process.kill()
                 stopped.append(name)
+
+        if self.usb_stream_mode:
+            adb = self._resolve_adb()
+            try:
+                if adb:
+                    result = subprocess.run(
+                        [adb, "devices", "-l"], capture_output=True, text=True, timeout=15, check=False
+                    )
+                    online = [
+                        device.serial for device in parse_adb_devices(result.stdout)
+                        if device.transport == "usb" and device.state == "device"
+                    ]
+                    if len(online) == 1:
+                        serial = online[0]
+                        rollback_ini = save_quest_ini(self.config_data, GENERATED / "quest-client-udp-config.ini")
+                        subprocess.run(
+                            [adb, "-s", serial, "push", str(rollback_ini),
+                             "/sdcard/Android/data/com.questbridge.xr/files/config.ini"],
+                            capture_output=True, text=True, timeout=30, check=False,
+                        )
+                        subprocess.run(
+                            [adb, "-s", serial, "reverse", "--remove", f"tcp:{USB_STREAM_PORT}"],
+                            capture_output=True, text=True, timeout=15, check=False,
+                        )
+                        subprocess.run(
+                            [adb, "-s", serial, "shell", "am", "force-stop", "com.questbridge.xr"],
+                            capture_output=True, text=True, timeout=15, check=False,
+                        )
+                        subprocess.run(
+                            [adb, "-s", serial, "shell", "monkey", "-p", "com.questbridge.xr", "1"],
+                            capture_output=True, text=True, timeout=20, check=False,
+                        )
+                        stopped.append("USB tunnel removed; Quest returned to UDP mode")
+                    else:
+                        stopped.append("USB tunnel cleanup skipped (Quest not uniquely connected)")
+            except (OSError, subprocess.SubprocessError, ValueError):
+                stopped.append("USB tunnel cleanup failed")
+            self.usb_stream_mode = False
+
         self.status_var.set("Stopped: " + ", ".join(stopped) if stopped else "No active child processes.")
 
     def _open_config_folder(self) -> None:

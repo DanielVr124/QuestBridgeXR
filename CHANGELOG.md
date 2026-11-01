@@ -1,5 +1,15 @@
 # Changelog
 
+# Changelog
+
+## Unreleased — bidirectional wired USB streaming
+
+- Added a USB-only transport in the Quest client using a framed, full-duplex TCP connection over ADB reverse; HMD/controller/heartbeat packets travel to Windows and encoded video packets return to Quest over the same cable.
+- Added a loopback-only Windows TCP sender/relay that forwards Quest control packets to the existing localhost UDP host and sends H.264 video over TCP without changing the normal UDP/Wi-Fi path.
+- Added Studio's one-click wired setup: install the matching Quest APK, configure ADB reverse, push USB-mode settings, start the host/sender, and relaunch the Quest app. Stopping the session or a failed start restores UDP settings and removes the reverse mapping.
+- Added TCP framing, config-export, handshake-diagnostic, and wired transport tests.
+- The native Quest APK and Windows package must pass CI, and end-to-end throughput/latency/decoder behavior still require physical Quest testing.
+
 ## 0.8.1 — OpenXR runtime correctness hardening (experimental)
 
 - Corrected duplicate validation branches in action-set/action creation and interaction-profile binding setup.

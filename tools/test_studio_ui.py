@@ -47,6 +47,31 @@ class StudioUiTests(unittest.TestCase):
         self.assertIn("Fake VR / Game Bridge", labels)
         self.assertIn("Play Modes", labels)
 
+    def test_connect_home_and_usb_actions_are_first_class(self):
+        notebooks = []
+        buttons = []
+        def visit(widget):
+            if widget.winfo_class() == "TNotebook":
+                notebooks.append(widget)
+            if widget.winfo_class() == "TButton":
+                buttons.append(str(widget.cget("text")))
+            for child in widget.winfo_children():
+                visit(child)
+        visit(self.app)
+        labels = [notebooks[0].tab(tab_id, "text") for tab_id in notebooks[0].tabs()]
+        self.assertEqual(labels[0], "Connect")
+        self.assertTrue(hasattr(self.app, "usb_status_var"))
+        self.assertIn("Test USB Connection", buttons)
+        self.assertIn("Locate adb.exe…", buttons)
+        self.assertIn("Send Settings to Quest", buttons)
+        self.assertIn("Start Wired USB Streaming", buttons)
+
+    def test_usb_explanation_describes_bidirectional_wired_video_and_tracking(self):
+        note = self.app.usb_transport_note.cget("text").casefold()
+        self.assertIn("bidirectional tcp stream", note)
+        self.assertIn("video returns to the quest over the usb cable", note)
+        self.assertIn("does not use wi-fi", note)
+
     def test_virtual_room_exposes_new_scenery_choices(self):
         combo_values = []
         def visit(widget):
