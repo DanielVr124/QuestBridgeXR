@@ -245,9 +245,17 @@ def build_controller(side):
          (math.radians(90.0), 0.0, 0.0))
     box("StrapLoopBridge", (0.0, -0.091, 0.025), (0.013, 0.008, 0.007), SHELL, 0.002)
 
-    # Parent all geometry under a stable OpenXR grip-origin empty.
-    for obj in created[1:]:
-        obj.parent = root
+    # Consolidate geometry per controller to keep the Quest draw-call count low.
+    mesh_parts = [obj for obj in created[1:] if obj.type == "MESH"]
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in mesh_parts:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = mesh_parts[0]
+    bpy.ops.object.join()
+    combined = bpy.context.object
+    combined.name = prefix + ".ControllerMesh"
+    combined.parent = root
+    created = [root, combined]
     bpy.context.view_layer.update()
     return root, created, collection
 
@@ -275,7 +283,11 @@ bpy.context.view_layer.update()
 
 # Lighting and camera for actual Blender renders, not mock-up illustrations.
 scene = bpy.context.scene
-scene.render.engine = "BLENDER_EEVEE_NEXT"
+try:
+    scene.render.engine = "BLENDER_EEVEE_NEXT"
+except TypeError:
+    # Ubuntu 22.04 repositories may package Blender 3.x.
+    scene.render.engine = "BLENDER_EEVEE"
 scene.render.resolution_x = 1400
 scene.render.resolution_y = 1000
 scene.render.resolution_percentage = 100
