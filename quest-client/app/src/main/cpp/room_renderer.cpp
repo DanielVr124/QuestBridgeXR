@@ -2586,7 +2586,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
         }
         chairWheelRoll_=std::fmod(chairWheelRoll_+speedNow*dt/.065f,2.0f*kPi);
         // Hydraulic seat-height travel is gentle and bounded to +/- 10 cm.
-        if(rightGrip>0.55f) {
+        if(rightGrip>0.55f&&!mouseGripAttached_&&!previousMouseGrip_) {
             chairHeight_=std::clamp(chairHeight_+std::clamp(rightStickY,-1.0f,1.0f)*0.12f*dt,
                                     -0.10f,0.10f);
         }
