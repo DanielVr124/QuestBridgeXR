@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <cctype>
 #include <vector>
 #include <zlib.h>
 
@@ -181,7 +182,32 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
 void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint locModel,GLint locColor,
                     GLint locTextured,GLint locTexture,GLint locMaterial,GLint locRounded,GLint locUvScale,
                     const std::array<float,4>* emissiveOverrideColor,const char* emissiveNodeMarker,
-                    const std::array<float,4>* albedoTint) const {
+                    const std::array<float,4>* albedoTint,float seatLiftMeters,
+                    float backrestReclineRadians) const {
+    auto lowerName=[](std::string name) {
+        std::transform(name.begin(),name.end(),name.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+        return name;
+    };
+    auto isFixedBase=[&](const std::string& name) {
+        const std::string lower=lowerName(name);
+        return lower.find("wheel")!=std::string::npos || lower.find("caster")!=std::string::npos ||
+               lower.find("base")!=std::string::npos || lower.find("piston")!=std::string::npos ||
+               lower.find("gas_lift")!=std::string::npos || lower.find("gas lift")!=std::string::npos;
+    };
+    auto isBackrest=[&](const std::string& name) {
+        const std::string lower=lowerName(name);
+        return lower.find("backrest")!=std::string::npos || lower.find("back_rest")!=std::string::npos ||
+               lower.find("upper_back")!=std::string::npos || lower.find("back_pad")!=std::string::npos;
+    };
+    const float c=std::cos(backrestReclineRadians),sn=std::sin(backrestReclineRadians);
+    // Chair-space hinge sits just above the seat cushion, where the backrest meets the seat.
+    const float toHinge[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,-0.88f,-0.30f,1};
+    const float fromHinge[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0.88f,0.30f,1};
+    const float rotateBack[16]={1,0,0,0, 0,c,sn,0, 0,-sn,c,0, 0,0,0,1};
+    float hingeTmp[16],hingeRotation[16];
+    multiply(rotateBack,toHinge,hingeTmp);
+    multiply(fromHinge,hingeTmp,hingeRotation);
+    const float lift[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,seatLiftMeters,0,1};
     for(const Primitive& p:primitives_) {
         const bool emissiveOverride=emissiveOverrideColor&&emissiveNodeMarker&&
             p.nodeName.find(emissiveNodeMarker)!=std::string::npos;
@@ -189,7 +215,17 @@ void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint lo
         if(albedoTint&&!emissiveOverride) {
             for(size_t channel=0;channel<4;++channel) color[channel]*=(*albedoTint)[channel];
         }
-        float model[16],mvp[16]; multiply(placement,p.nodeMatrix.data(),model); multiply(pv,model,mvp);
+        float nodeTransform[16],model[16],mvp[16];
+        std::copy(p.nodeMatrix.begin(),p.nodeMatrix.end(),nodeTransform);
+        if(!isFixedBase(p.nodeName) && std::fabs(seatLiftMeters)>0.0001f) {
+            float lifted[16]; multiply(lift,nodeTransform,lifted);
+            std::copy(lifted,lifted+16,nodeTransform);
+        }
+        if(isBackrest(p.nodeName) && std::fabs(backrestReclineRadians)>0.0001f) {
+            float articulated[16]; multiply(hingeRotation,nodeTransform,articulated);
+            std::copy(articulated,articulated+16,nodeTransform);
+        }
+        multiply(placement,nodeTransform,model); multiply(pv,model,mvp);
         glUniformMatrix4fv(locMvp,1,GL_FALSE,mvp); glUniformMatrix4fv(locModel,1,GL_FALSE,model);
         glUniform4fv(locColor,1,color.data());
         glUniform1i(locMaterial,emissiveOverride?7:-1); glUniform1i(locRounded,0);
