@@ -41,7 +41,9 @@ public:
     void updateLocomotion(float leftX, float leftY, float rightX, float rightY,
                           float leftGrip, float rightGrip, float dt,
                           const XrPosef& headPose);
-    void handleRoomInteraction(const XrPosef& controllerAimPose, const XrPosef& headPose, bool triggerPressed);
+    void handleRoomInteraction(const XrPosef& controllerAimPose, const XrPosef& controllerGripPose,
+                                bool gripPoseValid, const XrPosef& headPose, bool triggerPressed,
+                                bool gripPressed, bool releasePressed);
     void setTrackedControllerPoses(const std::array<XrPosef,2>& poses,
                                    const std::array<bool,2>& valid);
     bool consumeMousePayload(qbx::MousePayload& payload);
@@ -88,7 +90,8 @@ private:
     void drawText(const float* projectionView, const char* text, float x, float y, float z,
                   float pixelSize, const std::array<float, 4>& color,
                   float curveCenterX = 0.0f, float curveWidth = 0.0f, float curveDepth = 0.0f,
-                  float curveCenterY = 0.0f);
+                  float curveCenterY = 0.0f, float curveYaw = 0.0f,
+                  float transformCenterX = 0.0f, float transformCenterZ = 0.0f);
     void drawSphere(const float* projectionView, float x, float y, float z,
                     float sx, float sy, float sz, const std::array<float, 4>& color,
                     int material = 0);
@@ -98,7 +101,8 @@ private:
     void drawCurvedPanel(const float* projectionView, float x, float y, float z,
                          float width, float height, float curveDepth, GLuint texture,
                          const std::array<float, 4>& color, int segments = 24,
-                         float yaw = 0.0f);
+                         float yaw = 0.0f, float curvatureCenterOffsetX = 0.0f,
+                         float curvatureWidth = 0.0f);
     void drawGroundShadow(const float* projectionView, float x, float y, float z,
                           float width, float depth, float opacity);
     void drawEnvironmentWindow(const float* projectionView, float wallX, float centerZ, float floorY,
@@ -215,6 +219,7 @@ private:
     bool chairFacingPending_ = false;
     float chairHeight_ = 0.0f;       // Limited +/- 10 cm seat-height travel.
     float chairRecline_ = 0.0f;      // Smoothed backrest recline angle in radians.
+    float chairReclineTarget_ = 0.0f;
     float chairVelocityX_ = 0.0f;
     float chairVelocityZ_ = 0.0f;
     float chairAngularVelocity_ = 0.0f;
@@ -247,6 +252,10 @@ private:
     bool roomLightsOn_ = true;
     bool previousRoomTrigger_ = false;
     bool mouseDragging_ = false;
+    bool mouseGripAttached_ = false;
+    bool previousMouseGrip_ = false;
+    bool previousMouseRelease_ = false;
+    float mouseYaw_ = 0.0f;
     bool mousePayloadPending_ = false;
     bool sittingActive_ = false;
     bool sitAnchorPending_ = false;
