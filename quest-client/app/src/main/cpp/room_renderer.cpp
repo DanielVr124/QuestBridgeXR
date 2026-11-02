@@ -3068,10 +3068,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform3f(locCeilingLightColor_,1.0f,0.82f,0.70f);
     glUniform1f(locCeilingLightIntensity_,1.02f*roomLightScale);
     glUniform3f(locPracticalLightPosition_,-halfW+0.30f,floorY+1.92f,-1.45f);
-    glUniform3f(locPracticalLightColor_,ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]);
+    glUniform3f(locPracticalLightColor_,darkAccent[0],darkAccent[1],darkAccent[2]);
     glUniform1f(locPracticalLightIntensity_,0.0f);
     glUniform3f(locPracticalLight2Position_,halfW-0.30f,floorY+1.92f,-1.45f);
-    glUniform3f(locPracticalLight2Color_,ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]);
+    glUniform3f(locPracticalLight2Color_,darkAccent[0],darkAccent[1],darkAccent[2]);
     glUniform1f(locPracticalLight2Intensity_,0.0f);
     glUniform3f(locHeadboardGlowPosition_,halfW-2.0f+.20f,floorY+1.43f,-halfD+2.10f-1.22f);
     glUniform3f(locHeadboardGlowColor_,ledCeiling[0],ledCeiling[1],ledCeiling[2]);
