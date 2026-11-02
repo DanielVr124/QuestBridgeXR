@@ -995,14 +995,18 @@ private:
         float moveX = applyDeadzone(std::clamp(config_.invertThumbstickX ? -move.x : move.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
         float moveY = applyDeadzone(std::clamp(config_.invertThumbstickY ? -move.y : move.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
         float turnX = applyDeadzone(std::clamp(turn.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
+        const float turnY = applyDeadzone(std::clamp(turn.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
+        const float leftGrip = std::clamp(floatAction(hands_[0].squeeze, hands_[0].handPath), 0.0f, 1.0f);
+        const float rightGrip = std::clamp(floatAction(hands_[1].squeeze, hands_[1].handPath), 0.0f, 1.0f);
         if (room_.menuVisible()) {
-            room_.handleMenuInput(move.x, move.y, turn.x, menuSelectEdge);
+            // Menus are operated only by the right-hand pointer and trigger.
+            // Sticks never navigate the UI or leak into room/chair movement.
             moveX = 0.0f;
             moveY = 0.0f;
             turnX = 0.0f;
         }
         if (room_.consumeReconnectRequest()) network_.requestReconnect();
-        room_.updateLocomotion(moveX, moveY, turnX, dt, headPose);
+        room_.updateLocomotion(moveX, moveY, turnX, turnY, leftGrip, rightGrip, dt, headPose);
 
         // Use the existing right-hand pose/trigger for physical room hardware.
         // The ray interaction is independent of PC controller telemetry forwarding.
