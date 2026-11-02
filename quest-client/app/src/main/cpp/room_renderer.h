@@ -251,7 +251,6 @@ private:
     bool reconnectRequested_ = false;
     bool roomLightsOn_ = true;
     bool previousRoomTrigger_ = false;
-    bool mouseDragging_ = false;
     bool mouseGripAttached_ = false;
     bool previousMouseGrip_ = false;
     bool previousMouseRelease_ = false;
