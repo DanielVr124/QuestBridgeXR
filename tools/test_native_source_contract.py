@@ -334,6 +334,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertNotIn("mouseDragging_", header)
         self.assertIn("if(releaseEdge&&mouseGripAttached_)", renderer)
         self.assertIn("if(gripEdge&&gripPoseValid)", renderer)
+        self.assertIn("if(rightGrip>0.55f&&!mouseGripAttached_&&!previousMouseGrip_)", renderer)
         self.assertIn("mouseGripAttached_=true", renderer)
         self.assertIn("roomGripPose.position.x-deskX-mouseGrabOffsetX_", renderer)
         self.assertIn("roomGripPose.position.z-deskZ-mouseGrabOffsetZ_", renderer)
