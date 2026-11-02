@@ -256,7 +256,9 @@ void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint lo
         return lower.find("backrest")!=std::string::npos || lower.find("back_rest")!=std::string::npos ||
                lower.find("upper_back")!=std::string::npos || lower.find("back_pad")!=std::string::npos;
     };
-    const float c=std::cos(backrestReclineRadians),sn=std::sin(backrestReclineRadians);
+    // The chair GLB's local backrest points toward +Z after its 180-degree node
+    // transform; negative X rotation therefore reclines it backward, away from the desk.
+    const float c=std::cos(backrestReclineRadians),sn=-std::sin(backrestReclineRadians);
     // Chair-space hinge sits just above the seat cushion, where the backrest meets the seat.
     // Measured chair hinge in the GLB's node/world coordinates. The source
     // nodes rotate 180 degrees around Y, so the hinge sits at +Z after node transform.
