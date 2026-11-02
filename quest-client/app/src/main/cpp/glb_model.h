@@ -31,6 +31,7 @@ private:
         std::array<float,16> nodeMatrix{};
         bool indexed=false;
         bool backrestPart=false;
+        bool seatLiftPart=false;
         uint32_t sourceMeshIndex=0;
         uint32_t sourcePrimitiveIndex=0;
     };
