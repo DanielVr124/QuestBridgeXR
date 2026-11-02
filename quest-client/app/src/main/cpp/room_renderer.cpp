@@ -2527,15 +2527,18 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     float targetZ=std::clamp(playerZ+stepZ,-halfD+0.34f,halfD-0.34f);
 
     constexpr float bedScale=1.28f;
-    const float bedWidth=3.20f*bedScale,bedDepth=4.05f*bedScale;
-    const float bedX=halfW-bedWidth*.5f,bedZ=-halfD+bedDepth*.5f;
+    // Bounds measured from gaming_bed.glb: X [-1.29,+1.29], Z [-1.106,+1.115].
+    const float bedWidth=2.58f*bedScale,bedDepth=2.221f*bedScale;
+    const float bedX=halfW-1.29f*bedScale;
+    const float bedZ=-halfD+1.106f*bedScale;
+    const float bedCenterZ=bedZ+.0045f*bedScale;
     auto overlaps=[](float x,float z,float cx,float cz,float rx,float rz) {
         return std::fabs(x-cx)<rx && std::fabs(z-cz)<rz;
     };
     auto collides=[&](float x,float z) {
         return overlaps(x,z,deskX,deskZ,1.36f,.52f) ||
                (!sittingActive_&&settings_.showChair&&overlaps(x,z,chairX,chairZ,.43f,.60f)) ||
-               overlaps(x,z,bedX,bedZ,bedWidth*.5f,bedDepth*.5f);
+               overlaps(x,z,bedX,bedCenterZ,bedWidth*.5f,bedDepth*.5f);
     };
 
     if(sittingActive_&&settings_.showChair) {
@@ -3296,12 +3299,14 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // -------------------------------------------------------------------------
     // Place the enlarged upholstered bed flush into the far-right/back corner.
     constexpr float bedScale=1.28f;
-    const float bedWidth=3.20f*bedScale;
-    const float bedDepth=4.05f*bedScale;
-    const float bedRenderX=halfW-bedWidth*.5f;
-    const float bedX=bedRenderX;
-    const float bedZ=backZ+bedDepth*.5f;
-    drawGroundShadow(pv.data(),bedRenderX,floorY+.004f,bedZ,bedWidth,bedDepth,.42f);
+    // Use the imported GLB's actual geometric bounds so the bed headboard and
+    // right edge land flush against the room walls.
+    const float bedWidth=2.58f*bedScale;
+    const float bedDepth=2.221f*bedScale;
+    const float bedX=halfW-1.29f*bedScale;
+    const float bedZ=backZ+1.106f*bedScale;
+    const float bedCenterZ=bedZ+.0045f*bedScale;
+    drawGroundShadow(pv.data(),bedX,floorY+.004f,bedCenterZ,bedWidth,bedDepth,.42f);
     const float bedPlacement[16] = {
         bedScale,0,0,0, 0,bedScale,0,0, 0,0,bedScale,0, bedX,floorY,bedZ,1
     };
@@ -3533,7 +3538,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // User-supplied tall-stand TV replaces the former procedural screen and console.
     // The imported display faces back toward the bed and retains PC stream routing.
     if(settings_.showTv) {
-        const float tvX=bedX, tvZ=bedZ+bedDepth*.5f+.85f;
+        const float tvX=bedX, tvZ=bedCenterZ+bedDepth*.5f+.85f;
         const float tvRenderX=tvX+.20f;
         // Scale the full stand and display together to better balance it beside the bed.
         constexpr float tvModelScale=1.32f;
