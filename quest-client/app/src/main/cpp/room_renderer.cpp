@@ -2627,9 +2627,9 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
 }
 
 void RoomRenderer::updateMousePayload(std::uint16_t buttons) {
-    const float normalizedX=std::clamp((mouseOffsetX_+1.20f)/2.40f,0.0f,1.0f);
-    // The mapping exactly matches the desk ray's +/-0.41 m drag limits.
-    const float normalizedY=std::clamp((mouseOffsetZ_+.41f)/.82f,0.0f,1.0f);
+    const float normalizedX=std::clamp((mouseOffsetX_+1.10f)/2.20f,0.0f,1.0f);
+    // Mouse center is kept inside the desk edge with enough room for the whole shell.
+    const float normalizedY=std::clamp((mouseOffsetZ_+.31f)/.62f,0.0f,1.0f);
     const std::uint16_t nextX=static_cast<std::uint16_t>(std::lround(normalizedX*65535.0f));
     const std::uint16_t nextY=static_cast<std::uint16_t>(std::lround(normalizedY*65535.0f));
     const bool changed=nextX!=lastQueuedMouseX_||nextY!=lastQueuedMouseY_||
@@ -2654,10 +2654,15 @@ bool RoomRenderer::consumeMousePayload(qbx::MousePayload& payload) {
     return true;
 }
 
-void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const XrPosef& headPose,
-                                         bool triggerPressed) {
+void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const XrPosef& controllerGripPose,
+                                         bool gripPoseValid,const XrPosef& headPose,bool triggerPressed,
+                                         bool gripPressed,bool releasePressed) {
     const bool triggerEdge=triggerPressed&&!previousRoomTrigger_;
+    const bool gripEdge=gripPressed&&!previousMouseGrip_;
+    const bool releaseEdge=releasePressed&&!previousMouseRelease_;
     previousRoomTrigger_=triggerPressed;
+    previousMouseGrip_=gripPressed;
+    previousMouseRelease_=releasePressed;
 
     float halfW=3.0f,halfD=3.8f;
     if(settings_.roomSize=="large"){halfW=6.0f;halfD=7.5f;}
@@ -2671,15 +2676,65 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
     const float chairX=deskX+chairOffsetX_;
     const float chairZ=deskZ+1.12f+chairOffsetZ_;
     const float effectiveYaw=virtualYaw_+(sittingActive_?chairYaw_:0.0f);
+    const float seatPoseDrop=.42f*seatedBlend_-chairHeight_*seatedBlend_;
     const XrPosef roomPointerPose=mapTrackedPoseToRoom(
-        controllerAimPose,headPose,moveX_,moveZ_,effectiveYaw,.42f*seatedBlend_);
+        controllerAimPose,headPose,moveX_,moveZ_,effectiveYaw,seatPoseDrop);
+    XrPosef roomGripPose=controllerGripPose;
+    if(gripPoseValid) {
+        roomGripPose=mapTrackedPoseToRoom(controllerGripPose,headPose,moveX_,moveZ_,
+                                          effectiveYaw,seatPoseDrop);
+    }
     const auto pointerOrigin=std::array<float,3>{roomPointerPose.position.x,
                                                  roomPointerPose.position.y,
                                                  roomPointerPose.position.z};
     const auto pointerDirection=rotateByQuaternion(roomPointerPose.orientation,{0.0f,0.0f,-1.0f});
 
-    // Never leave a host-side mouse button held when a menu or settings change
-    // interrupts a drag operation.
+    // A Touch Plus grip attaches the mouse only when the tracked hand is physically
+    // over the mouse on the desk. The mouse then follows hand X/Z but remains on the
+    // tabletop; A detaches it, while the trigger performs the PC left-click.
+    if(releaseEdge&&mouseGripAttached_) {
+        mouseGripAttached_=false;
+        updateMousePayload(0);
+    }
+    if(menuVisible_) {
+        if(mouseGripAttached_) {
+            mouseGripAttached_=false;
+            updateMousePayload(0);
+        }
+    } else if(settings_.roomControlsEnabled) {
+        if(mouseGripAttached_) {
+            if(gripPoseValid) {
+                mouseOffsetX_=std::clamp(roomGripPose.position.x-deskX-mouseGrabOffsetX_,-1.10f,1.10f);
+                mouseOffsetZ_=std::clamp(roomGripPose.position.z-deskZ-mouseGrabOffsetZ_,-.31f,.31f);
+                const auto& q=roomGripPose.orientation;
+                mouseYaw_=std::atan2(2.0f*(q.w*q.y+q.x*q.z),
+                                     1.0f-2.0f*(q.y*q.y+q.x*q.x));
+            }
+            updateMousePayload(triggerPressed?1u:0u);
+            return;
+        }
+        if(gripEdge&&gripPoseValid) {
+            const float mouseX=deskX+mouseOffsetX_;
+            const float mouseZ=deskZ+mouseOffsetZ_;
+            const bool touchingMouse=
+                std::fabs(roomGripPose.position.x-mouseX)<=.145f &&
+                std::fabs(roomGripPose.position.z-mouseZ)<=.180f &&
+                roomGripPose.position.y>=deskSurface-.14f &&
+                roomGripPose.position.y<=deskSurface+.22f;
+            if(touchingMouse) {
+                mouseGripAttached_=true;
+                mouseGrabOffsetX_=roomGripPose.position.x-mouseX;
+                mouseGrabOffsetZ_=roomGripPose.position.z-mouseZ;
+                const auto& q=roomGripPose.orientation;
+                mouseYaw_=std::atan2(2.0f*(q.w*q.y+q.x*q.z),
+                                     1.0f-2.0f*(q.y*q.y+q.x*q.x));
+                updateMousePayload(triggerPressed?1u:0u);
+                return;
+            }
+        }
+    }
+
+    // Never leave a host-side click held when a menu or settings change interrupts input.
     if(menuVisible_) {
         menuPointerValid_=false;
         auto menuPointerDirection=pointerDirection;
@@ -2825,31 +2880,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
 
     float hitDeskX=0.0f,hitDeskZ=0.0f;
     const bool overDesk=deskIntersection(hitDeskX,hitDeskZ);
-    if(mouseDragging_) {
-        if(!triggerPressed) {
-            mouseDragging_=false;
-            updateMousePayload(0);
-        } else {
-            if(overDesk) {
-                mouseOffsetX_=std::clamp(hitDeskX-deskX-mouseGrabOffsetX_,-1.20f,1.20f);
-                mouseOffsetZ_=std::clamp(hitDeskZ-deskZ-mouseGrabOffsetZ_,-.41f,.41f);
-            }
-            updateMousePayload(1);
-        }
-        return;
-    }
     if(!triggerEdge)return;
-
-    // Trigger-down on the mouse grabs it. Continue holding to drag; trigger-up
-    // releases the physical left mouse button on Windows.
-    if(overDesk && std::fabs((hitDeskX-deskX)-mouseOffsetX_)<=.065f &&
-       std::fabs((hitDeskZ-deskZ)-mouseOffsetZ_)<=.090f) {
-        mouseGrabOffsetX_=(hitDeskX-deskX)-mouseOffsetX_;
-        mouseGrabOffsetZ_=(hitDeskZ-deskZ)-mouseOffsetZ_;
-        mouseDragging_=true;
-        updateMousePayload(1);
-        return;
-    }
 
     // A click while seated stands the user up. The virtual eye-height offset
     // eases out over time; raw OpenXR head tracking itself remains unchanged.
@@ -2936,6 +2967,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float pivotY=headCenterPose.position.y;
     const float pivotZ=headCenterPose.position.z;
     const float effectiveWorldYaw=virtualYaw_+(sittingActive_?chairYaw_:0.0f);
+    const float seatPoseDrop=.42f*seatedBlend_-chairHeight_*seatedBlend_;
     const float effectiveChairPitch=chairRecline_*seatedBlend_;
     const Mat4 inverseVirtualRotation=mul(
         translation(pivotX,pivotY,pivotZ),
@@ -2947,8 +2979,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float reclineDrop=reclineHeadLever*(1.0f-std::cos(effectiveChairPitch));
     const float reclineBack=reclineHeadLever*std::sin(effectiveChairPitch);
     const Mat4 inverseVirtualTranslation=translation(
-        -moveX_,.42f*seatedBlend_-chairHeight_*seatedBlend_+reclineDrop,
-        -moveZ_-reclineBack);
+        -moveX_,seatPoseDrop+reclineDrop,-moveZ_-reclineBack);
     const Mat4 inverseVirtualWorld=mul(inverseVirtualRotation,inverseVirtualTranslation);
     Mat4 camera=mul(physicalView,inverseVirtualWorld);
     Mat4 pv=mul(projection,camera);
@@ -3502,10 +3533,9 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // White wireless mouse rests on the desk and moves only over the tabletop.
     const float mouseX=deskX+mouseOffsetX_,mouseZ=deskZ+mouseOffsetZ_;
     if(mouseModel_.loaded()) {
-        const float mousePlacement[16]={
-            1,0,0,0, 0,1,0,0, 0,0,1,0, mouseX,deskSurface+.003f,mouseZ,1
-        };
-        mouseModel_.draw(pv.data(),mousePlacement,locMvp_,locModel_,locColor_,locTextured_,
+        const Mat4 mousePlacementMatrix=mul(translation(mouseX,deskSurface+.003f,mouseZ),
+                                             rotateY(mouseYaw_));
+        mouseModel_.draw(pv.data(),mousePlacementMatrix.data(),locMvp_,locModel_,locColor_,locTextured_,
                          locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&mouseExposure);
     }
 
@@ -3558,7 +3588,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     for(int hand=0;hand<2;++hand) {
         if(!controllerPoseValid_[hand]) continue;
         const XrPosef virtualController=mapTrackedPoseToRoom(
-            controllerPoses_[hand],headCenterPose,moveX_,moveZ_,effectiveWorldYaw,.42f*seatedBlend_);
+            controllerPoses_[hand],headCenterPose,moveX_,moveZ_,effectiveWorldYaw,seatPoseDrop);
         const Mat4 controllerTransform=mul(
             translation(virtualController.position.x,virtualController.position.y,
                         virtualController.position.z),
@@ -3838,7 +3868,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 label(chairTitles[row],bodyX-.184f,chairRows[row]+.002f,.00134f,white);
                 label(chairValues[row].c_str(),bodyX+.060f,chairRows[row]+.002f,.00132f,
                       row==0&&sittingActive_?green:blue);
-                if(row>=1&&row<=3) {
+                if(row>=1&&row<=3||row==5) {
                     label("−",bodyX+.169f,chairRows[row]+.002f,.00170f,muted);
                     label("+",bodyX+.190f,chairRows[row]+.002f,.00170f,cyan);
                 }
