@@ -199,7 +199,11 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
                 for(size_t tri=0;tri+2<indices.size();tri+=3) {
                     const uint32_t a=indices[tri],b=indices[tri+1],c=indices[tri+2];
                     const float centerY=(positions[a*3+1]+positions[b*3+1]+positions[c*3+1])/3.0f;
-                    auto& bucket=centerY>.30f?movingSupportIndices:fixedBaseIndices;
+                    const float centerX=(positions[a*3+0]+positions[b*3+0]+positions[c*3+0])/3.0f;
+                    // Only the two upper arm-support brackets move with the seat.
+                    // The central gas piston and five-spoke base remain planted.
+                    auto& bucket=(centerY>.30f&&std::fabs(centerX)>.10f)
+                        ?movingSupportIndices:fixedBaseIndices;
                     bucket.push_back(a);bucket.push_back(b);bucket.push_back(c);
                 }
                 uploadPart(fixedBaseIndices,false,false);
