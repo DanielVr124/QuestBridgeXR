@@ -49,7 +49,7 @@ public:
     void cycleEnvironment();
     void toggleMenu();
     bool menuVisible() const { return menuVisible_; }
-    void handleMenuInput(float horizontal, float vertical, float adjust, bool selectPressed);
+    void handleMenuInput(float horizontal, float vertical, float adjust, bool selectPressed, int selectionDirection = 1);
     void setConnectionState(bool connected, const std::string& hostIp, bool streaming);
     bool consumeReconnectRequest();
     void renderEye(int eyeIndex, int width, int height, const XrView& view,
@@ -114,7 +114,7 @@ private:
         float brightness = 0.68f;
     };
     RoomSettings settings_{};
-    std::array<LedZoneSettings,7> ledZones_{};
+    std::array<LedZoneSettings,2> ledZones_{};
     bool ledDefaultsSeeded_ = false;
     GlbModel bedModel_;
     GlbModel deskModel_;
@@ -211,6 +211,8 @@ private:
     float chairOffsetX_ = 0.0f;
     float chairOffsetZ_ = 0.0f;
     float chairYaw_ = 0.0f;
+    float chairFacingYaw_ = 0.0f;
+    bool chairFacingPending_ = false;
     float chairHeight_ = 0.0f;       // Limited +/- 10 cm seat-height travel.
     float chairRecline_ = 0.0f;      // Smoothed backrest recline angle in radians.
     float chairVelocityX_ = 0.0f;
