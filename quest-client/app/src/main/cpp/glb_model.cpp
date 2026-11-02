@@ -234,7 +234,8 @@ void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint lo
         const std::string lower=lowerName(name);
         return lower.find("wheel")!=std::string::npos || lower.find("caster")!=std::string::npos ||
                lower.find("base")!=std::string::npos || lower.find("piston")!=std::string::npos ||
-               lower.find("gas_lift")!=std::string::npos || lower.find("gas lift")!=std::string::npos;
+               lower.find("gas_lift")!=std::string::npos || lower.find("gas lift")!=std::string::npos ||
+               lower=="chair_chrome";
     };
     auto isBackrest=[&](const std::string& name) {
         const std::string lower=lowerName(name);
