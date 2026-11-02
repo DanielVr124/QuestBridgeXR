@@ -3604,8 +3604,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             panel(bodyX,y,bodyWidth,.040f,menuSelection_==index?selected:card);
             label(title,bodyX-.184f,y+.005f,.00185f,white);
             label(value.c_str(),bodyX+.045f,y+.005f,.00175f,blue);
-            label("−",bodyX+.169f,y+.004f,.00185f,muted);
-            label("+",bodyX+.190f,y+.004f,.00185f,cyan);
+            if(index==0||index==2) {
+                label("−",bodyX+.169f,y+.004f,.00185f,muted);
+                label("+",bodyX+.190f,y+.004f,.00185f,cyan);
+            }
         };
 
         glDisable(GL_DEPTH_TEST);
