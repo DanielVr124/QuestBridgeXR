@@ -3432,7 +3432,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float angle=arcIndex*monitorArcStep;
         const float screenX=monitorX+monitorArcRadius*std::sin(angle);
         const float screenZ=monitorZ+monitorArcRadius*(1.0f-std::cos(angle));
-        const Mat4 monitorPlacementMatrix=mul(translation(screenX,deskSurface,screenZ),rotateY(-angle));
+        const Mat4 monitorPlacementMatrix=mul(translation(screenX,deskSurface,screenZ),
+            mul(rotateY(-angle),scaling(1.03f,1.0f,1.0f)));
         monitorModel_.draw(pv.data(),monitorPlacementMatrix.data(),locMvp_,locModel_,locColor_,locTextured_,
                            locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&monitorExposure);
         if(streamOn) {
