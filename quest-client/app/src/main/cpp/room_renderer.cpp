@@ -2470,7 +2470,7 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
         // Ease the virtual room anchor toward the chair instead of teleporting
         // the player to it. Raw OpenXR head tracking and orientation stay intact.
         const float targetMoveX=chairX-headPose.position.x;
-        const float targetMoveZ=(chairZ+.18f)-headPose.position.z;
+        const float targetMoveZ=(chairZ+.05f)-headPose.position.z;
         const float anchorBlend=1.0f-std::exp(-std::max(dt,0.0f)*7.5f);
         moveX_+=(targetMoveX-moveX_)*anchorBlend;
         moveZ_+=(targetMoveZ-moveZ_)*anchorBlend;
@@ -3075,13 +3075,13 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform1f(locHeadboardGlowIntensity_,ledZones_[0].enabled?1.72f*roomLightScale:0.0f);
     glUniform3f(locNeonBluePosition_,-halfW+0.20f,floorY+2.75f,-0.45f);
     glUniform3f(locNeonBlueColor_,ledLeftWall[0],ledLeftWall[1],ledLeftWall[2]);
-    glUniform1f(locNeonBlueIntensity_,ledZones_[2].enabled?1.12f*roomLightScale:0.0f);
+    glUniform1f(locNeonBlueIntensity_,0.0f);
     glUniform3f(locNeonVioletPosition_,halfW-0.20f,floorY+2.55f,0.80f);
     glUniform3f(locNeonVioletColor_,ledRightWall[0],ledRightWall[1],ledRightWall[2]);
-    glUniform1f(locNeonVioletIntensity_,ledZones_[3].enabled?1.08f*roomLightScale:0.0f);
+    glUniform1f(locNeonVioletIntensity_,0.0f);
     glUniform3f(locNeonPinkPosition_,0.0f,floorY+2.25f,backZ+0.58f);
     glUniform3f(locNeonPinkColor_,ledRear[0],ledRear[1],ledRear[2]);
-    glUniform1f(locNeonPinkIntensity_,ledZones_[4].enabled?0.82f*roomLightScale:0.0f);
+    glUniform1f(locNeonPinkIntensity_,0.0f);
     // Room shell: floor, ceiling, side walls and back wall. Shapes stay anchored in world coordinates.
     // The right wall is split around the single window aperture. No other wall surface
     // is transparent, and the existing room bounds and wall material are preserved.
@@ -3686,7 +3686,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                   menuY+.010f,.00135f,pcStreaming_?cyan:muted);
             panel(bodyX,menuY-.075f,bodyWidth,.045f,menuSelection_==0?selected:card);
             label("RECONNECT TO PC",bodyX-.175f,menuY-.080f,.00180f,white);
-            label("A",bodyX+.165f,menuY-.080f,.00175f,blue);
+            label("TRIGGER",bodyX+.165f,menuY-.080f,.00155f,blue);
             label("Check the PC IP in QuestBridge Studio if offline.",
                   bodyX-.184f,menuY-.125f,.00130f,muted);
         } else if(menuPage_==1) {
@@ -3719,7 +3719,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                     label(item==0?"NEON BEDROOM":"WALKABLE CITY",bodyX+.076f,
                           sceneRows[item]-.004f,.00108f,selectedScene?cyan:muted);
                 }
-                label("A  SELECT",bodyX-.130f,menuY-.068f,.00118f,muted);
+                label("POINT + TRIGGER",bodyX-.130f,menuY-.068f,.00118f,muted);
             }
         } else if(menuPage_==2) {
             label("DISPLAY",bodyX-.184f,contentTop,.00205f,white);
