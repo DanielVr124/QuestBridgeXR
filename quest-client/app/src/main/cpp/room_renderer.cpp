@@ -1927,7 +1927,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
         if(environmentDropdownOpen_) {
             environmentDropdownIndex_=(environmentDropdownIndex_+(vertical>0.0f?1:1))%2;
         } else {
-            const int rowCounts[5]={1,6,3,6,6};
+            const int rowCounts[5]={1,6,3,6,8};
             const int count=rowCounts[menuPage_];
             menuSelection_=(menuSelection_+(vertical>0.0f?count-1:1))%count;
         }
@@ -2042,11 +2042,11 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
                 sittingActive_=!sittingActive_;
                 sitAnchorPending_=sittingActive_;
                 if(!sittingActive_) { chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f; chairCasterYaw_=0.0f; }
-            } else if(menuSelection_==4) {
+            } else if(menuSelection_==6) {
                 chairOffsetX_=chairOffsetZ_=chairYaw_=chairWheelRoll_=chairCasterYaw_=0.0f;
                 chairHeight_=chairRecline_=0.0f;
                 chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f;
-            } else if(menuSelection_==5) {
+            } else if(menuSelection_==7) {
                 sittingActive_=false;
                 sitAnchorPending_=false;
                 virtualYaw_+=chairYaw_;
@@ -2687,14 +2687,18 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
                         const float navX=monitorX-.216f;
                         const float bodyX=monitorX+.063f;
                         if(std::fabs(hitX-navX)<.067f) {
-                            const float tabY[5]={menuY+.061f,menuY+.015f,menuY-.031f,
-                                                menuY-.077f,menuY-.123f};
-                            for(int i=0;i<5;++i) if(std::fabs(hitY-tabY[i])<.020f) {
-                                menuPage_=i;menuSelection_=0;
-                                environmentDropdownOpen_=false;
-                                lightingColorPickerOpen_=false;
-                                break;
+                            if(std::fabs(hitY-(menuY+.061f))<.018f) {
+                                menuPage_=0;menuSelection_=0;
+                            } else if(std::fabs(hitY-(menuY+.015f))<.018f) {
+                                menuPage_=menuPage_==0?1:menuPage_;menuSelection_=0;
+                            } else {
+                                const float settingsRows[4]={menuY-.031f,menuY-.063f,menuY-.095f,menuY-.127f};
+                                for(int i=0;i<4;++i) if(std::fabs(hitY-settingsRows[i])<.016f) {
+                                    menuPage_=i+1;menuSelection_=0;break;
+                                }
                             }
+                            environmentDropdownOpen_=false;
+                            lightingColorPickerOpen_=false;
                         } else if(environmentDropdownOpen_&&hitX>bodyX-.155f&&hitX<bodyX+.225f) {
                             if(std::fabs(hitY-(menuY+.018f))<.020f) {
                                 selectRoomScene(0);
@@ -2706,6 +2710,13 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
                         } else if(menuPage_==3&&lightingColorPickerOpen_&&
                                   hitX>bodyX+.125f&&hitY<menuY-.105f) {
                             lightingColorPickerOpen_=false;
+                        } else if(menuPage_==3&&lightingColorPickerOpen_&&
+                                  hitY>menuY-.112f&&hitY<menuY-.082f&&
+                                  hitX>bodyX+.105f&&hitX<bodyX+.315f) {
+                            lightingPickerValue_=std::clamp((hitX-(bodyX+.105f))/.210f,.04f,1.0f);
+                            const auto picked=hsvToRgb(lightingPickerHue_,lightingPickerSaturation_,lightingPickerValue_);
+                            auto& zone=ledZones_[static_cast<size_t>(lightingZoneIndex_)];
+                            if(lightingColorTarget_==0) zone.primary=picked; else zone.secondary=picked;
                         } else if(menuPage_==3&&lightingColorPickerOpen_&&
                                   hitX<bodyX+.165f&&hitY>menuY-.075f&&hitY<menuY+.055f) {
                             const float dx=hitX-(bodyX+.095f);
@@ -2724,12 +2735,12 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
                             static const float envRows[6]={.038f,.005f,-.028f,-.061f,-.094f,-.127f};
                             static const float displayRows[3]={.034f,-.018f,-.070f};
                             static const float ledRows[6]={.046f,.009f,-.028f,-.065f,-.102f,-.139f};
-                            static const float chairRows[6]={.046f,.009f,-.028f,-.065f,-.102f,-.139f};
+                            static const float chairRows[8]={.046f,.018f,-.010f,-.038f,-.066f,-.094f,-.122f,-.150f};
                             int count=0;
                             if(menuPage_==1){rows=envRows;count=6;}
                             else if(menuPage_==2){rows=displayRows;count=3;}
                             else if(menuPage_==3&&!lightingColorPickerOpen_){rows=ledRows;count=6;}
-                            else if(menuPage_==4){rows=chairRows;count=6;}
+                            else if(menuPage_==4){rows=chairRows;count=8;}
                             else if(menuPage_==0) {
                                 if(std::fabs(hitY-(menuY-.075f))<.025f) selection=0;
                             }
@@ -3575,7 +3586,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     }
     // Full monitor UI with persistent navigation and distinct virtual-desktop-style pages.
     if (menuVisible_) {
-        const float uiCurve=0.0f,uiWidth=.574f,uiHeight=.322f;
+        const float uiCurve=.032f,uiWidth=.574f,uiHeight=.322f;
         const float menuY=deskSurface+.280f,menuZ=monitorZ+.001f;
         const float navX=monitorX-.216f,bodyX=monitorX+.063f,bodyWidth=.405f;
         const auto background=rgb(.010f,.015f,.030f,.985f);
@@ -3590,8 +3601,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const auto green=rgb(.24f,.88f,.62f,1.0f);
         const auto amber=rgb(1.0f,.68f,.28f,1.0f);
         auto panel=[&](float x,float y,float w,float h,const std::array<float,4>& tint) {
-            // Square-corner, flat rectangles: the menu is a genuine 2D monitor overlay.
-            drawPlane(pv.data(),x,y,menuZ,w,h,0,tint);
+            // Every main menu surface follows the monitor's shallow physical curve.
+            drawCurvedPanel(pv.data(),x,y,menuZ,w,h,uiCurve,0,tint,24);
+        };
+        auto flatPanel=[&](float x,float y,float w,float h,const std::array<float,4>& tint) {
+            // Color selection remains a flat, two-dimensional control surface.
+            drawPlane(pv.data(),x,y,menuZ+.002f,w,h,0,tint);
         };
         auto label=[&](const char* value,float x,float y,float size,const std::array<float,4>& tint) {
             drawText(pv.data(),value,x,y,menuZ+.0015f,size,tint,monitorX,uiWidth,uiCurve,menuY);
@@ -3622,15 +3637,24 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
               pcConnected_?green:amber);
         panel(navX,menuY-.006f,.132f,.270f,navBase);
         panel(monitorX-.143f,menuY-.006f,.0025f,.270f,rgb(.09f,.16f,.25f,1.0f));
-        label("LIBRARY",navX-.050f,menuY+.105f,.00135f,muted);
-        const char* tabs[5]={"PC","ROOM","DISPLAY","LIGHTS","CHAIR"};
-        const float tabY[5]={menuY+.061f,menuY+.015f,menuY-.031f,menuY-.077f,menuY-.123f};
-        for(int i=0;i<5;++i) {
-            panel(navX,tabY[i],.119f,.037f,i==menuPage_?selected:navBase);
-            if(i==menuPage_) panel(navX-.055f,tabY[i],.004f,.024f,blue);
-            label(tabs[i],navX-.048f,tabY[i]-.001f,.00142f,i==menuPage_?white:muted);
+        label("NAVIGATION",navX-.050f,menuY+.105f,.00135f,muted);
+        const float mainTabY[2]={menuY+.061f,menuY+.015f};
+        const char* mainTabs[2]={"PC","SETTINGS"};
+        for(int i=0;i<2;++i) {
+            const bool active=i==0?menuPage_==0:menuPage_!=0;
+            panel(navX,mainTabY[i],.119f,.037f,active?selected:navBase);
+            if(active) panel(navX-.055f,mainTabY[i],.004f,.024f,blue);
+            label(mainTabs[i],navX-.048f,mainTabY[i]-.001f,.00142f,active?white:muted);
         }
-        label("LEFT STICK  NAVIGATE",navX-.050f,menuY-.135f,.00105f,muted);
+        const float settingsTabY[4]={menuY-.031f,menuY-.063f,menuY-.095f,menuY-.127f};
+        const char* settingsTabs[4]={"ROOM","DISPLAY","LED STRIPS","CHAIR"};
+        for(int i=0;i<4;++i) {
+            const bool active=menuPage_==i+1;
+            panel(navX+.002f,settingsTabY[i],.113f,.027f,active?selected:navBase);
+            if(active) panel(navX-.052f,settingsTabY[i],.0035f,.018f,cyan);
+            label(settingsTabs[i],navX-.045f,settingsTabY[i]-.001f,.00116f,active?white:muted);
+        }
+        label("AIM + TRIGGER",navX-.050f,menuY-.143f,.00105f,muted);
         const float contentTop=menuY+.092f;
         if(menuPage_==0) {
             label("COMPUTERS",bodyX-.184f,contentTop,.00205f,white);
@@ -3693,7 +3717,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                   bodyX-.184f,menuY-.132f,.00135f,muted);
         } else if(menuPage_==3) {
             const auto& zone=ledZones_[static_cast<size_t>(lightingZoneIndex_)];
-            const char* zoneNames[7]={"HEADBOARD GLOW","CEILING COVE","LEFT WALL","RIGHT WALL","REAR WALL","LEFT BEDSIDE","RIGHT BEDSIDE"};
+            const char* zoneNames[7]={"HEADBOARD","CEILING EDGE","FLOOR LEFT","FLOOR RIGHT","FLOOR FRONT","FLOOR BACK","ROOM ACCENT"};
             label(lightingColorPickerOpen_?"COLOR PICKER":"LED COLOR CONTROLS",
                   bodyX-.184f,contentTop,.00205f,white);
             if(lightingColorPickerOpen_) {
@@ -3701,21 +3725,21 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                       bodyX-.184f,contentTop-.025f,.00132f,cyan);
                 const float centerX=bodyX+.095f,centerY=menuY-.008f,radius=.060f;
                 // A vivid hue ring with a saturation/value selector inside.
-                for(int swatch=0;swatch<48;++swatch) {
-                    const float hue=static_cast<float>(swatch)/48.0f;
+                for(int swatch=0;swatch<64;++swatch) {
+                    const float hue=static_cast<float>(swatch)/64.0f;
                     const float angle=hue*2.0f*kPi-kPi*.5f;
                     const auto hueColor=hsvToRgb(hue,1.0f,1.0f);
-                    panel(centerX+std::cos(angle)*radius,centerY+std::sin(angle)*radius,
-                          .0085f,.0085f,rgb(hueColor[0],hueColor[1],hueColor[2]));
+                    flatPanel(centerX+std::cos(angle)*radius,centerY+std::sin(angle)*radius,
+                              .0085f,.0085f,rgb(hueColor[0],hueColor[1],hueColor[2]));
                 }
                 const float markerRadius=radius*(.12f+.74f*lightingPickerSaturation_);
                 const float markerAngle=lightingPickerHue_*2.0f*kPi-kPi*.5f;
                 const auto selectedColor=hsvToRgb(lightingPickerHue_,lightingPickerSaturation_,lightingPickerValue_);
-                panel(centerX+std::cos(markerAngle)*markerRadius,
-                      centerY+std::sin(markerAngle)*markerRadius,.017f,.017f,
-                      rgb(selectedColor[0],selectedColor[1],selectedColor[2]));
-                panel(centerX,centerY,.024f,.024f,
-                      rgb(selectedColor[0],selectedColor[1],selectedColor[2]));
+                flatPanel(centerX+std::cos(markerAngle)*markerRadius,
+                          centerY+std::sin(markerAngle)*markerRadius,.017f,.017f,
+                          rgb(selectedColor[0],selectedColor[1],selectedColor[2]));
+                flatPanel(centerX,centerY,.024f,.024f,
+                          rgb(selectedColor[0],selectedColor[1],selectedColor[2]));
                 char hueText[32],satText[32],valueText[32];
                 std::snprintf(hueText,sizeof(hueText),"HUE  %03.0f",lightingPickerHue_*360.0f);
                 std::snprintf(satText,sizeof(satText),"SAT  %02.0f%%",lightingPickerSaturation_*100.0f);
@@ -3729,9 +3753,16 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 label(satText,bodyX+.190f,menuY-.006f,.00138f,muted);
                 label(valueText,bodyX+.190f,menuY-.037f,.00138f,muted);
                 label(rgbText,bodyX+.190f,menuY-.067f,.00124f,cyan);
-                label("LEFT STICK  HUE / SATURATION",bodyX-.184f,menuY-.105f,.00120f,muted);
-                label("RIGHT STICK  BRIGHTNESS",bodyX-.184f,menuY-.130f,.00120f,muted);
-                label("A  DONE",bodyX+.185f,menuY-.130f,.00120f,blue);
+                label("BRIGHTNESS",bodyX-.184f,menuY-.095f,.00116f,muted);
+                flatPanel(bodyX+.210f,menuY-.095f,.210f,.014f,rgb(.025f,.040f,.070f));
+                for(int step=0;step<28;++step) {
+                    const float value=.04f+.96f*(step+.5f)/28.0f;
+                    const auto tint=hsvToRgb(lightingPickerHue_,lightingPickerSaturation_,value);
+                    flatPanel(bodyX+.108f+(step+.5f)*(.204f/28.0f),menuY-.095f,
+                              .0078f,.011f,rgb(tint[0],tint[1],tint[2]));
+                }
+                label("POINT + TRIGGER TO SET",bodyX-.184f,menuY-.132f,.00114f,muted);
+                label("POINT + TRIGGER TO FINISH",bodyX+.065f,menuY-.132f,.00110f,blue);
             } else {
                 label("Each zone has its own power, brightness, solid color, and gradient.",
                       bodyX-.184f,contentTop-.024f,.00122f,muted);
@@ -3769,20 +3800,26 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             std::snprintf(roll,sizeof(roll),"%.1f M/S",settings_.chairRollSpeed);
             std::snprintf(spin,sizeof(spin),"%.1f",settings_.chairSpinSpeed);
             std::snprintf(friction,sizeof(friction),"%.1f",settings_.chairFriction);
-            const float chairRows[6]={menuY+.046f,menuY+.009f,menuY-.028f,menuY-.065f,menuY-.102f,menuY-.139f};
-            const char* chairTitles[6]={"CHAIR STATE","ROLL SPEED","SPIN SPEED","FRICTION","RESET CHAIR","STAND UP"};
-            const std::string chairValues[6]={sittingActive_?"SITTING":"STANDING",roll,spin,friction,"RESET","GET UP"};
-            for(int row=0;row<6;++row) {
-                panel(bodyX,chairRows[row],bodyWidth,.032f,menuSelection_==row?selected:card);
-                label(chairTitles[row],bodyX-.184f,chairRows[row]+.003f,.00148f,white);
-                label(chairValues[row].c_str(),bodyX+.060f,chairRows[row]+.003f,.00140f,
+            char heightValue[24],reclineValue[24];
+            std::snprintf(heightValue,sizeof(heightValue),"%+.0f CM",chairHeight_*100.0f);
+            std::snprintf(reclineValue,sizeof(reclineValue),"%d DEG",static_cast<int>(std::lround(chairRecline_*180.0f/kPi)));
+            const float chairRows[8]={menuY+.046f,menuY+.018f,menuY-.010f,menuY-.038f,
+                                      menuY-.066f,menuY-.094f,menuY-.122f,menuY-.150f};
+            const char* chairTitles[8]={"CHAIR STATE","ROLL SPEED","SPIN SPEED","ROLL RESISTANCE",
+                                        "SEAT HEIGHT","BACKREST RECLINE","RESET CHAIR","STAND UP"};
+            const std::string chairValues[8]={sittingActive_?"SITTING":"STANDING",roll,spin,friction,
+                                               heightValue,reclineValue,"RESET","GET UP"};
+            for(int row=0;row<8;++row) {
+                panel(bodyX,chairRows[row],bodyWidth,.024f,menuSelection_==row?selected:card);
+                label(chairTitles[row],bodyX-.184f,chairRows[row]+.002f,.00134f,white);
+                label(chairValues[row].c_str(),bodyX+.060f,chairRows[row]+.002f,.00132f,
                       row==0&&sittingActive_?green:blue);
             }
-            label("LEFT STICK  ROLL     RIGHT STICK  SPIN",bodyX-.184f,menuY-.170f,.00115f,muted);
+            label("RIGHT GRIP + STICK: HEIGHT   LEFT GRIP: RECLINE",bodyX-.184f,menuY-.171f,.00102f,muted);
         }
         if(!lightingColorPickerOpen_) {
-            label("A  SELECT",monitorX-.270f,menuY-.151f,.00120f,muted);
-            label("LEFT / RIGHT  TABS",monitorX-.145f,menuY-.151f,.00120f,muted);
+            label("POINT + TRIGGER  SELECT",monitorX-.270f,menuY-.151f,.00116f,muted);
+            label("PC  /  SETTINGS",monitorX-.145f,menuY-.151f,.00116f,muted);
         }
         glDisable(GL_BLEND);
         glDepthMask(GL_TRUE);
