@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <cctype>
 #include <vector>
 #include <zlib.h>
 
@@ -114,7 +115,6 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
             cgltf_accessor_unpack_floats(pos,positions.data(),positions.size());
             std::vector<float> uvs(pos->count*2,0.0f);
             if(uv) cgltf_accessor_unpack_floats(uv,uvs.data(),uvs.size());
-            Primitive p{};
             std::vector<float> vertices(pos->count*5);
             for(cgltf_size v=0;v<pos->count;++v) {
                 vertices[v*5+0]=positions[v*3+0]; vertices[v*5+1]=positions[v*3+1]; vertices[v*5+2]=positions[v*3+2];
@@ -128,23 +128,89 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
                 indices.resize(pos->count); for(cgltf_size i=0;i<pos->count;++i) indices[i]=static_cast<uint32_t>(i);
             }
             if(src->type!=cgltf_primitive_type_triangles) continue;
-            glGenVertexArrays(1,&p.vao); glGenBuffers(1,&p.vbo); glGenBuffers(1,&p.ebo);
-            glBindVertexArray(p.vao); glBindBuffer(GL_ARRAY_BUFFER,p.vbo);
-            glBufferData(GL_ARRAY_BUFFER,vertices.size()*sizeof(float),vertices.data(),GL_STATIC_DRAW);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,p.ebo);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER,indices.size()*sizeof(uint32_t),indices.data(),GL_STATIC_DRAW);
-            glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,5*sizeof(float),nullptr);
-            glEnableVertexAttribArray(1); glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(3*sizeof(float)));
-            glBindVertexArray(0); p.indexCount=static_cast<GLsizei>(indices.size()); p.indexed=true;
-            if(src->material) {
-                const auto& mat=*src->material;
-                const auto& factor=mat.pbr_metallic_roughness.base_color_factor;
-                p.color={float(factor[0]),float(factor[1]),float(factor[2]),float(factor[3])};
-                const cgltf_texture_view* tv=&mat.pbr_metallic_roughness.base_color_texture;
-                if(tv->texture && tv->texture->image) p.texture=makeTexture(tv->texture->image);
+
+            auto uploadPart=[&](const std::vector<uint32_t>& sourceIndices,bool backrestPart,bool seatLiftPart=false) {
+                if(sourceIndices.empty()) return;
+                // Compact vertices per articulated part so the GPU buffers contain
+                // only its triangles. The seat and wheels remain separate and static.
+                std::vector<int32_t> remap(pos->count,-1);
+                std::vector<float> partVertices;
+                std::vector<uint32_t> partIndices;
+                partVertices.reserve(sourceIndices.size()*5);
+                partIndices.reserve(sourceIndices.size());
+                for(uint32_t sourceIndex:sourceIndices) {
+                    if(sourceIndex>=pos->count) continue;
+                    if(remap[sourceIndex]<0) {
+                        remap[sourceIndex]=static_cast<int32_t>(partVertices.size()/5);
+                        for(int component=0;component<5;++component)
+                            partVertices.push_back(vertices[static_cast<size_t>(sourceIndex)*5+component]);
+                    }
+                    partIndices.push_back(static_cast<uint32_t>(remap[sourceIndex]));
+                }
+                if(partIndices.empty()) return;
+                Primitive p{};
+                glGenVertexArrays(1,&p.vao); glGenBuffers(1,&p.vbo); glGenBuffers(1,&p.ebo);
+                glBindVertexArray(p.vao); glBindBuffer(GL_ARRAY_BUFFER,p.vbo);
+                glBufferData(GL_ARRAY_BUFFER,partVertices.size()*sizeof(float),partVertices.data(),GL_STATIC_DRAW);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,p.ebo);
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER,partIndices.size()*sizeof(uint32_t),partIndices.data(),GL_STATIC_DRAW);
+                glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,5*sizeof(float),nullptr);
+                glEnableVertexAttribArray(1); glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,5*sizeof(float),reinterpret_cast<void*>(3*sizeof(float)));
+                glBindVertexArray(0);
+                p.indexCount=static_cast<GLsizei>(partIndices.size()); p.indexed=true;
+                p.backrestPart=backrestPart;
+                p.seatLiftPart=seatLiftPart;
+                p.sourceMeshIndex=static_cast<uint32_t>(mi);
+                p.sourcePrimitiveIndex=static_cast<uint32_t>(pi);
+                if(src->material) {
+                    const auto& mat=*src->material;
+                    const auto& factor=mat.pbr_metallic_roughness.base_color_factor;
+                    p.color={float(factor[0]),float(factor[1]),float(factor[2]),float(factor[3])};
+                    const cgltf_texture_view* tv=&mat.pbr_metallic_roughness.base_color_texture;
+                    if(tv->texture && tv->texture->image) p.texture=makeTexture(tv->texture->image);
+                }
+                p.nodeMatrix={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
+                primitives_.push_back(p);
+            };
+
+            const bool chairAsset=std::strstr(assetPath,"white_gaming_chair.glb")!=nullptr;
+            const bool splitBackrest=chairAsset&&mesh->name&&
+                (std::strcmp(mesh->name,"chair_wl")==0||std::strcmp(mesh->name,"chair_piping")==0);
+            const bool splitChrome=chairAsset&&mesh->name&&std::strcmp(mesh->name,"chair_chrome")==0;
+            if(splitBackrest) {
+                std::vector<uint32_t> seatIndices,backrestIndices;
+                seatIndices.reserve(indices.size());
+                backrestIndices.reserve(indices.size()/2);
+                for(size_t tri=0;tri+2<indices.size();tri+=3) {
+                    const uint32_t a=indices[tri],b=indices[tri+1],c=indices[tri+2];
+                    const float centerY=(positions[a*3+1]+positions[b*3+1]+positions[c*3+1])/3.0f;
+                    const float centerZ=(positions[a*3+2]+positions[b*3+2]+positions[c*3+2])/3.0f;
+                    // The backrest is the tall rear upholstered component in the source
+                    // GLB's local coordinates: above the seat hinge and toward -Z.
+                    auto& bucket=(centerY>.56f&&centerZ<-.13f)?backrestIndices:seatIndices;
+                    bucket.push_back(a);bucket.push_back(b);bucket.push_back(c);
+                }
+                uploadPart(seatIndices,false);
+                uploadPart(backrestIndices,true);
+            } else if(splitChrome) {
+                std::vector<uint32_t> fixedBaseIndices,movingSupportIndices;
+                fixedBaseIndices.reserve(indices.size());
+                movingSupportIndices.reserve(indices.size()/3);
+                for(size_t tri=0;tri+2<indices.size();tri+=3) {
+                    const uint32_t a=indices[tri],b=indices[tri+1],c=indices[tri+2];
+                    const float centerY=(positions[a*3+1]+positions[b*3+1]+positions[c*3+1])/3.0f;
+                    const float centerX=(positions[a*3+0]+positions[b*3+0]+positions[c*3+0])/3.0f;
+                    // Only the two upper arm-support brackets move with the seat.
+                    // The central gas piston and five-spoke base remain planted.
+                    auto& bucket=(centerY>.30f&&std::fabs(centerX)>.10f)
+                        ?movingSupportIndices:fixedBaseIndices;
+                    bucket.push_back(a);bucket.push_back(b);bucket.push_back(c);
+                }
+                uploadPart(fixedBaseIndices,false,false);
+                uploadPart(movingSupportIndices,false,true);
+            } else {
+                uploadPart(indices,false);
             }
-            p.nodeMatrix={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
-            primitives_.push_back(p);
         }
     }
     // Apply node transforms by duplicating each mesh primitive with its node matrix.
@@ -154,20 +220,15 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
         for(cgltf_size ni=0;ni<data->nodes_count;++ni) {
             cgltf_node* node=&data->nodes[ni]; if(!node->mesh) continue;
             float world[16]; cgltf_node_transform_world(node,world);
-            for(cgltf_size pi=0;pi<node->mesh->primitives_count;++pi) {
-                // Match the mesh primitive in traversal order; clone GPU handles are shared safely.
-                size_t index=0;
-                for(cgltf_size m=0;m<data->meshes_count;++m) {
-                    if(&data->meshes[m]==node->mesh) break;
-                    index+=data->meshes[m].primitives_count;
-                }
-                index+=pi;
-                if(index<primitives_.size()) {
-                    Primitive copy=primitives_[index];
-                    std::copy(world,world+16,copy.nodeMatrix.begin());
-                    copy.nodeName=node->name?node->name:"";
-                    transformed.push_back(copy);
-                }
+            const uint32_t sourceMeshIndex=static_cast<uint32_t>(node->mesh-data->meshes);
+            // A mesh can expand into multiple draw primitives (for example, the
+            // seat and backrest split). Preserve the node transform on every part.
+            for(const Primitive& base:primitives_) {
+                if(base.sourceMeshIndex!=sourceMeshIndex) continue;
+                Primitive copy=base;
+                std::copy(world,world+16,copy.nodeMatrix.begin());
+                copy.nodeName=node->name?node->name:"";
+                transformed.push_back(copy);
             }
         }
         if(!transformed.empty()) primitives_.swap(transformed);
@@ -181,15 +242,71 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
 void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint locModel,GLint locColor,
                     GLint locTextured,GLint locTexture,GLint locMaterial,GLint locRounded,GLint locUvScale,
                     const std::array<float,4>* emissiveOverrideColor,const char* emissiveNodeMarker,
-                    const std::array<float,4>* albedoTint) const {
+                    const std::array<float,4>* albedoTint,float seatLiftMeters,
+                    float backrestReclineRadians,bool omitDisplaySurface,float horizontalTvBodyScale) const {
+    auto lowerName=[](std::string name) {
+        std::transform(name.begin(),name.end(),name.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+        return name;
+    };
+    auto isFixedBase=[&](const std::string& name) {
+        const std::string lower=lowerName(name);
+        return lower.find("wheel")!=std::string::npos || lower.find("caster")!=std::string::npos ||
+               lower.find("base")!=std::string::npos || lower.find("piston")!=std::string::npos ||
+               lower.find("gas_lift")!=std::string::npos || lower.find("gas lift")!=std::string::npos ||
+               lower=="chair_chrome";
+    };
+    auto isBackrest=[&](const std::string& name) {
+        const std::string lower=lowerName(name);
+        return lower.find("backrest")!=std::string::npos || lower.find("back_rest")!=std::string::npos ||
+               lower.find("upper_back")!=std::string::npos || lower.find("back_pad")!=std::string::npos;
+    };
+    // The chair GLB's local backrest points toward +Z after its 180-degree node
+    // transform; negative X rotation therefore reclines it backward, away from the desk.
+    const float c=std::cos(backrestReclineRadians),sn=-std::sin(backrestReclineRadians);
+    // Chair-space hinge sits just above the seat cushion, where the backrest meets the seat.
+    // Measured chair hinge in the GLB's node/world coordinates. The source
+    // nodes rotate 180 degrees around Y, so the hinge sits at +Z after node transform.
+    const float hingeY=.52f+seatLiftMeters,hingeZ=.155f;
+    const float toHinge[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,-hingeY,-hingeZ,1};
+    const float fromHinge[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,hingeY,hingeZ,1};
+    const float rotateBack[16]={1,0,0,0, 0,c,sn,0, 0,-sn,c,0, 0,0,0,1};
+    float hingeTmp[16],hingeRotation[16];
+    multiply(rotateBack,toHinge,hingeTmp);
+    multiply(fromHinge,hingeTmp,hingeRotation);
+    const float lift[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,seatLiftMeters,0,1};
     for(const Primitive& p:primitives_) {
+        if(omitDisplaySurface) {
+            const std::string node=lowerName(p.nodeName);
+            if(node.find("screen")!=std::string::npos||node.find("display")!=std::string::npos||
+               node.find("lcd")!=std::string::npos||node.find("glass")!=std::string::npos) continue;
+        }
         const bool emissiveOverride=emissiveOverrideColor&&emissiveNodeMarker&&
             p.nodeName.find(emissiveNodeMarker)!=std::string::npos;
         std::array<float,4> color=emissiveOverride?*emissiveOverrideColor:p.color;
         if(albedoTint&&!emissiveOverride) {
             for(size_t channel=0;channel<4;++channel) color[channel]*=(*albedoTint)[channel];
         }
-        float model[16],mvp[16]; multiply(placement,p.nodeMatrix.data(),model); multiply(pv,model,mvp);
+        float nodeTransform[16],model[16],mvp[16];
+        std::copy(p.nodeMatrix.begin(),p.nodeMatrix.end(),nodeTransform);
+        const std::string nodeLabel=lowerName(p.nodeName);
+        const bool tvBodyNode=nodeLabel=="tv_tvblk"||nodeLabel=="tv_tvback"||
+            nodeLabel=="tv_alu"||nodeLabel=="tv_ledw"||nodeLabel=="tv_screen"||
+            nodeLabel=="tv_logo";
+        if(tvBodyNode&&std::fabs(horizontalTvBodyScale-1.0f)>0.0001f) {
+            const float bodyScale[16]={horizontalTvBodyScale,0,0,0,
+                                       0,1,0,0,0,0,1,0,0,0,0,1};
+            float scaled[16];multiply(bodyScale,nodeTransform,scaled);
+            std::copy(scaled,scaled+16,nodeTransform);
+        }
+        if((!isFixedBase(p.nodeName)||p.seatLiftPart) && std::fabs(seatLiftMeters)>0.0001f) {
+            float lifted[16]; multiply(lift,nodeTransform,lifted);
+            std::copy(lifted,lifted+16,nodeTransform);
+        }
+        if((p.backrestPart||isBackrest(p.nodeName)) && std::fabs(backrestReclineRadians)>0.0001f) {
+            float articulated[16]; multiply(hingeRotation,nodeTransform,articulated);
+            std::copy(articulated,articulated+16,nodeTransform);
+        }
+        multiply(placement,nodeTransform,model); multiply(pv,model,mvp);
         glUniformMatrix4fv(locMvp,1,GL_FALSE,mvp); glUniformMatrix4fv(locModel,1,GL_FALSE,model);
         glUniform4fv(locColor,1,color.data());
         glUniform1i(locMaterial,emissiveOverride?7:-1); glUniform1i(locRounded,0);

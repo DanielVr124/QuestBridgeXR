@@ -2,6 +2,7 @@
 #include <GLES3/gl3.h>
 #include <android/asset_manager.h>
 #include <array>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -14,7 +15,11 @@ public:
               GLint locRounded, GLint locUvScale,
               const std::array<float,4>* emissiveOverrideColor = nullptr,
               const char* emissiveNodeMarker = nullptr,
-              const std::array<float,4>* albedoTint = nullptr) const;
+              const std::array<float,4>* albedoTint = nullptr,
+              float seatLiftMeters = 0.0f,
+              float backrestReclineRadians = 0.0f,
+              bool omitDisplaySurface = false,
+              float horizontalTvBodyScale = 1.0f) const;
     void release();
     bool loaded() const { return !primitives_.empty(); }
 private:
@@ -25,6 +30,10 @@ private:
         std::string nodeName;
         std::array<float,16> nodeMatrix{};
         bool indexed=false;
+        bool backrestPart=false;
+        bool seatLiftPart=false;
+        uint32_t sourceMeshIndex=0;
+        uint32_t sourcePrimitiveIndex=0;
     };
     std::vector<Primitive> primitives_;
 };
