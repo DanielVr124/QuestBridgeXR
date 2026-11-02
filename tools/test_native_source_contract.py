@@ -361,6 +361,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("chairCasterYaw_", renderer)
         self.assertIn("chairFacingYaw_", renderer)
         self.assertIn("chairFacingPending_", renderer)
+        self.assertIn("chairFacingYaw_=headYaw(headPose)+virtualYaw_", renderer)
         self.assertIn("moveZ_=seatedChairZ-headPose.position.z", renderer)
         self.assertIn('constexpr float bedScale=1.28f', renderer)
         self.assertIn('constexpr float tvModelScale=1.32f', renderer)
