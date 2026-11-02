@@ -312,6 +312,7 @@ class NativeSourceContractTests(unittest.TestCase):
     def test_chair_seating_and_grip_attached_mouse_remain_desk_bounded(self):
         renderer = (ROOT / "quest-client/app/src/main/cpp/room_renderer.cpp").read_text(encoding="utf-8")
         header = (ROOT / "quest-client/app/src/main/cpp/room_renderer.h").read_text(encoding="utf-8")
+        main = (ROOT / "quest-client/app/src/main/cpp/main.cpp").read_text(encoding="utf-8")
         host = (ROOT / "host/src/main.cpp").read_text(encoding="utf-8")
         self.assertIn('tvModel_.load(assets,"models/tv_on_2_mattress_tall_stand.glb")', renderer)
         self.assertIn('chairModel_.load(assets,"models/white_gaming_chair.glb")', renderer)
