@@ -2257,12 +2257,13 @@ void RoomRenderer::drawPlane(const float* pv,float x,float y,float z,float sx,fl
 
 void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
                                     float width, float height, float curveDepth, GLuint texture,
-                                    const std::array<float,4>& color, int segments) {
+                                    const std::array<float,4>& color, int segments,float yaw) {
     segments = std::clamp(segments, 8, 48);
     std::vector<Vertex> vertices;
     vertices.reserve(static_cast<size_t>(segments) * 6u);
     const float pitchCos = std::cos(kMonitorScreenPitch);
     const float pitchSin = std::sin(kMonitorScreenPitch);
+    const float yawCos=std::cos(yaw),yawSin=std::sin(yaw);
     auto point = [&](float u, float v) {
         const float localX = (u - 0.5f) * width;
         const float normalized = 2.0f * u - 1.0f;
@@ -2271,7 +2272,9 @@ void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
         const float localY = (v - 0.5f) * height;
         const float pitchedY = pitchCos * localY + pitchSin * localZ;
         const float pitchedZ = -pitchSin * localY + pitchCos * localZ;
-        return Vertex{localX, pitchedY, pitchedZ, u, 1.0f - v};
+        const float rotatedX=yawCos*localX+yawSin*pitchedZ;
+        const float rotatedZ=-yawSin*localX+yawCos*pitchedZ;
+        return Vertex{rotatedX, pitchedY, rotatedZ, u, 1.0f - v};
     };
     for (int i = 0; i < segments; ++i) {
         const float u0 = static_cast<float>(i) / static_cast<float>(segments);
@@ -2660,17 +2663,24 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
             const float halfD=settings_.roomSize=="large"?7.5f:(settings_.roomSize=="medium"?5.4f:3.8f);
             const float deskX=-halfW+1.32f+.04f,deskZ=-halfD+.56f;
             const int pointerMonitorCount=std::clamp(settings_.monitorCount,1,3);
-            const float pointerMonitorBaseX=deskX-(pointerMonitorCount-1)*.335f;
-            const float monitorX=pointerMonitorCount==3?deskX:pointerMonitorBaseX;
+            const float monitorX=deskX-.34f;
             const float monitorZ=deskZ-.31f;
             const float menuY=settings_.floorOffsetY+1.03f;
             if(menuPointerDirection[2]<-.08f) {
-                const float t=(monitorZ+.001f-pointerOrigin[2])/menuPointerDirection[2];
+                const float menuCurve=.032f,menuWidth=.574f;
+                float t=(monitorZ+.001f-pointerOrigin[2])/menuPointerDirection[2];
+                float hitX=0.0f,hitY=0.0f,hitSurfaceZ=monitorZ+.001f;
+                // Iterate the ray/arc intersection so the pointer stays on the curved glass.
+                for(int iteration=0;iteration<3;++iteration) {
+                    hitX=pointerOrigin[0]+menuPointerDirection[0]*t;
+                    hitY=pointerOrigin[1]+menuPointerDirection[1]*t;
+                    const float normalized=std::clamp((hitX-monitorX)/(menuWidth*.5f),-1.0f,1.0f);
+                    hitSurfaceZ=monitorZ+.001f+menuCurve*normalized*normalized;
+                    t=(hitSurfaceZ-pointerOrigin[2])/menuPointerDirection[2];
+                }
                 if(t>.02f&&t<8.0f) {
-                    const float hitX=pointerOrigin[0]+menuPointerDirection[0]*t;
-                    const float hitY=pointerOrigin[1]+menuPointerDirection[1]*t;
                     menuPointerOrigin_=pointerOrigin;
-                    menuPointerHit_={hitX,hitY,monitorZ+.003f};
+                    menuPointerHit_={hitX,hitY,hitSurfaceZ+.003f};
                     menuPointerValid_=hitX>=monitorX-.300f&&hitX<=monitorX+.300f&&
                                       hitY>=menuY-.175f&&hitY<=menuY+.175f;
                     if(menuPointerValid_&&triggerPressed&&!previousMenuPointerTrigger_) {
@@ -3262,8 +3272,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float deskZ=backZ+0.56f;
     const float deskX=-halfW+1.32f+.04f;
     const int monitorCount=std::clamp(settings_.monitorCount,1,3);
-    const float monitorBaseX=deskX-(monitorCount-1)*.335f;
-    const float monitorX=monitorCount==3?deskX:monitorBaseX;
+    // The monitor array is shifted left to reserve a clean PC-tower footprint on the desk's right.
+    const float monitorX=deskX-.34f;
     const float deskSurface=floorY+.75f;
     const float monitorZ=deskZ-0.31f; // display stand sits at the rear edge, close to the wall
 
@@ -3386,17 +3396,21 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     // The central display remains the primary menu surface when a three-screen row is used.
     const bool streamOn=settings_.screenDestination=="monitor"||
                         settings_.screenDestination=="both";
+    constexpr float monitorArcRadius=1.95f;
+    constexpr float monitorArcStep=.31f;
     for(int screen=0;screen<monitorCount;++screen) {
-        const float screenX=monitorBaseX+screen*.67f;
-        const float monitorPlacement[16] = {
-            1,0,0,0, 0,1,0,0, 0,0,1,0, screenX,deskSurface,monitorZ,1
-        };
-        monitorModel_.draw(pv.data(),monitorPlacement,locMvp_,locModel_,locColor_,locTextured_,
+        const float arcIndex=static_cast<float>(screen)-(monitorCount-1)*.5f;
+        const float angle=arcIndex*monitorArcStep;
+        const float screenX=monitorX+monitorArcRadius*std::sin(angle);
+        const float screenZ=monitorZ+monitorArcRadius*(1.0f-std::cos(angle));
+        const Mat4 monitorPlacementMatrix=mul(translation(screenX,deskSurface,screenZ),rotateY(-angle));
+        monitorModel_.draw(pv.data(),monitorPlacementMatrix.data(),locMvp_,locModel_,locColor_,locTextured_,
                            locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&monitorExposure);
         if(streamOn) {
-            drawCurvedPanel(pv.data(),screenX,deskSurface+.280f,monitorZ+.001f,
-                            .584f,.328f,.029f,
-                            hasVideo?videoTexture:videoFallbackTexture_,rgb(1,1,1),32);
+            // Adjacent panels share their edges and follow one continuous shallow arc.
+            drawCurvedPanel(pv.data(),screenX,deskSurface+.280f,screenZ+.001f,
+                            .606f,.340f,.029f,
+                            hasVideo?videoTexture:videoFallbackTexture_,rgb(1,1,1),32,-angle);
         }
     }
 
