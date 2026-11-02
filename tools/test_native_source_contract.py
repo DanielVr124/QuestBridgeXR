@@ -398,6 +398,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("horizontalTvBodyScale = 1.0f", glb_header)
         self.assertIn('tvBodyNode=nodeLabel=="tv_tvblk"', glb_source)
         self.assertIn("bool backrestPart=false", glb_header)
+        self.assertIn('lower=="chair_chrome"', glb_source)
         self.assertIn('std::strcmp(mesh->name,"chair_wl")==0', glb_source)
         self.assertIn('std::strcmp(mesh->name,"chair_piping")==0', glb_source)
         self.assertIn("centerY>.56f&&centerZ<-.13f", glb_source)
