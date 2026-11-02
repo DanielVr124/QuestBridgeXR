@@ -3466,7 +3466,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const Mat4 monitorPlacementMatrix=mul(translation(screenX,deskSurface,screenZ),
             mul(rotateY(-angle),scaling(.94f,1.0f,1.0f)));
         monitorModel_.draw(pv.data(),monitorPlacementMatrix.data(),locMvp_,locModel_,locColor_,locTextured_,
-                           locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&monitorExposure);
+                           locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&monitorExposure,0.0f,0.0f,true);
         // Each monitor has its own dark housing. The screen surfaces touch, but
         // there is no shared bridge or connecting frame between the physical models.
         // The idle glass is deliberately a lighter black than the bezel.
@@ -3585,18 +3585,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             drawGroundShadow(pv.data(),tvRenderX,floorY+.004f,tvZ+.05f,
                              tvScreenWidth,.92f*tvModelScale,.34f);
             drawRoundedBox(pv.data(),tvRenderX,floorY+1.10f*tvModelScale,tvZ+.045f,
-                           1.52f*tvModelScale,.91f*tvModelScale,.105f*tvModelScale,bezel,0.0f,5);
+                           tvScreenWidth+.14f,.91f*tvModelScale,.105f*tvModelScale,bezel,0.0f,5);
             drawRoundedBox(pv.data(),tvRenderX,floorY+1.10f*tvModelScale,tvZ-.013f,
-                           1.43f*tvModelScale,.82f*tvModelScale,.018f*tvModelScale,
+                           tvScreenWidth-.02f,.82f*tvModelScale,.018f*tvModelScale,
                            rgb(.035f,.045f,.075f),0.0f,5);
             drawPlane(pv.data(),tvRenderX,tvScreenCenterY,tvZ-.026f,
-                      1.405f*tvModelScale,.795f*tvModelScale,tvTex,rgb(1,1,1),kPi);
+                      tvScreenWidth-.10f,.795f*tvModelScale,tvTex,rgb(1,1,1),kPi);
             drawSphere(pv.data(),tvRenderX,floorY+.60f*tvModelScale,tvZ+.07f,
                        .035f*tvModelScale,.035f*tvModelScale,.035f*tvModelScale,rgb(.16f,.65f,1.0f),7);
             drawRoundedBox(pv.data(),tvRenderX,floorY+.31f*tvModelScale,tvZ+.12f,
                            .12f*tvModelScale,.49f*tvModelScale,.13f*tvModelScale,stand,0.0f,4);
             drawRoundedBox(pv.data(),tvRenderX,floorY+.075f*tvModelScale,tvZ+.16f,
-                           .78f*tvModelScale,.07f*tvModelScale,.35f*tvModelScale,stand,0.0f,4);
+                           (tvScreenWidth*.55f),.07f*tvModelScale,.35f*tvModelScale,stand,0.0f,4);
         }
     }
 
