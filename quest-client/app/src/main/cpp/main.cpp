@@ -982,28 +982,28 @@ private:
         if (XR_FAILED(xrSyncActions(session_, &syncInfo))) return;
         const XrVector2f move = vector2Action(hands_[0].thumbstick, hands_[0].handPath);
         const XrVector2f turn = vector2Action(hands_[1].thumbstick, hands_[1].handPath);
-        // Quest may reserve the physical system-menu button; left Y is a deliberate in-app fallback.
+        // The menu opens only from the controller menu button; thumbsticks are never menu inputs.
         const bool menuPressed = boolAction(hands_[0].menu, hands_[0].handPath) ||
                                  boolAction(hands_[0].secondary, hands_[0].handPath);
         if (menuPressed && !previousMenuPressed_) room_.toggleMenu();
         previousMenuPressed_ = menuPressed;
-        const bool menuSelectPressed = boolAction(hands_[0].primary, hands_[0].handPath);
-        const bool menuSelectEdge = menuSelectPressed && !previousMenuSelectPressed_;
-        previousMenuSelectPressed_ = menuSelectPressed;
         // OpenXR thumbstick +Y is forward. The room renderer treats positive Y as forward (-Z),
         // so preserve that sign unless the user explicitly enables inversion.
         float moveX = applyDeadzone(std::clamp(config_.invertThumbstickX ? -move.x : move.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
         float moveY = applyDeadzone(std::clamp(config_.invertThumbstickY ? -move.y : move.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
         float turnX = applyDeadzone(std::clamp(turn.x, -1.0f, 1.0f), config_.thumbstickDeadzone);
-        const float turnY = applyDeadzone(std::clamp(turn.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
-        const float leftGrip = std::clamp(floatAction(hands_[0].squeeze, hands_[0].handPath), 0.0f, 1.0f);
-        const float rightGrip = std::clamp(floatAction(hands_[1].squeeze, hands_[1].handPath), 0.0f, 1.0f);
+        float turnY = applyDeadzone(std::clamp(turn.y, -1.0f, 1.0f), config_.thumbstickDeadzone);
+        float leftGrip = std::clamp(floatAction(hands_[0].squeeze, hands_[0].handPath), 0.0f, 1.0f);
+        float rightGrip = std::clamp(floatAction(hands_[1].squeeze, hands_[1].handPath), 0.0f, 1.0f);
         if (room_.menuVisible()) {
             // Menus are operated only by the right-hand pointer and trigger.
             // Sticks never navigate the UI or leak into room/chair movement.
             moveX = 0.0f;
             moveY = 0.0f;
             turnX = 0.0f;
+            turnY = 0.0f;
+            leftGrip = 0.0f;
+            rightGrip = 0.0f;
         }
         if (room_.consumeReconnectRequest()) network_.requestReconnect();
         room_.updateLocomotion(moveX, moveY, turnX, turnY, leftGrip, rightGrip, dt, headPose);
