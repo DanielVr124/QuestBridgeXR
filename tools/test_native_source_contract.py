@@ -409,6 +409,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("centerY>.30f?movingSupportIndices:fixedBaseIndices", glb_source)
         self.assertIn("!isFixedBase(p.nodeName)||p.seatLiftPart", glb_source)
         self.assertIn("const float hingeY=.52f+seatLiftMeters,hingeZ=.155f", glb_source)
+        self.assertIn("sn=-std::sin(backrestReclineRadians)", glb_source)
         self.assertIn("(p.backrestPart||isBackrest(p.nodeName))", glb_source)
         self.assertIn("base.sourceMeshIndex!=sourceMeshIndex", glb_source)
         self.assertIn("bool omitDisplaySurface = false", glb_header)
