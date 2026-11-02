@@ -159,6 +159,8 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
                 glBindVertexArray(0);
                 p.indexCount=static_cast<GLsizei>(partIndices.size()); p.indexed=true;
                 p.backrestPart=backrestPart;
+                p.sourceMeshIndex=static_cast<uint32_t>(mi);
+                p.sourcePrimitiveIndex=static_cast<uint32_t>(pi);
                 if(src->material) {
                     const auto& mat=*src->material;
                     const auto& factor=mat.pbr_metallic_roughness.base_color_factor;
@@ -200,20 +202,15 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
         for(cgltf_size ni=0;ni<data->nodes_count;++ni) {
             cgltf_node* node=&data->nodes[ni]; if(!node->mesh) continue;
             float world[16]; cgltf_node_transform_world(node,world);
-            for(cgltf_size pi=0;pi<node->mesh->primitives_count;++pi) {
-                // Match the mesh primitive in traversal order; clone GPU handles are shared safely.
-                size_t index=0;
-                for(cgltf_size m=0;m<data->meshes_count;++m) {
-                    if(&data->meshes[m]==node->mesh) break;
-                    index+=data->meshes[m].primitives_count;
-                }
-                index+=pi;
-                if(index<primitives_.size()) {
-                    Primitive copy=primitives_[index];
-                    std::copy(world,world+16,copy.nodeMatrix.begin());
-                    copy.nodeName=node->name?node->name:"";
-                    transformed.push_back(copy);
-                }
+            const uint32_t sourceMeshIndex=static_cast<uint32_t>(node->mesh-data->meshes);
+            // A mesh can expand into multiple draw primitives (for example, the
+            // seat and backrest split). Preserve the node transform on every part.
+            for(const Primitive& base:primitives_) {
+                if(base.sourceMeshIndex!=sourceMeshIndex) continue;
+                Primitive copy=base;
+                std::copy(world,world+16,copy.nodeMatrix.begin());
+                copy.nodeName=node->name?node->name:"";
+                transformed.push_back(copy);
             }
         }
         if(!transformed.empty()) primitives_.swap(transformed);
