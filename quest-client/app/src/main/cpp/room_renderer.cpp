@@ -3576,7 +3576,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     if (menuVisible_) {
         const int menuMonitorIndex=monitorCount==2?0:monitorCount/2;
         const float menuMonitorArc=(static_cast<float>(menuMonitorIndex)-(monitorCount-1)*.5f)*monitorArcStep;
-        const float menuScreenX=menuScreenX+monitorArcRadius*std::sin(menuMonitorArc);
+        const float menuScreenX=monitorX+monitorArcRadius*std::sin(menuMonitorArc);
         const float menuScreenZ=monitorZ+monitorArcRadius*(1.0f-std::cos(menuMonitorArc));
 
         const float uiCurve=0.0f,uiWidth=.606f,uiHeight=.340f;
