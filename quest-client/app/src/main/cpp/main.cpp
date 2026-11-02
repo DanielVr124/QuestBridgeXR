@@ -1241,7 +1241,6 @@ private:
     GLuint framebuffer_ = 0;
     Clock::time_point lastTrackingSend_{};
     bool previousMenuPressed_ = false;
-    bool previousMenuSelectPressed_ = false;
 };
 
 } // namespace
