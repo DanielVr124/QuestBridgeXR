@@ -2044,6 +2044,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
                 if(!sittingActive_) { chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f; chairCasterYaw_=0.0f; }
             } else if(menuSelection_==4) {
                 chairOffsetX_=chairOffsetZ_=chairYaw_=chairWheelRoll_=chairCasterYaw_=0.0f;
+                chairHeight_=chairRecline_=0.0f;
                 chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f;
             } else if(menuSelection_==5) {
                 sittingActive_=false;
@@ -2396,7 +2397,8 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float cente
     }
 }
 
-void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float dt,const XrPosef& headPose) {
+void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,float rightStickY,
+                                    float leftGrip,float rightGrip,float dt,const XrPosef& headPose) {
     if(dt<0.0f||dt>0.1f)dt=0.0f;
     const float virtualHeading=virtualYaw_+(sittingActive_?chairYaw_:0.0f);
     if(!hasPreviousHeadPosition_) {
@@ -2536,7 +2538,8 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
         // Right stick applies a torque; when released, the chair coasts on angular
         // momentum and slowly settles under swivel friction rather than stopping instantly.
         const float spinAcceleration=2.8f*std::clamp(settings_.chairSpinSpeed,.30f,3.50f);
-        chairAngularVelocity_+=std::clamp(rightStickX,-1.0f,1.0f)*spinAcceleration*dt;
+        // Positive right-stick input turns right, matching the standing turn convention.
+        chairAngularVelocity_-=std::clamp(rightStickX,-1.0f,1.0f)*spinAcceleration*dt;
         const float swivelDrag=.10f+.12f*std::clamp(settings_.chairFriction,.50f,6.0f);
         chairAngularVelocity_*=std::exp(-swivelDrag*dt);
         chairAngularVelocity_=std::clamp(chairAngularVelocity_,-4.5f,4.5f);
@@ -2549,6 +2552,16 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
             chairCasterYaw_+=casterError*std::clamp(dt*9.0f,0.0f,1.0f);
         }
         chairWheelRoll_=std::fmod(chairWheelRoll_+speedNow*dt/.065f,2.0f*kPi);
+        // Hydraulic seat-height travel is gentle and bounded to +/- 10 cm.
+        if(rightGrip>0.55f) {
+            chairHeight_=std::clamp(chairHeight_+std::clamp(rightStickY,-1.0f,1.0f)*0.12f*dt,
+                                    -0.10f,0.10f);
+        }
+        // Hold the left grip to recline progressively; releasing it eases upright.
+        constexpr float maxRecline=18.0f*kPi/180.0f;
+        const float reclineInput=std::clamp((leftGrip-0.22f)/0.70f,0.0f,1.0f);
+        const float reclineTarget=maxRecline*reclineInput;
+        chairRecline_+=(reclineTarget-chairRecline_)*(1.0f-std::exp(-dt*3.6f));
         const float seatedChairX=deskX+chairOffsetX_;
         const float seatedChairZ=deskZ+1.12f+chairOffsetZ_;
         moveX_=seatedChairX-headPose.position.x;
@@ -2866,11 +2879,19 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float pivotY=headCenterPose.position.y;
     const float pivotZ=headCenterPose.position.z;
     const float effectiveWorldYaw=virtualYaw_+(sittingActive_?chairYaw_:0.0f);
+    const float effectiveChairPitch=chairRecline_*seatedBlend_;
     const Mat4 inverseVirtualRotation=mul(
         translation(pivotX,pivotY,pivotZ),
-        mul(rotateY(-effectiveWorldYaw),translation(-pivotX,-pivotY,-pivotZ)));
-    const Mat4 inverseVirtualTranslation=
-        translation(-moveX_,.42f*seatedBlend_,-moveZ_);
+        mul(rotateY(-effectiveWorldYaw),
+            mul(rotateX(-effectiveChairPitch),translation(-pivotX,-pivotY,-pivotZ))));
+    // The head sits slightly above and forward of the backrest hinge. This compensates
+    // for the arc of a real reclining chair without moving or rewriting OpenXR eye poses.
+    constexpr float reclineHeadLever=0.82f;
+    const float reclineDrop=reclineHeadLever*(1.0f-std::cos(effectiveChairPitch));
+    const float reclineBack=reclineHeadLever*std::sin(effectiveChairPitch);
+    const Mat4 inverseVirtualTranslation=translation(
+        -moveX_,.42f*seatedBlend_-chairHeight_*seatedBlend_+reclineDrop,
+        -moveZ_-reclineBack);
     const Mat4 inverseVirtualWorld=mul(inverseVirtualRotation,inverseVirtualTranslation);
     Mat4 camera=mul(physicalView,inverseVirtualWorld);
     Mat4 pv=mul(projection,camera);
@@ -2881,8 +2902,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float cameraZ=-(camera[8]*camera[12]+camera[9]*camera[13]+camera[10]*camera[14]);
     if(settings_.environment=="explorable_city") {
         Mat4 cityProjection=makeCityProjection(view.fov);
-        Mat4 cityPv=mul(cityProjection,camera);
-        cityWorld_.render(cityPv.data(),cameraX,cameraY,cameraZ);
+        // City meshes are authored with their pavement at world Y=0. LOCAL space
+        // is head-centred, so use the configured room-floor offset for this scene only.
+        const Mat4 cityFloorAlignment=translation(0.0f,settings_.floorOffsetY,0.0f);
+        const Mat4 cityCamera=mul(camera,cityFloorAlignment);
+        Mat4 cityPv=mul(cityProjection,cityCamera);
+        cityWorld_.render(cityPv.data(),cameraX,cameraY-settings_.floorOffsetY,cameraZ);
         if(settings_.comfortVignette && vignetteProgram_) {
             glDisable(GL_DEPTH_TEST);
             glEnable(GL_BLEND);
@@ -3386,7 +3411,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 translation(chairX,floorY,chairZ),rotateY(chairYaw_));
             chairModel_.draw(pv.data(),chairPlacementMatrix.data(),locMvp_,locModel_,locColor_,locTextured_,
                              locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,
-                             &chairExposure);
+                             &chairExposure,chairHeight_,chairRecline_);
             // Separate small caster overlays spin as the chair rolls, while the
             // imported upholstered shell remains a single high-quality GLB.
             for(int wheel=0;wheel<5;++wheel) {
