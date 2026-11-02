@@ -38,7 +38,8 @@ public:
     bool initialize(AAssetManager* assets, const RoomSettings& settings);
     void release();
     void setSettings(const RoomSettings& settings);
-    void updateLocomotion(float leftX, float leftY, float rightX, float dt,
+    void updateLocomotion(float leftX, float leftY, float rightX, float rightY,
+                          float leftGrip, float rightGrip, float dt,
                           const XrPosef& headPose);
     void handleRoomInteraction(const XrPosef& controllerAimPose, const XrPosef& headPose, bool triggerPressed);
     void setTrackedControllerPoses(const std::array<XrPosef,2>& poses,
@@ -96,7 +97,8 @@ private:
                    float yaw = 0.0f);
     void drawCurvedPanel(const float* projectionView, float x, float y, float z,
                          float width, float height, float curveDepth, GLuint texture,
-                         const std::array<float, 4>& color, int segments = 24);
+                         const std::array<float, 4>& color, int segments = 24,
+                         float yaw = 0.0f);
     void drawGroundShadow(const float* projectionView, float x, float y, float z,
                           float width, float depth, float opacity);
     void drawEnvironmentWindow(const float* projectionView, float wallX, float centerZ, float floorY,
@@ -209,6 +211,8 @@ private:
     float chairOffsetX_ = 0.0f;
     float chairOffsetZ_ = 0.0f;
     float chairYaw_ = 0.0f;
+    float chairHeight_ = 0.0f;       // Limited +/- 10 cm seat-height travel.
+    float chairRecline_ = 0.0f;      // Smoothed backrest recline angle in radians.
     float chairVelocityX_ = 0.0f;
     float chairVelocityZ_ = 0.0f;
     float chairAngularVelocity_ = 0.0f;
