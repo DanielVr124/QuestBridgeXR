@@ -2758,8 +2758,12 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
                             else if(menuPage_==0) {
                                 if(std::fabs(hitY-(menuY-.075f))<.025f) selection=0;
                             }
+                            // Match each page's visible row height; adjacent chair/LED
+                            // targets must never overlap and steal one another's clicks.
+                            const float rowHitTolerance=menuPage_==4?.0115f:
+                                (menuPage_==3?.0155f:(menuPage_==1?.0145f:.019f));
                             if(rows) for(int i=0;i<count;++i)
-                                if(std::fabs(hitY-(menuY+rows[i]))<.019f){selection=i;break;}
+                                if(std::fabs(hitY-(menuY+rows[i]))<rowHitTolerance){selection=i;break;}
                             if(selection>=0&&hitX>=bodyX-.205f&&hitX<=bodyX+.215f) {
                                 menuSelection_=selection;
                                 handleMenuInput(0.0f,0.0f,0.0f,true,hitX<bodyX+.18f?-1:1);
