@@ -374,7 +374,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn('backrestReclineRadians', (ROOT / 'quest-client/app/src/main/cpp/glb_model.cpp').read_text(encoding='utf-8'))
         self.assertIn('cityFloorAlignment=translation(0.0f,settings_.floorOffsetY,0.0f)', renderer)
         self.assertIn('monitorArcRadius=1.95f', renderer)
-        self.assertIn('std::asin(.606f/(2.0f*monitorArcRadius))', renderer)
+        self.assertIn('std::atan(.606f/(2.0f*monitorArcRadius))', renderer)
         self.assertIn('scaling(.94f,1.0f,1.0f)', renderer)
         self.assertIn('rgb(.075f,.078f,.086f)', renderer)
         self.assertIn('monitorExposure{{.025f,.028f,.034f,1.0f}}', renderer)
