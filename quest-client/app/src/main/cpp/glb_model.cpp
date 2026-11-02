@@ -183,7 +183,7 @@ void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint lo
                     GLint locTextured,GLint locTexture,GLint locMaterial,GLint locRounded,GLint locUvScale,
                     const std::array<float,4>* emissiveOverrideColor,const char* emissiveNodeMarker,
                     const std::array<float,4>* albedoTint,float seatLiftMeters,
-                    float backrestReclineRadians) const {
+                    float backrestReclineRadians,bool omitDisplaySurface) const {
     auto lowerName=[](std::string name) {
         std::transform(name.begin(),name.end(),name.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
         return name;
@@ -209,6 +209,11 @@ void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint lo
     multiply(fromHinge,hingeTmp,hingeRotation);
     const float lift[16]={1,0,0,0, 0,1,0,0, 0,0,1,0, 0,seatLiftMeters,0,1};
     for(const Primitive& p:primitives_) {
+        if(omitDisplaySurface) {
+            const std::string node=lowerName(p.nodeName);
+            if(node.find("screen")!=std::string::npos||node.find("display")!=std::string::npos||
+               node.find("lcd")!=std::string::npos||node.find("glass")!=std::string::npos) continue;
+        }
         const bool emissiveOverride=emissiveOverrideColor&&emissiveNodeMarker&&
             p.nodeName.find(emissiveNodeMarker)!=std::string::npos;
         std::array<float,4> color=emissiveOverride?*emissiveOverrideColor:p.color;
