@@ -425,7 +425,7 @@ void main(){
   vec4 tex = uTextured != 0 ? texture(uTexture, vUv) : vec4(1.0);
   vec4 base = tex * uColor;
   // Emissive shader path for recessed neon strips and illuminated hardware.
-  if (uMaterial == 7) { outColor=vec4(min(base.rgb*1.42,vec3(1.0)),base.a); return; }
+  if (uMaterial == 7) { outColor=vec4(min(base.rgb*2.20,vec3(1.0)),base.a); return; }
   if (uTextured != 0 || uMaterial < 0) { outColor=base; return; }
 
   vec2 uv=vUv*uUvScale;
@@ -2759,7 +2759,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
                                 if(std::fabs(hitY-(menuY+rows[i]))<.019f){selection=i;break;}
                             if(selection>=0&&hitX>=bodyX-.205f&&hitX<=bodyX+.215f) {
                                 menuSelection_=selection;
-                                handleMenuInput(0.0f,0.0f,0.0f,true,hitX<bodyX?-1:1);
+                                handleMenuInput(0.0f,0.0f,0.0f,true,hitX<bodyX+.18f?-1:1);
                             }
                         }
                     }
@@ -2970,16 +2970,6 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             const auto color=ledZoneColor(zone,t);
             drawRoundedBox(pv.data(),x-sx*.5f+segmentWidth*(segment+.5f),y,z,
                            segmentWidth*1.18f,sy,sz,rgb(color[0],color[1],color[2]),0.0f,7);
-        }
-    };
-    auto drawGradientBarY=[&](int zone,float x,float y,float z,float sx,float sy,float sz,int segments=24) {
-        if(zone<0||zone>=static_cast<int>(ledZones_.size())||!ledZones_[static_cast<size_t>(zone)].enabled) return;
-        const float segmentHeight=sy/static_cast<float>(segments);
-        for(int segment=0;segment<segments;++segment) {
-            const float t=(static_cast<float>(segment)+0.5f)/static_cast<float>(segments);
-            const auto color=ledZoneColor(zone,t);
-            drawRoundedBox(pv.data(),x,y-sy*.5f+segmentHeight*(segment+.5f),z,
-                           sx,segmentHeight*1.18f,sz,rgb(color[0],color[1],color[2]),0.0f,7);
         }
     };
     auto drawGradientBarZ=[&](int zone,float x,float y,float z,float sx,float sy,float sz,int segments=24) {
@@ -3321,7 +3311,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             for(float z : {frontLedZ,backLedZ}) {
                 const int zone=y>floorY+1.0f?0:1;
                 const auto tint=ledZoneColor(zone,.5f);
-                drawSphere(pv.data(),x,y,z,.034f,.034f,.034f
+                drawSphere(pv.data(),x,y,z,.034f,.034f,.034f,
                            rgb(tint[0],tint[1],tint[2]),7);
             }
         }
@@ -3409,15 +3399,14 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             mul(rotateY(-angle),scaling(.94f,1.0f,1.0f)));
         monitorModel_.draw(pv.data(),monitorPlacementMatrix.data(),locMvp_,locModel_,locColor_,locTextured_,
                            locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&monitorExposure);
-        if(streamOn) {
-            // Separate black monitor shells; screen glass meets edge-to-edge.
-            // A live stream replaces the near-black idle panel without changing the shell.
-            const bool liveScreen=streamOn&&hasVideo;
-            drawCurvedPanel(pv.data(),screenX,deskSurface+.280f,screenZ+.001f,
-                            .606f,.340f,.029f,
-                            liveScreen?videoTexture:0,
-                            liveScreen?rgb(1,1,1):rgb(.075f,.078f,.086f),32,-angle);
-        }
+        // Each monitor has its own dark housing. The screen surfaces touch, but
+        // there is no shared bridge or connecting frame between the physical models.
+        // The idle glass is deliberately a lighter black than the bezel.
+        const bool liveScreen=streamOn&&hasVideo;
+        drawCurvedPanel(pv.data(),screenX,deskSurface+.280f,screenZ+.001f,
+                        .606f,.340f,.029f,
+                        liveScreen?videoTexture:0,
+                        liveScreen?rgb(1,1,1):rgb(.075f,.078f,.086f),32,-angle);
     }
 
     // User-supplied chair faces the desk; yaw 180 degrees puts the tall
