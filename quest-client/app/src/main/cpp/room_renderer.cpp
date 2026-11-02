@@ -2679,21 +2679,27 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
             const int pointerMonitorCount=std::clamp(settings_.monitorCount,1,3);
             const float monitorX=deskX-.34f;
             const float monitorZ=deskZ-.31f;
+            constexpr float pointerArcRadius=1.95f;
+            const float pointerArcStep=2.0f*std::asin(.606f/(2.0f*pointerArcRadius));
+            const int pointerMenuIndex=pointerMonitorCount==2?0:pointerMonitorCount/2;
+            const float pointerMenuArc=(static_cast<float>(pointerMenuIndex)-(pointerMonitorCount-1)*.5f)*pointerArcStep;
+            const float pointerMenuX=monitorX+pointerArcRadius*std::sin(pointerMenuArc);
+            const float pointerMenuZ=monitorZ+pointerArcRadius*(1.0f-std::cos(pointerMenuArc));
             const float menuY=settings_.floorOffsetY+1.03f;
             if(menuPointerDirection[2]<-.08f) {
                 const float menuWidth=.606f;
-                const float hitSurfaceZ=monitorZ+.003f;
+                const float hitSurfaceZ=pointerMenuZ+.003f;
                 const float t=(hitSurfaceZ-pointerOrigin[2])/menuPointerDirection[2];
                 const float hitX=pointerOrigin[0]+menuPointerDirection[0]*t;
                 const float hitY=pointerOrigin[1]+menuPointerDirection[1]*t;
                 if(t>.02f&&t<8.0f) {
                     menuPointerOrigin_=pointerOrigin;
                     menuPointerHit_={hitX,hitY,hitSurfaceZ+.002f};
-                    menuPointerValid_=hitX>=monitorX-menuWidth*.5f&&hitX<=monitorX+menuWidth*.5f&&
+                    menuPointerValid_=hitX>=pointerMenuX-menuWidth*.5f&&hitX<=pointerMenuX+menuWidth*.5f&&
                                       hitY>=menuY-.170f&&hitY<=menuY+.170f;
                     if(menuPointerValid_&&triggerPressed&&!previousMenuPointerTrigger_) {
-                        const float navX=monitorX-.216f;
-                        const float bodyX=monitorX+.063f;
+                        const float navX=pointerMenuX-.216f;
+                        const float bodyX=pointerMenuX+.063f;
                         if(std::fabs(hitX-navX)<.067f) {
                             if(std::fabs(hitY-(menuY+.061f))<.018f) {
                                 menuPage_=0;menuSelection_=0;
@@ -3568,9 +3574,14 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     }
     // Full monitor UI with persistent navigation and distinct virtual-desktop-style pages.
     if (menuVisible_) {
+        const int menuMonitorIndex=monitorCount==2?0:monitorCount/2;
+        const float menuMonitorArc=(static_cast<float>(menuMonitorIndex)-(monitorCount-1)*.5f)*monitorArcStep;
+        const float menuScreenX=menuScreenX+monitorArcRadius*std::sin(menuMonitorArc);
+        const float menuScreenZ=monitorZ+monitorArcRadius*(1.0f-std::cos(menuMonitorArc));
+
         const float uiCurve=0.0f,uiWidth=.606f,uiHeight=.340f;
-        const float menuY=deskSurface+.280f,menuZ=monitorZ+.003f;
-        const float navX=monitorX-.216f,bodyX=monitorX+.063f,bodyWidth=.405f;
+        const float menuY=deskSurface+.280f,menuZ=menuScreenZ+.003f;
+        const float navX=menuScreenX-.216f,bodyX=menuScreenX+.063f,bodyWidth=.405f;
         const auto background=rgb(.010f,.015f,.030f,.985f);
         const auto header=rgb(.018f,.028f,.052f,.99f);
         const auto navBase=rgb(.018f,.026f,.048f,.98f);
@@ -3591,7 +3602,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             drawPlane(pv.data(),x,y,menuZ+.002f,w,h,0,tint);
         };
         auto label=[&](const char* value,float x,float y,float size,const std::array<float,4>& tint) {
-            drawText(pv.data(),value,x,y,menuZ+.0015f,size,tint,monitorX,uiWidth,0.0f,menuY);
+            drawText(pv.data(),value,x,y,menuZ+.0015f,size,tint,menuScreenX,uiWidth,0.0f,menuY);
         };
         auto prettyName=[](const std::string& value) {
             std::string out=value;
@@ -3615,14 +3626,14 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(program_);
-        panel(monitorX,menuY,uiWidth,uiHeight,background);
-        panel(monitorX,menuY+.139f,uiWidth-.010f,.038f,header);
-        label("QUESTBRIDGE",monitorX-.270f,menuY+.132f,.00245f,white);
-        label("XR STREAMING",monitorX-.122f,menuY+.132f,.00155f,muted);
-        label(pcConnected_?"PC ONLINE":"PC OFFLINE",monitorX+.130f,menuY+.132f,.00160f,
+        panel(menuScreenX,menuY,uiWidth,uiHeight,background);
+        panel(menuScreenX,menuY+.139f,uiWidth-.010f,.038f,header);
+        label("QUESTBRIDGE",menuScreenX-.270f,menuY+.132f,.00245f,white);
+        label("XR STREAMING",menuScreenX-.122f,menuY+.132f,.00155f,muted);
+        label(pcConnected_?"PC ONLINE":"PC OFFLINE",menuScreenX+.130f,menuY+.132f,.00160f,
               pcConnected_?green:amber);
         panel(navX,menuY-.006f,.132f,.270f,navBase);
-        panel(monitorX-.143f,menuY-.006f,.0025f,.270f,rgb(.09f,.16f,.25f,1.0f));
+        panel(menuScreenX-.143f,menuY-.006f,.0025f,.270f,rgb(.09f,.16f,.25f,1.0f));
         label("NAVIGATION",navX-.050f,menuY+.105f,.00135f,muted);
         const float mainTabY[2]={menuY+.061f,menuY+.015f};
         const char* mainTabs[2]={"PC","SETTINGS"};
@@ -3816,8 +3827,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             label("RIGHT GRIP + STICK: HEIGHT   LEFT GRIP: RECLINE",bodyX-.184f,menuY-.171f,.00102f,muted);
         }
         if(!lightingColorPickerOpen_) {
-            label("POINT + TRIGGER  SELECT",monitorX-.270f,menuY-.151f,.00116f,muted);
-            label("PC  /  SETTINGS",monitorX-.145f,menuY-.151f,.00116f,muted);
+            label("POINT + TRIGGER  SELECT",menuScreenX-.270f,menuY-.151f,.00116f,muted);
+            label("PC  /  SETTINGS",menuScreenX-.145f,menuY-.151f,.00116f,muted);
         }
         glDisable(GL_BLEND);
         glDepthMask(GL_TRUE);
