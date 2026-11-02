@@ -148,6 +148,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("ledChannelX(ceilingLedY,frontLedZ,0)", renderer)
         self.assertIn("ledChannelX(floorLedY,frontLedZ,1)", renderer)
         self.assertNotIn("ledZones_[6]", renderer)
+        self.assertNotIn("ledLeftLamp", renderer)
+        self.assertNotIn("ledRightLamp", renderer)
         self.assertNotIn("drawGradientBarY", renderer)
         self.assertIn("base.rgb*2.20", renderer)
         self.assertIn("ledChannelX(ceilingLedY,frontLedZ,0)", renderer)
