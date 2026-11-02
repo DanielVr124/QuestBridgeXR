@@ -364,7 +364,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("roomDz-physicalDz", renderer)
         self.assertIn('controllerPoses_[hand]', renderer)
         self.assertIn('const char* sceneNames[2]={"GAMING ROOM","EXPLORABLE CITY"}', renderer)
-        self.assertIn('uiCurve=0.0f,uiWidth=.606f,uiHeight=.340f', renderer)
+        self.assertIn('uiCurve=.029f,uiWidth=.606f,uiHeight=.340f', renderer)
         self.assertIn("drawCurvedPanel(pv.data(),point[0],y,point[1],w,h,uiCurve,0,tint,24", renderer)
         self.assertIn("menuYaw,menuScreenX,menuScreenZ+.003f", renderer)
         self.assertIn("menuMonitorIndex=monitorCount==2?0:monitorCount/2", renderer)
