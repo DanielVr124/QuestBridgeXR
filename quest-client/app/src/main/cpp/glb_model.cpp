@@ -225,7 +225,7 @@ void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint lo
                     GLint locTextured,GLint locTexture,GLint locMaterial,GLint locRounded,GLint locUvScale,
                     const std::array<float,4>* emissiveOverrideColor,const char* emissiveNodeMarker,
                     const std::array<float,4>* albedoTint,float seatLiftMeters,
-                    float backrestReclineRadians,bool omitDisplaySurface) const {
+                    float backrestReclineRadians,bool omitDisplaySurface,float horizontalTvBodyScale) const {
     auto lowerName=[](std::string name) {
         std::transform(name.begin(),name.end(),name.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
         return name;
@@ -267,6 +267,16 @@ void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint lo
         }
         float nodeTransform[16],model[16],mvp[16];
         std::copy(p.nodeMatrix.begin(),p.nodeMatrix.end(),nodeTransform);
+        const std::string nodeLabel=lowerName(p.nodeName);
+        const bool tvBodyNode=nodeLabel=="tv_tvblk"||nodeLabel=="tv_tvback"||
+            nodeLabel=="tv_alu"||nodeLabel=="tv_ledw"||nodeLabel=="tv_screen"||
+            nodeLabel=="tv_logo";
+        if(tvBodyNode&&std::fabs(horizontalTvBodyScale-1.0f)>0.0001f) {
+            const float bodyScale[16]={horizontalTvBodyScale,0,0,0,
+                                       0,1,0,0,0,0,1,0,0,0,0,1};
+            float scaled[16];multiply(bodyScale,nodeTransform,scaled);
+            std::copy(scaled,scaled+16,nodeTransform);
+        }
         if(!isFixedBase(p.nodeName) && std::fabs(seatLiftMeters)>0.0001f) {
             float lifted[16]; multiply(lift,nodeTransform,lifted);
             std::copy(lifted,lifted+16,nodeTransform);
