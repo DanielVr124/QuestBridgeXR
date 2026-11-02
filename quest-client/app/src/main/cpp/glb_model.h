@@ -16,7 +16,8 @@ public:
               const char* emissiveNodeMarker = nullptr,
               const std::array<float,4>* albedoTint = nullptr,
               float seatLiftMeters = 0.0f,
-              float backrestReclineRadians = 0.0f) const;
+              float backrestReclineRadians = 0.0f,
+              bool omitDisplaySurface = false) const;
     void release();
     bool loaded() const { return !primitives_.empty(); }
 private:
