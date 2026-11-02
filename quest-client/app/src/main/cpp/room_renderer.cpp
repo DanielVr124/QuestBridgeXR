@@ -3540,21 +3540,23 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     if(settings_.showTv) {
         const float tvX=bedX, tvZ=bedCenterZ+bedDepth*.5f+.85f;
         const float tvRenderX=tvX+.20f;
-        // Scale the full stand and display together to better balance it beside the bed.
+        // Scale only the TV panel/body until its outer bezel touches the right wall.
+        // Keep the tall stand and lower hardware at their original proportions.
         constexpr float tvModelScale=1.32f;
-        const float tvScreenWidth=2.0f*(halfW-.015f-tvRenderX);
-        const float tvModelScaleX=tvScreenWidth/1.218f;
+        const float tvBodyScaleX=(halfW-.015f-tvRenderX)/(.615f*tvModelScale);
+        const float tvScreenWidth=1.218f*tvModelScale*tvBodyScaleX;
         const float tvScreenHeight=.685f*tvModelScale;
         const float tvScreenCenterY=floorY+.984f*tvModelScale;
         const bool tvStream=settings_.screenDestination=="tv"||settings_.screenDestination=="both";
         const GLuint tvTex=(tvStream&&hasVideo)?videoTexture:env;
         if(tvModel_.loaded()) {
             const float tvPlacement[16]={
-                -tvModelScaleX,0,0,0, 0,tvModelScale,0,0, 0,0,-tvModelScale,0,
+                -tvModelScale,0,0,0, 0,tvModelScale,0,0, 0,0,-tvModelScale,0,
                 tvRenderX,floorY,tvZ,1
             };
             tvModel_.draw(pv.data(),tvPlacement,locMvp_,locModel_,locColor_,locTextured_,
-                          locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&tvExposure);
+                          locTexture_,locMaterial_,locRounded_,locUvScale_,nullptr,nullptr,&tvExposure,
+                          0.0f,0.0f,false,tvBodyScaleX);
             drawPlane(pv.data(),tvX+.20f,tvScreenCenterY,tvZ-.002f,
                       tvScreenWidth,tvScreenHeight,tvTex,rgb(1,1,1),kPi);
         } else {
