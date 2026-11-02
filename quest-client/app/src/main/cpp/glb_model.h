@@ -28,6 +28,7 @@ private:
         std::string nodeName;
         std::array<float,16> nodeMatrix{};
         bool indexed=false;
+        bool backrestPart=false;
     };
     std::vector<Primitive> primitives_;
 };
