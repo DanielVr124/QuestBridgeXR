@@ -14,7 +14,9 @@ public:
               GLint locRounded, GLint locUvScale,
               const std::array<float,4>* emissiveOverrideColor = nullptr,
               const char* emissiveNodeMarker = nullptr,
-              const std::array<float,4>* albedoTint = nullptr) const;
+              const std::array<float,4>* albedoTint = nullptr,
+              float seatLiftMeters = 0.0f,
+              float backrestReclineRadians = 0.0f) const;
     void release();
     bool loaded() const { return !primitives_.empty(); }
 private:
