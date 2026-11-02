@@ -1031,7 +1031,9 @@ private:
                                    (roomPointerFlags&3u)==3u;
         const bool roomTriggerPressed=roomPointerValid &&
             floatAction(hands_[1].trigger,hands_[1].handPath)>.72f;
-        room_.handleRoomInteraction(roomPointerPose,headPose,roomTriggerPressed);
+        const bool rightARelease=boolAction(hands_[1].primary,hands_[1].handPath);
+        room_.handleRoomInteraction(roomPointerPose,gripPoses[1],gripPoseValid[1],headPose,
+                                     roomTriggerPressed,rightGrip>.62f,rightARelease);
         qbx::MousePayload mouse{};
         if (room_.consumeMousePayload(mouse)) {
             mouse.timestampNs = nowNs();
