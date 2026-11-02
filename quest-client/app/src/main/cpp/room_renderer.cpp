@@ -3644,9 +3644,17 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float menuScreenX=monitorX+monitorArcRadius*std::sin(menuMonitorArc);
         const float menuScreenZ=monitorZ+monitorArcRadius*(1.0f-std::cos(menuMonitorArc));
 
-        const float uiCurve=0.0f,uiWidth=.606f,uiHeight=.340f;
-        const float menuY=deskSurface+.280f,menuZ=menuScreenZ+.003f;
-        const float navX=menuScreenX-.216f,bodyX=menuScreenX+.063f,bodyWidth=.405f;
+        const float menuYaw=-menuMonitorArc;
+        const float uiCurve=.029f,uiWidth=.606f,uiHeight=.340f;
+        const float menuY=deskSurface+.280f,bodyWidth=.405f;
+        const float navX=-.216f,bodyX=.063f;
+        const float menuCos=std::cos(menuYaw),menuSin=std::sin(menuYaw);
+        auto menuWorldPoint=[&](float localX,float localZ) {
+            return std::array<float,2>{
+                menuScreenX+menuCos*localX+menuSin*localZ,
+                menuScreenZ-menuSin*localX+menuCos*localZ
+            };
+        };
         const auto background=rgb(.010f,.015f,.030f,.985f);
         const auto header=rgb(.018f,.028f,.052f,.99f);
         const auto navBase=rgb(.018f,.026f,.048f,.98f);
@@ -3659,15 +3667,22 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const auto green=rgb(.24f,.88f,.62f,1.0f);
         const auto amber=rgb(1.0f,.68f,.28f,1.0f);
         auto panel=[&](float x,float y,float w,float h,const std::array<float,4>& tint) {
-            // Entire interface is a flat 2D panel matching the monitor screen.
-            drawPlane(pv.data(),x,y,menuZ,w,h,0,tint);
+            const float normalized=std::clamp(x/(uiWidth*.5f),-1.0f,1.0f);
+            const float localZ=.003f+uiCurve*normalized*normalized;
+            const auto point=menuWorldPoint(x,localZ);
+            drawCurvedPanel(pv.data(),point[0],y,point[1],w,h,uiCurve,0,tint,24,
+                            menuYaw,x,uiWidth);
         };
         auto flatPanel=[&](float x,float y,float w,float h,const std::array<float,4>& tint) {
-            // Color selection remains a flat, two-dimensional control surface.
-            drawPlane(pv.data(),x,y,menuZ+.002f,w,h,0,tint);
+            const float normalized=std::clamp(x/(uiWidth*.5f),-1.0f,1.0f);
+            const float localZ=.005f+uiCurve*normalized*normalized;
+            const auto point=menuWorldPoint(x,localZ);
+            drawCurvedPanel(pv.data(),point[0],y,point[1],w,h,uiCurve,0,tint,20,
+                            menuYaw,x,uiWidth);
         };
         auto label=[&](const char* value,float x,float y,float size,const std::array<float,4>& tint) {
-            drawText(pv.data(),value,x,y,menuZ+.0015f,size,tint,menuScreenX,uiWidth,0.0f,menuY);
+            drawText(pv.data(),value,x,y,0.0f,size,tint,0.0f,uiWidth,uiCurve,menuY,
+                     menuYaw,menuScreenX,menuScreenZ+.003f);
         };
         auto prettyName=[](const std::string& value) {
             std::string out=value;
@@ -3691,14 +3706,14 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(program_);
-        panel(menuScreenX,menuY,uiWidth,uiHeight,background);
-        panel(menuScreenX,menuY+.139f,uiWidth-.010f,.038f,header);
-        label("QUESTBRIDGE",menuScreenX-.270f,menuY+.132f,.00245f,white);
-        label("XR STREAMING",menuScreenX-.122f,menuY+.132f,.00155f,muted);
-        label(pcConnected_?"PC ONLINE":"PC OFFLINE",menuScreenX+.130f,menuY+.132f,.00160f,
+        panel(0.0f,menuY,uiWidth,uiHeight,background);
+        panel(0.0f,menuY+.139f,uiWidth-.010f,.038f,header);
+        label("QUESTBRIDGE",-.270f,menuY+.132f,.00245f,white);
+        label("XR STREAMING",-.122f,menuY+.132f,.00155f,muted);
+        label(pcConnected_?"PC ONLINE":"PC OFFLINE",.130f,menuY+.132f,.00160f,
               pcConnected_?green:amber);
         panel(navX,menuY-.006f,.132f,.270f,navBase);
-        panel(menuScreenX-.143f,menuY-.006f,.0025f,.270f,rgb(.09f,.16f,.25f,1.0f));
+        panel(-.143f,menuY-.006f,.0025f,.270f,rgb(.09f,.16f,.25f,1.0f));
         label("NAVIGATION",navX-.050f,menuY+.105f,.00135f,muted);
         const float mainTabY[2]={menuY+.061f,menuY+.015f};
         const char* mainTabs[2]={"PC","SETTINGS"};
@@ -3892,8 +3907,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             label("RIGHT GRIP + STICK: HEIGHT   LEFT GRIP: RECLINE",bodyX-.184f,menuY-.171f,.00102f,muted);
         }
         if(!lightingColorPickerOpen_) {
-            label("POINT + TRIGGER  SELECT",menuScreenX-.270f,menuY-.151f,.00116f,muted);
-            label("PC  /  SETTINGS",menuScreenX-.145f,menuY-.151f,.00116f,muted);
+            label("POINT + TRIGGER  SELECT",-.270f,menuY-.151f,.00116f,muted);
+            label("PC  /  SETTINGS",-.145f,menuY-.151f,.00116f,muted);
         }
         glDisable(GL_BLEND);
         glDepthMask(GL_TRUE);
