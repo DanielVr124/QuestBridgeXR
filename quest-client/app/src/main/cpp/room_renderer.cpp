@@ -2768,7 +2768,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
             if(localDirectionZ<-.08f) {
                 constexpr float menuWidth=.606f,menuCurve=.029f;
                 float t=(.003f-localOriginZ)/localDirectionZ;
-                float hitLocalX=0.0f,hitLocalY=0.0f,hitSurfaceLocalZ=.003f;
+                float hitLocalX=0.0f,hitSurfaceLocalZ=.003f;
                 for(int iteration=0;iteration<4;++iteration) {
                     hitLocalX=localOriginX+localDirectionX*t;
                     const float normalized=std::clamp(hitLocalX/(menuWidth*.5f),-1.0f,1.0f);
@@ -2861,42 +2861,17 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
             }
         }
         previousMenuPointerTrigger_=triggerPressed;
-        if(mouseDragging_) {mouseDragging_=false;updateMousePayload(0);}
         return;
     }
     previousMenuPointerTrigger_=false;
-    if(!settings_.roomControlsEnabled) {
-        if(mouseDragging_) {mouseDragging_=false;updateMousePayload(0);}
-        return;
-    }
+    if(!settings_.roomControlsEnabled) return;
 
     const auto origin=pointerOrigin;
     auto direction=pointerDirection;
     const float directionLength=std::sqrt(direction[0]*direction[0]+direction[1]*direction[1]+direction[2]*direction[2]);
-    if(directionLength<0.0001f) {
-        if(mouseDragging_&&!triggerPressed) {
-            mouseDragging_=false;
-            updateMousePayload(0);
-        }
-        return;
-    }
+    if(directionLength<0.0001f) return;
     for(float& component:direction)component/=directionLength;
 
-    // Desk-top ray intersection. The draggable footprint is clamped to the
-    // tabletop so neither the model nor the remote pointer can slide off it.
-    auto deskIntersection=[&](float& hitX,float& hitZ) {
-        if(direction[1]>=-.10f)return false;
-        const float t=(deskSurface-origin[1])/direction[1];
-        if(t<=0.0f||t>4.5f)return false;
-        hitX=origin[0]+direction[0]*t;
-        hitZ=origin[2]+direction[2]*t;
-        return hitX>=deskX-1.20f&&hitX<=deskX+1.20f&&
-               hitZ>=deskZ-.41f&&hitZ<=deskZ+.41f;
-    };
-
-    float hitDeskX=0.0f,hitDeskZ=0.0f;
-    const bool overDesk=deskIntersection(hitDeskX,hitDeskZ);
-    if(!triggerEdge)return;
 
     // A click while seated stands the user up. The virtual eye-height offset
     // eases out over time; raw OpenXR head tracking itself remains unchanged.
