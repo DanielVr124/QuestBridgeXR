@@ -1973,6 +1973,9 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
                 settings_.chairSpinSpeed=std::clamp(settings_.chairSpinSpeed+direction*0.10f,0.30f,3.50f);
             } else if(menuSelection_==3) {
                 settings_.chairFriction=std::clamp(settings_.chairFriction+direction*0.20f,0.50f,6.00f);
+            } else if(menuSelection_==5) {
+                chairReclineTarget_=std::clamp(chairReclineTarget_+
+                    direction*(3.0f*kPi/180.0f),0.0f,18.0f*kPi/180.0f);
             }
         }
     };
@@ -2053,7 +2056,7 @@ void RoomRenderer::handleMenuInput(float horizontal,float vertical,float adjust,
                 }
             } else if(menuSelection_==6) {
                 chairOffsetX_=chairOffsetZ_=chairYaw_=chairWheelRoll_=chairCasterYaw_=0.0f;
-                chairHeight_=chairRecline_=0.0f;
+                chairHeight_=chairRecline_=chairReclineTarget_=0.0f;
                 chairVelocityX_=chairVelocityZ_=chairAngularVelocity_=0.0f;
             } else if(menuSelection_==7) {
                 sittingActive_=false;
@@ -2151,7 +2154,8 @@ void RoomRenderer::drawRoundedBox(const float* pv,float x,float y,float z,float 
 }
 void RoomRenderer::drawText(const float* pv, const char* text, float x, float y, float z,
                             float pixelSize, const std::array<float,4>& color,
-                            float curveCenterX, float curveWidth, float curveDepth, float curveCenterY) {
+                            float curveCenterX, float curveWidth, float curveDepth, float curveCenterY,
+                            float curveYaw, float transformCenterX, float transformCenterZ) {
     if (!text || !gFontAtlasReady || !gFontAtlasTexture) return;
     std::vector<Vertex> vertices;
     vertices.reserve(std::strlen(text) * 6u);
@@ -2170,7 +2174,12 @@ void RoomRenderer::drawText(const float* pv, const char* text, float x, float y,
             projectedY = curveCenterY + pitchCos * localY + pitchSin * localZ;
             projectedZ = z - pitchSin * localY + pitchCos * localZ;
         }
-        vertices.push_back({px, projectedY, projectedZ, u, v});
+        const float localX=px;
+        const float localZ=projectedZ-z;
+        const float yawCos=std::cos(curveYaw),yawSin=std::sin(curveYaw);
+        const float worldX=transformCenterX+yawCos*localX+yawSin*localZ;
+        const float worldZ=transformCenterZ-yawSin*localX+yawCos*localZ;
+        vertices.push_back({worldX, projectedY, worldZ, u, v});
     };
     for (int i = 0; text[i] != '\0'; ++i) {
         unsigned char character = static_cast<unsigned char>(text[i]);
@@ -2267,7 +2276,8 @@ void RoomRenderer::drawPlane(const float* pv,float x,float y,float z,float sx,fl
 
 void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
                                     float width, float height, float curveDepth, GLuint texture,
-                                    const std::array<float,4>& color, int segments,float yaw) {
+                                    const std::array<float,4>& color, int segments,float yaw,
+                                    float curvatureCenterOffsetX,float curvatureWidth) {
     segments = std::clamp(segments, 8, 48);
     std::vector<Vertex> vertices;
     vertices.reserve(static_cast<size_t>(segments) * 6u);
@@ -2276,9 +2286,13 @@ void RoomRenderer::drawCurvedPanel(const float* pv, float x, float y, float z,
     const float yawCos=std::cos(yaw),yawSin=std::sin(yaw);
     auto point = [&](float u, float v) {
         const float localX = (u - 0.5f) * width;
-        const float normalized = 2.0f * u - 1.0f;
-        // Match the monitor glass: shallow concave center, with both edges projecting forward.
-        const float localZ = curveDepth * normalized * normalized;
+        const float normalized=curvatureWidth>0.0001f
+            ?std::clamp((curvatureCenterOffsetX+localX)/(curvatureWidth*.5f),-1.0f,1.0f)
+            :2.0f*u-1.0f;
+        const float centerNormalized=curvatureWidth>0.0001f
+            ?std::clamp(curvatureCenterOffsetX/(curvatureWidth*.5f),-1.0f,1.0f):0.0f;
+        // Every 2D menu tile follows the same full-screen curve, not its own tiny arc.
+        const float localZ=curveDepth*(normalized*normalized-centerNormalized*centerNormalized);
         const float localY = (v - 0.5f) * height;
         const float pitchedY = pitchCos * localY + pitchSin * localZ;
         const float pitchedZ = -pitchSin * localY + pitchCos * localZ;
@@ -2575,9 +2589,12 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
         }
         // Hold the left grip to recline progressively; releasing it eases upright.
         constexpr float maxRecline=18.0f*kPi/180.0f;
-        const float reclineInput=std::clamp((leftGrip-0.22f)/0.70f,0.0f,1.0f);
-        const float reclineTarget=maxRecline*reclineInput;
-        chairRecline_+=(reclineTarget-chairRecline_)*(1.0f-std::exp(-dt*3.6f));
+        if(leftGrip>0.22f) {
+            const float reclineInput=std::clamp((leftGrip-0.22f)/0.70f,0.0f,1.0f);
+            chairReclineTarget_=maxRecline*reclineInput;
+        }
+        chairReclineTarget_=std::clamp(chairReclineTarget_,0.0f,maxRecline);
+        chairRecline_+=(chairReclineTarget_-chairRecline_)*(1.0f-std::exp(-dt*3.6f));
         const float seatedChairX=deskX+chairOffsetX_;
         const float seatedChairZ=deskZ+1.12f+chairOffsetZ_;
         moveX_=seatedChairX-headPose.position.x;
@@ -2903,7 +2920,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     (void)eyeIndex; (void)width; (void)height;
     const float floorY=settings_.floorOffsetY, ceilingY=floorY+4.4f, backZ=-halfD, frontZ=halfD;
     const std::array<float,4> deskExposure{{.66f,.64f,.61f,1.0f}};
-    const std::array<float,4> monitorExposure{{.025f,.028f,.034f,1.0f}};
+    const std::array<float,4> monitorExposure{{.008f,.009f,.012f,1.0f}};
     const std::array<float,4> chairExposure{{.64f,.65f,.68f,1.0f}};
     const std::array<float,4> mouseExposure{{.62f,.64f,.68f,1.0f}};
     const std::array<float,4> tvExposure{{.60f,.62f,.66f,1.0f}};
@@ -3260,7 +3277,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float bedWidth=3.20f*bedScale;
     const float bedDepth=4.05f*bedScale;
     const float bedRenderX=halfW-bedWidth*.5f;
-    const float bedX=bedRenderX-.20f;
+    const float bedX=bedRenderX;
     const float bedZ=backZ+bedDepth*.5f;
     drawGroundShadow(pv.data(),bedRenderX,floorY+.004f,bedZ,bedWidth,bedDepth,.42f);
     const float bedPlacement[16] = {
@@ -3292,14 +3309,12 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const float ledDepth=halfD*2.0f-.44f;
     const float frontLedZ=frontZ-.17f,backLedZ=backZ+.17f;
     const float leftLedX=-halfW+.17f,rightLedX=halfW-.17f;
-    const float ledThickness=.036f,ledHeight=.034f;
+    const float ledThickness=.046f,ledHeight=.040f;
     auto ledChannelX=[&](float y,float z,int zone) {
-        drawRoundedBox(pv.data(),0,y,z,ledWidth,.064f,.074f,trimDark,0.0f,5);
-        drawGradientBar(zone,0,y,z,ledWidth,ledThickness,ledHeight,32);
+        drawGradientBar(zone,0,y,z,ledWidth,ledThickness,ledHeight,48);
     };
     auto ledChannelZ=[&](float x,float y,int zone) {
-        drawRoundedBox(pv.data(),x,y,0,.074f,.064f,ledDepth,trimDark,0.0f,5);
-        drawGradientBarZ(zone,x,y,0,ledThickness,ledHeight,ledDepth,32);
+        drawGradientBarZ(zone,x,y,0,ledThickness,ledHeight,ledDepth,48);
     };
     // Ceiling perimeter: one continuous colour zone wraps all four corners.
     ledChannelX(ceilingLedY,frontLedZ,0);
@@ -3412,7 +3427,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         drawCurvedPanel(pv.data(),screenX,deskSurface+.280f,screenZ+.001f,
                         .606f,.340f,.029f,
                         liveScreen?videoTexture:0,
-                        liveScreen?rgb(1,1,1):rgb(.075f,.078f,.086f),32,-angle);
+                        liveScreen?rgb(1,1,1):rgb(.085f,.090f,.100f),32,-angle);
     }
 
     // User-supplied chair faces the desk; yaw 180 degrees puts the tall
@@ -3501,14 +3516,15 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         const float tvRenderX=tvX+.20f;
         // Scale the full stand and display together to better balance it beside the bed.
         constexpr float tvModelScale=1.32f;
-        const float tvScreenWidth=1.218f*tvModelScale;
+        const float tvScreenWidth=2.0f*(halfW-.015f-tvRenderX);
+        const float tvModelScaleX=tvScreenWidth/1.218f;
         const float tvScreenHeight=.685f*tvModelScale;
         const float tvScreenCenterY=floorY+.984f*tvModelScale;
         const bool tvStream=settings_.screenDestination=="tv"||settings_.screenDestination=="both";
         const GLuint tvTex=(tvStream&&hasVideo)?videoTexture:env;
         if(tvModel_.loaded()) {
             const float tvPlacement[16]={
-                -tvModelScale,0,0,0, 0,tvModelScale,0,0, 0,0,-tvModelScale,0,
+                -tvModelScaleX,0,0,0, 0,tvModelScale,0,0, 0,0,-tvModelScale,0,
                 tvRenderX,floorY,tvZ,1
             };
             tvModel_.draw(pv.data(),tvPlacement,locMvp_,locModel_,locColor_,locTextured_,
@@ -3521,7 +3537,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
             const auto bezel=rgb(.012f,.016f,.027f);
             const auto stand=rgb(.17f,.20f,.27f);
             drawGroundShadow(pv.data(),tvRenderX,floorY+.004f,tvZ+.05f,
-                             1.72f*tvModelScale,.92f*tvModelScale,.34f);
+                             tvScreenWidth,.92f*tvModelScale,.34f);
             drawRoundedBox(pv.data(),tvRenderX,floorY+1.10f*tvModelScale,tvZ+.045f,
                            1.52f*tvModelScale,.91f*tvModelScale,.105f*tvModelScale,bezel,0.0f,5);
             drawRoundedBox(pv.data(),tvRenderX,floorY+1.10f*tvModelScale,tvZ-.013f,
