@@ -2,6 +2,7 @@
 #include <GLES3/gl3.h>
 #include <android/asset_manager.h>
 #include <array>
+#include <cstdint>
 #include <string>
 #include <vector>
 
