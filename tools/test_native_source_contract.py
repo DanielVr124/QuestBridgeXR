@@ -354,6 +354,8 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("pointerMenuIndex=pointerMonitorCount==2?0:pointerMonitorCount/2", renderer)
         self.assertIn("handleMenuInput(float horizontal,float vertical,float adjust,bool selectPressed,int selectionDirection)", renderer)
         self.assertIn("selectionDirection<0?-1:1", renderer)
+        self.assertIn("const float rowHitTolerance=menuPage_==4?.0115f", renderer)
+        self.assertIn("(menuPage_==3?.0155f:(menuPage_==1?.0145f:.019f))", renderer)
         self.assertIn("settings_.monitorCount=std::clamp(settings_.monitorCount+direction,1,3)", renderer)
         self.assertIn("drawPlane(pv.data(),x,y,menuZ+.002f,w,h,0,tint)", renderer)
         self.assertIn("chairCasterYaw_", renderer)
