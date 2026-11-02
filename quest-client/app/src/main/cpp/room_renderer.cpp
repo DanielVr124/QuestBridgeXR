@@ -2399,10 +2399,7 @@ void RoomRenderer::drawEnvironmentWindow(const float* pv,float wallX,float cente
     const float sillY=windowY-windowH*.5f-.065f;
     rounded(0,sillY,.12f,windowW+.24f,.085f,.25f,frame,5);
     rounded(0,sillY-.10f,.075f,windowW+.12f,.13f,.09f,sash,5);
-    if(activeEnvironmentIndex_==29) {
-        box(0,windowY+windowH*.5f+.018f,.086f,windowW*.96f,.009f,.012f,rgb(.12f,.30f,1.0f),7);
-        box(0,windowY-windowH*.5f-.018f,.086f,windowW*.96f,.008f,.010f,rgb(.58f,.10f,1.0f),7);
-    }
+    
     const auto brass=rgb(.62f,.47f,.23f);
     for(int side : {-1,1}) {
         const auto p=point(side*(windowW*.5f-.10f),sillY+.075f,.225f);
@@ -3672,6 +3669,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 panel(bodyX,envRows[row],bodyWidth,.030f,menuSelection_==row?selected:card);
                 label(envTitles[row],bodyX-.184f,envRows[row]+.002f,.00138f,white);
                 label(envValues[row].c_str(),bodyX+.060f,envRows[row]+.002f,.00132f,row==5?cyan:blue);
+                if(row==1||row==3) {
+                    label("−",bodyX+.169f,envRows[row]+.002f,.00170f,muted);
+                    label("+",bodyX+.190f,envRows[row]+.002f,.00170f,cyan);
+                }
             }
             if(environmentDropdownOpen_) {
                 // Exactly two destinations; the large, flat rows are also the pointer hit targets.
@@ -3766,6 +3767,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                     label(titles[row],bodyX-.184f,rows[row]+.003f,.00148f,white);
                     label(values[row].c_str(),bodyX+.060f,rows[row]+.003f,.00140f,
                           row==5?(zone.enabled?green:amber):blue);
+                    if(row==0||row==4) {
+                        label("−",bodyX+.169f,rows[row]+.003f,.00170f,muted);
+                        label("+",bodyX+.190f,rows[row]+.003f,.00170f,cyan);
+                    }
                 }
                 const auto primary=zone.primary;
                 const auto secondary=zone.gradient?zone.secondary:zone.primary;
@@ -3801,6 +3806,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
                 label(chairTitles[row],bodyX-.184f,chairRows[row]+.002f,.00134f,white);
                 label(chairValues[row].c_str(),bodyX+.060f,chairRows[row]+.002f,.00132f,
                       row==0&&sittingActive_?green:blue);
+                if(row>=1&&row<=3) {
+                    label("−",bodyX+.169f,chairRows[row]+.002f,.00170f,muted);
+                    label("+",bodyX+.190f,chairRows[row]+.002f,.00170f,cyan);
+                }
             }
             label("RIGHT GRIP + STICK: HEIGHT   LEFT GRIP: RECLINE",bodyX-.184f,menuY-.171f,.00102f,muted);
         }
