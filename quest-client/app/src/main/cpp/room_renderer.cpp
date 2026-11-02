@@ -2679,7 +2679,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
             const float monitorX=deskX-.34f;
             const float monitorZ=deskZ-.31f;
             constexpr float pointerArcRadius=1.95f;
-            const float pointerArcStep=2.0f*std::asin(.606f/(2.0f*pointerArcRadius));
+            const float pointerArcStep=2.0f*std::atan(.606f/(2.0f*pointerArcRadius));
             const int pointerMenuIndex=pointerMonitorCount==2?0:pointerMonitorCount/2;
             const float pointerMenuArc=(static_cast<float>(pointerMenuIndex)-(pointerMonitorCount-1)*.5f)*pointerArcStep;
             const float pointerMenuX=monitorX+pointerArcRadius*std::sin(pointerMenuArc);
@@ -3395,7 +3395,7 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     const bool streamOn=settings_.screenDestination=="monitor"||
                         settings_.screenDestination=="both";
     constexpr float monitorArcRadius=1.95f;
-    const float monitorArcStep=2.0f*std::asin(.606f/(2.0f*monitorArcRadius));
+    const float monitorArcStep=2.0f*std::atan(.606f/(2.0f*monitorArcRadius));
     for(int screen=0;screen<monitorCount;++screen) {
         const float arcIndex=static_cast<float>(screen)-(monitorCount-1)*.5f;
         const float angle=arcIndex*monitorArcStep;
