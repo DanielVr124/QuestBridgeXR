@@ -406,7 +406,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("p.backrestPart=backrestPart", glb_source)
         self.assertIn("p.seatLiftPart=seatLiftPart", glb_source)
         self.assertIn('std::strcmp(mesh->name,"chair_chrome")==0', glb_source)
-        self.assertIn("centerY>.30f?movingSupportIndices:fixedBaseIndices", glb_source)
+        self.assertIn("centerY>.30f&&std::fabs(centerX)>.10f", glb_source)
         self.assertIn("!isFixedBase(p.nodeName)||p.seatLiftPart", glb_source)
         self.assertIn("const float hingeY=.52f+seatLiftMeters,hingeZ=.155f", glb_source)
         self.assertIn("sn=-std::sin(backrestReclineRadians)", glb_source)
