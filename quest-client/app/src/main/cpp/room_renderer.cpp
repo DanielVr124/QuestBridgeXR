@@ -2961,8 +2961,8 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         for(int segment=0;segment<segments;++segment) {
             const float t=(static_cast<float>(segment)+0.5f)/static_cast<float>(segments);
             const auto color=ledZoneColor(zone,t);
-            drawBox(pv.data(),x-sx*.5f+segmentWidth*(segment+.5f),y,z,
-                    segmentWidth*1.08f,sy,sz,rgb(color[0],color[1],color[2]),0.0f,7);
+            drawRoundedBox(pv.data(),x-sx*.5f+segmentWidth*(segment+.5f),y,z,
+                           segmentWidth*1.18f,sy,sz,rgb(color[0],color[1],color[2]),0.0f,7);
         }
     };
     auto drawGradientBarY=[&](int zone,float x,float y,float z,float sx,float sy,float sz,int segments=24) {
@@ -2971,8 +2971,18 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
         for(int segment=0;segment<segments;++segment) {
             const float t=(static_cast<float>(segment)+0.5f)/static_cast<float>(segments);
             const auto color=ledZoneColor(zone,t);
-            drawBox(pv.data(),x,y-sy*.5f+segmentHeight*(segment+.5f),z,
-                    sx,segmentHeight*1.08f,sz,rgb(color[0],color[1],color[2]),0.0f,7);
+            drawRoundedBox(pv.data(),x,y-sy*.5f+segmentHeight*(segment+.5f),z,
+                           sx,segmentHeight*1.18f,sz,rgb(color[0],color[1],color[2]),0.0f,7);
+        }
+    };
+    auto drawGradientBarZ=[&](int zone,float x,float y,float z,float sx,float sy,float sz,int segments=24) {
+        if(zone<0||zone>=static_cast<int>(ledZones_.size())||!ledZones_[static_cast<size_t>(zone)].enabled) return;
+        const float segmentDepth=sz/static_cast<float>(segments);
+        for(int segment=0;segment<segments;++segment) {
+            const float t=(static_cast<float>(segment)+0.5f)/static_cast<float>(segments);
+            const auto color=ledZoneColor(zone,t);
+            drawRoundedBox(pv.data(),x,y,z-sz*.5f+segmentDepth*(segment+.5f),
+                           sx,sy,segmentDepth*1.18f,rgb(color[0],color[1],color[2]),0.0f,7);
         }
     };
     std::array<float,4> wall = rgb(.14f,.17f,.25f);
@@ -3056,10 +3066,10 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     glUniform1f(locCeilingLightIntensity_,1.02f*roomLightScale);
     glUniform3f(locPracticalLightPosition_,-halfW+0.30f,floorY+1.92f,-1.45f);
     glUniform3f(locPracticalLightColor_,ledLeftLamp[0],ledLeftLamp[1],ledLeftLamp[2]);
-    glUniform1f(locPracticalLightIntensity_,ledZones_[5].enabled?0.68f*roomLightScale:0.0f);
+    glUniform1f(locPracticalLightIntensity_,0.0f);
     glUniform3f(locPracticalLight2Position_,halfW-0.30f,floorY+1.92f,-1.45f);
     glUniform3f(locPracticalLight2Color_,ledRightLamp[0],ledRightLamp[1],ledRightLamp[2]);
-    glUniform1f(locPracticalLight2Intensity_,ledZones_[6].enabled?0.68f*roomLightScale:0.0f);
+    glUniform1f(locPracticalLight2Intensity_,0.0f);
     glUniform3f(locHeadboardGlowPosition_,halfW-2.0f+.20f,floorY+1.43f,-halfD+2.10f-1.22f);
     glUniform3f(locHeadboardGlowColor_,ledHeadboard[0],ledHeadboard[1],ledHeadboard[2]);
     glUniform1f(locHeadboardGlowIntensity_,ledZones_[0].enabled?1.72f*roomLightScale:0.0f);
@@ -3292,33 +3302,41 @@ void RoomRenderer::renderEye(int eyeIndex,int width,int height,const XrView& vie
     drawGroundShadow(pv.data(),deskX,floorY+0.004f,deskZ,2.70f,1.02f,.38f);
     drawGroundShadow(pv.data(),plantX,floorY+0.004f,plantZ,.62f,.64f,.24f);
 
-    const float trimY = floorY + 3.72f;
-    // Recessed RGB coves sit inside a dark ceiling reveal; the cores are truly emissive.
-    drawRoundedBox(pv.data(),0,trimY,0,halfW*1.66f,.050f,.075f,trimDark,0.0f,5);
-    drawGradientBar(1,0,trimY-.030f,0,halfW*1.53f,.012f,.022f,32);
-    // Individually controlled left/right and rear room accents.
-    for(int segment=0;segment<24;++segment) {
-        const float z=-halfD*.82f+(segment+.5f)*(halfD*1.64f/24.0f);
-        const auto left=ledZoneColor(2,(segment+.5f)/24.0f);
-        const auto right=ledZoneColor(3,(segment+.5f)/24.0f);
-        drawBox(pv.data(),-halfW+.12f,trimY-.08f,z,.020f,.022f,halfD*1.65f/24.0f,
-                rgb(left[0],left[1],left[2]),0.0f,7);
-        drawBox(pv.data(),halfW-.12f,trimY-.08f,z,.020f,.022f,halfD*1.65f/24.0f,
-                rgb(right[0],right[1],right[2]),0.0f,7);
-    }
-    drawGradientBar(4,0,trimY-.08f,-halfD+.14f,halfW*1.60f,.020f,.022f,32);
-    // Vertical bars are recessed into the side-wall reveals, rather than floating props.
-    for(int side : {-1,1}) {
-        for(int bar=0;bar<3;++bar) {
-            const float z=-1.8f+bar*1.65f;
-            const int zone=side<0?2:3;
-            drawBox(pv.data(),side*(halfW-.16f),floorY+2.45f,z,.055f,1.28f,.10f,trimDark,0.0f,5);
-            for(int segment=0;segment<12;++segment) {
-                const float t=(segment+.5f)/12.0f;
-                const auto tint=ledZoneColor(zone,t);
-                drawBox(pv.data(),side*(halfW-.125f),floorY+2.45f-.91f*.5f+.91f*t,z,
-                        .010f,.91f/12.0f*1.08f,.026f,
-                        rgb(tint[0],tint[1],tint[2]),0.0f,7);
+    // Continuous recessed LED channels now run around the ceiling and floor perimeter.
+    // Rounded diffusers overlap slightly so they read as smooth strips, not detached cubes.
+    const float ceilingLedY=ceilingY-.145f;
+    const float floorLedY=floorY+.030f;
+    const float ledWidth=halfW*2.0f-.34f;
+    const float ledDepth=halfD*2.0f-.34f;
+    const float frontLedZ=frontZ-.17f,backLedZ=backZ+.17f;
+    const float leftLedX=-halfW+.17f,rightLedX=halfW-.17f;
+    const float ledThickness=.022f,ledHeight=.026f;
+    auto ledChannelX=[&](float y,float z,int zone) {
+        drawRoundedBox(pv.data(),0,y,z,ledWidth,.045f,.060f,trimDark,0.0f,5);
+        drawGradientBar(zone,0,y,z,ledWidth,ledThickness,ledHeight,32);
+    };
+    auto ledChannelZ=[&](float x,float y,int zone) {
+        drawRoundedBox(pv.data(),x,y,0,.060f,.045f,ledDepth,trimDark,0.0f,5);
+        drawGradientBarZ(zone,x,y,0,ledThickness,ledHeight,ledDepth,32);
+    };
+    // Ceiling perimeter: one continuous colour zone wraps all four corners.
+    ledChannelX(ceilingLedY,frontLedZ,1);
+    ledChannelX(ceilingLedY,backLedZ,1);
+    ledChannelZ(leftLedX,ceilingLedY,1);
+    ledChannelZ(rightLedX,ceilingLedY,1);
+    // Floor perimeter is independently editable by edge.
+    ledChannelX(floorLedY,frontLedZ,4);
+    ledChannelX(floorLedY,backLedZ,5);
+    ledChannelZ(leftLedX,floorLedY,2);
+    ledChannelZ(rightLedX,floorLedY,3);
+    // Soft, rounded corner junctions visually connect both legs of each channel.
+    for(float y : {ceilingLedY,floorLedY}) {
+        for(float x : {leftLedX,rightLedX}) {
+            for(float z : {frontLedZ,backLedZ}) {
+                const int zone=y>floorY+1.0f?1:(z>0.0f?4:5);
+                const auto tint=ledZoneColor(zone,.5f);
+                drawSphere(pv.data(),x,y,z,.024f,.024f,.024f,
+                           rgb(tint[0],tint[1],tint[2]),7);
             }
         }
     }
