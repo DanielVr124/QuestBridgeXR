@@ -261,7 +261,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("menuWorldPoint(x,localZ)", renderer)
         self.assertIn("void RoomRenderer::handleMenuInput", renderer)
         self.assertIn("label(settingsTabs[i]", renderer)
-        self.assertIn("const float tvX=bedX, tvZ=bedZ+bedDepth*.5f+.85f;", renderer)
+        self.assertIn("const float tvX=bedX, tvZ=bedCenterZ+bedDepth*.5f+.85f;", renderer)
         self.assertIn("tvModel_.draw(pv.data(),tvPlacement", renderer)
         self.assertIn("drawPlane(pv.data(),tvX", renderer)
         self.assertNotIn("DESK CHAIR", renderer)
