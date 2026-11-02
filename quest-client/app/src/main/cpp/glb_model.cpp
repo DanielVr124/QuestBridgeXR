@@ -129,7 +129,7 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
             }
             if(src->type!=cgltf_primitive_type_triangles) continue;
 
-            auto uploadPart=[&](const std::vector<uint32_t>& sourceIndices,bool backrestPart) {
+            auto uploadPart=[&](const std::vector<uint32_t>& sourceIndices,bool backrestPart,bool seatLiftPart=false) {
                 if(sourceIndices.empty()) return;
                 // Compact vertices per articulated part so the GPU buffers contain
                 // only its triangles. The seat and wheels remain separate and static.
@@ -159,6 +159,7 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
                 glBindVertexArray(0);
                 p.indexCount=static_cast<GLsizei>(partIndices.size()); p.indexed=true;
                 p.backrestPart=backrestPart;
+                p.seatLiftPart=seatLiftPart;
                 p.sourceMeshIndex=static_cast<uint32_t>(mi);
                 p.sourcePrimitiveIndex=static_cast<uint32_t>(pi);
                 if(src->material) {
@@ -175,6 +176,7 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
             const bool chairAsset=std::strstr(assetPath,"white_gaming_chair.glb")!=nullptr;
             const bool splitBackrest=chairAsset&&mesh->name&&
                 (std::strcmp(mesh->name,"chair_wl")==0||std::strcmp(mesh->name,"chair_piping")==0);
+            const bool splitChrome=chairAsset&&mesh->name&&std::strcmp(mesh->name,"chair_chrome")==0;
             if(splitBackrest) {
                 std::vector<uint32_t> seatIndices,backrestIndices;
                 seatIndices.reserve(indices.size());
@@ -190,6 +192,18 @@ bool GlbModel::load(AAssetManager* assets,const char* assetPath) {
                 }
                 uploadPart(seatIndices,false);
                 uploadPart(backrestIndices,true);
+            } else if(splitChrome) {
+                std::vector<uint32_t> fixedBaseIndices,movingSupportIndices;
+                fixedBaseIndices.reserve(indices.size());
+                movingSupportIndices.reserve(indices.size()/3);
+                for(size_t tri=0;tri+2<indices.size();tri+=3) {
+                    const uint32_t a=indices[tri],b=indices[tri+1],c=indices[tri+2];
+                    const float centerY=(positions[a*3+1]+positions[b*3+1]+positions[c*3+1])/3.0f;
+                    auto& bucket=centerY>.30f?movingSupportIndices:fixedBaseIndices;
+                    bucket.push_back(a);bucket.push_back(b);bucket.push_back(c);
+                }
+                uploadPart(fixedBaseIndices,false,false);
+                uploadPart(movingSupportIndices,false,true);
             } else {
                 uploadPart(indices,false);
             }
@@ -278,7 +292,7 @@ void GlbModel::draw(const float* pv,const float* placement,GLint locMvp,GLint lo
             float scaled[16];multiply(bodyScale,nodeTransform,scaled);
             std::copy(scaled,scaled+16,nodeTransform);
         }
-        if(!isFixedBase(p.nodeName) && std::fabs(seatLiftMeters)>0.0001f) {
+        if((!isFixedBase(p.nodeName)||p.seatLiftPart) && std::fabs(seatLiftMeters)>0.0001f) {
             float lifted[16]; multiply(lift,nodeTransform,lifted);
             std::copy(lifted,lifted+16,nodeTransform);
         }
