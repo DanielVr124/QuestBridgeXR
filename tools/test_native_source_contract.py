@@ -255,7 +255,7 @@ class NativeSourceContractTests(unittest.TestCase):
         self.assertIn("windowY+windowH*.12f", renderer)
         self.assertIn("Three brass hinges and a backplate/lever", renderer)
         self.assertIn("drawRoundedBox(pv.data(),doorX,doorY,doorZ", renderer)
-        self.assertIn("menuZ=monitorZ+.003f", renderer)
+        self.assertIn("menuZ=menuScreenZ+.003f", renderer)
         self.assertIn("void RoomRenderer::handleMenuInput", renderer)
         self.assertIn("label(settingsTabs[i]", renderer)
         self.assertIn("const float tvX=bedX, tvZ=bedZ+bedDepth*.5f+.85f;", renderer)
