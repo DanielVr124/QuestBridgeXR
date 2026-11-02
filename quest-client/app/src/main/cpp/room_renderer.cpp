@@ -2757,21 +2757,37 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
             const float pointerMenuX=monitorX+pointerArcRadius*std::sin(pointerMenuArc);
             const float pointerMenuZ=monitorZ+pointerArcRadius*(1.0f-std::cos(pointerMenuArc));
             const float menuY=settings_.floorOffsetY+1.03f;
-            if(menuPointerDirection[2]<-.08f) {
-                const float menuWidth=.606f;
-                const float hitSurfaceZ=pointerMenuZ+.003f;
-                const float t=(hitSurfaceZ-pointerOrigin[2])/menuPointerDirection[2];
-                const float hitX=pointerOrigin[0]+menuPointerDirection[0]*t;
+            const float pointerMenuYaw=-pointerMenuArc;
+            const float pointerCos=std::cos(pointerMenuYaw),pointerSin=std::sin(pointerMenuYaw);
+            const float originDeltaX=pointerOrigin[0]-pointerMenuX;
+            const float originDeltaZ=pointerOrigin[2]-pointerMenuZ;
+            const float localOriginX=pointerCos*originDeltaX-pointerSin*originDeltaZ;
+            const float localOriginZ=pointerSin*originDeltaX+pointerCos*originDeltaZ;
+            const float localDirectionX=pointerCos*menuPointerDirection[0]-pointerSin*menuPointerDirection[2];
+            const float localDirectionZ=pointerSin*menuPointerDirection[0]+pointerCos*menuPointerDirection[2];
+            if(localDirectionZ<-.08f) {
+                constexpr float menuWidth=.606f,menuCurve=.029f;
+                float t=(.003f-localOriginZ)/localDirectionZ;
+                float hitLocalX=0.0f,hitLocalY=0.0f,hitSurfaceLocalZ=.003f;
+                for(int iteration=0;iteration<4;++iteration) {
+                    hitLocalX=localOriginX+localDirectionX*t;
+                    const float normalized=std::clamp(hitLocalX/(menuWidth*.5f),-1.0f,1.0f);
+                    hitSurfaceLocalZ=.003f+menuCurve*normalized*normalized;
+                    t=(hitSurfaceLocalZ-localOriginZ)/localDirectionZ;
+                }
+                const float hitLocalZ=hitSurfaceLocalZ-.003f;
+                const float hitX=pointerMenuX+pointerCos*hitLocalX+pointerSin*hitLocalZ;
                 const float hitY=pointerOrigin[1]+menuPointerDirection[1]*t;
+                const float hitZ=pointerMenuZ-pointerSin*hitLocalX+pointerCos*hitLocalZ;
                 if(t>.02f&&t<8.0f) {
                     menuPointerOrigin_=pointerOrigin;
-                    menuPointerHit_={hitX,hitY,hitSurfaceZ+.002f};
-                    menuPointerValid_=hitX>=pointerMenuX-menuWidth*.5f&&hitX<=pointerMenuX+menuWidth*.5f&&
+                    menuPointerHit_={hitX,hitY,hitZ+.002f};
+                    menuPointerValid_=hitLocalX>=-menuWidth*.5f&&hitLocalX<=menuWidth*.5f&&
                                       hitY>=menuY-.170f&&hitY<=menuY+.170f;
                     if(menuPointerValid_&&triggerPressed&&!previousMenuPointerTrigger_) {
-                        const float navX=pointerMenuX-.216f;
-                        const float bodyX=pointerMenuX+.063f;
-                        if(std::fabs(hitX-navX)<.067f) {
+                        const float navX=-.216f;
+                        const float bodyX=.063f;
+                        if(std::fabs(hitLocalX-navX)<.067f) {
                             if(std::fabs(hitY-(menuY+.061f))<.018f) {
                                 menuPage_=0;menuSelection_=0;
                             } else if(std::fabs(hitY-(menuY+.015f))<.018f) {
@@ -2784,7 +2800,7 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
                             }
                             environmentDropdownOpen_=false;
                             lightingColorPickerOpen_=false;
-                        } else if(environmentDropdownOpen_&&hitX>bodyX-.155f&&hitX<bodyX+.225f) {
+                        } else if(environmentDropdownOpen_&&hitLocalX>bodyX-.155f&&hitLocalX<bodyX+.225f) {
                             if(std::fabs(hitY-(menuY+.018f))<.020f) {
                                 selectRoomScene(0);
                                 environmentDropdownOpen_=false;
@@ -2793,18 +2809,18 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
                                 environmentDropdownOpen_=false;
                             }
                         } else if(menuPage_==3&&lightingColorPickerOpen_&&
-                                  hitX>bodyX+.125f&&hitY<menuY-.105f) {
+                                  hitLocalX>bodyX+.125f&&hitY<menuY-.105f) {
                             lightingColorPickerOpen_=false;
                         } else if(menuPage_==3&&lightingColorPickerOpen_&&
                                   hitY>menuY-.112f&&hitY<menuY-.082f&&
-                                  hitX>bodyX+.105f&&hitX<bodyX+.315f) {
-                            lightingPickerValue_=std::clamp((hitX-(bodyX+.105f))/.210f,.04f,1.0f);
+                                  hitLocalX>bodyX+.105f&&hitLocalX<bodyX+.315f) {
+                            lightingPickerValue_=std::clamp((hitLocalX-(bodyX+.105f))/.210f,.04f,1.0f);
                             const auto picked=hsvToRgb(lightingPickerHue_,lightingPickerSaturation_,lightingPickerValue_);
                             auto& zone=ledZones_[static_cast<size_t>(lightingZoneIndex_)];
                             if(lightingColorTarget_==0) zone.primary=picked; else zone.secondary=picked;
                         } else if(menuPage_==3&&lightingColorPickerOpen_&&
-                                  hitX<bodyX+.165f&&hitY>menuY-.075f&&hitY<menuY+.055f) {
-                            const float dx=hitX-(bodyX+.095f);
+                                  hitLocalX<bodyX+.165f&&hitY>menuY-.075f&&hitY<menuY+.055f) {
+                            const float dx=hitLocalX-(bodyX+.095f);
                             const float dy=hitY-(menuY-.008f);
                             const float radius=std::sqrt(dx*dx+dy*dy);
                             if(radius>.010f) {
@@ -2835,9 +2851,9 @@ void RoomRenderer::handleRoomInteraction(const XrPosef& controllerAimPose,const 
                                 (menuPage_==3?.0155f:(menuPage_==1?.0145f:.019f));
                             if(rows) for(int i=0;i<count;++i)
                                 if(std::fabs(hitY-(menuY+rows[i]))<rowHitTolerance){selection=i;break;}
-                            if(selection>=0&&hitX>=bodyX-.205f&&hitX<=bodyX+.215f) {
+                            if(selection>=0&&hitLocalX>=bodyX-.205f&&hitLocalX<=bodyX+.215f) {
                                 menuSelection_=selection;
-                                handleMenuInput(0.0f,0.0f,0.0f,true,hitX<bodyX+.18f?-1:1);
+                                handleMenuInput(0.0f,0.0f,0.0f,true,hitLocalX<bodyX+.18f?-1:1);
                             }
                         }
                     }
