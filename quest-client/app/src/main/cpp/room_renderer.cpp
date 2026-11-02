@@ -2474,10 +2474,9 @@ void RoomRenderer::updateLocomotion(float leftX,float leftY,float rightStickX,fl
     const float deskX=-halfW+1.32f+.04f, deskZ=-halfD+.56f;
     const float chairX=deskX+chairOffsetX_, chairZ=deskZ+1.12f+chairOffsetZ_;
     if(chairFacingPending_&&sittingActive_) {
-        // Capture the user's current forward heading when sitting down.
-        const auto& q=headPose.orientation;
-        chairFacingYaw_=std::atan2(2.0f*(q.w*q.y+q.x*q.z),
-                                   1.0f-2.0f*(q.y*q.y+q.x*q.x));
+        // Capture the user's actual room-space forward heading, including any
+        // virtual turn already applied before sitting down.
+        chairFacingYaw_=headYaw(headPose)+virtualYaw_;
         chairFacingPending_=false;
     }
     if(sitAnchorPending_) {
